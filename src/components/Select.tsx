@@ -9,10 +9,11 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   options: Option[];
   requiredMark?: boolean;
   placeholder?: string | null;
+  hint?: string;
 };
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, options, className, requiredMark = false, placeholder, ...props }, ref) => {
+  ({ label, error, options, className, requiredMark = false, placeholder, hint, ...props }, ref) => {
   const resolvedPlaceholder = placeholder === null ? undefined : (placeholder ?? (label ? `Select ${label}` : undefined));
   const hasEmptyOption = options.some((option) => String(option.value) === "");
   const computedOptions =
@@ -21,9 +22,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       : options;
 
   return (
-    <label className="block">
+    <label className="block space-y-2">
       {label ? (
-        <span className="mb-2 block text-sm font-semibold text-slate-100">
+        <span className="block text-sm font-semibold text-slate-100">
           {label}
           {requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}
         </span>
@@ -32,7 +33,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           className={clsx(
-            "w-full appearance-none rounded-2xl border bg-slate-950/90 px-4 py-3 pr-12 text-sm font-medium text-slate-50 outline-none transition focus:border-cyan-300/60 focus:bg-slate-900/95",
+            "w-full appearance-none rounded-[var(--radius-control)] border bg-[var(--panel-strong)] px-4 py-3 pr-12 text-sm font-medium text-slate-50 outline-none transition focus:border-sky-300/50 focus:bg-slate-900/98 focus:ring-2 focus:ring-sky-300/20",
             error ? "border-rose-400/60" : "border-white/10",
             className
           )}
@@ -46,7 +47,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         </select>
         <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
       </div>
-      {error ? <span className="mt-2 block text-xs text-rose-300">{error}</span> : null}
+      {error ? <span className="block text-xs text-rose-300">{error}</span> : hint ? <span className="block text-xs text-slate-400">{hint}</span> : null}
     </label>
   );
 });

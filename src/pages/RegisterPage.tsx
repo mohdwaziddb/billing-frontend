@@ -22,13 +22,7 @@ export const RegisterPage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
-  const {
-    message: error,
-    fieldErrors,
-    clearFeedback,
-    clearFieldError,
-    applyApiError
-  } = useApiFormFeedback();
+  const { message: error, fieldErrors, clearFeedback, clearFieldError, applyApiError } = useApiFormFeedback();
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -57,12 +51,12 @@ export const RegisterPage = () => {
 
   return (
     <div className="noise flex min-h-screen items-center justify-center px-4 py-10">
-      <GlassCard className="w-full max-w-5xl rounded-[2rem] p-8 md:p-10">
+      <GlassCard className="w-full max-w-5xl p-8 md:p-10">
         <div className="mb-8">
-          <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/70">Launch your workspace</p>
+          <p className="text-sm uppercase tracking-[0.35em] text-sky-200/70">Create your workspace</p>
           <h1 className="mt-4 text-4xl font-extrabold text-white">Register your company</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-300/70">
-            Create a premium billing environment. Backend validation stays authoritative for auth and billing.
+            Set up your billing workspace and administrator account with backend validation for security and access.
           </p>
         </div>
 
@@ -72,7 +66,13 @@ export const RegisterPage = () => {
               key={key}
               label={label}
               requiredMark={requiredMark}
-              type={key.toLowerCase().includes("password") ? "password" : key.toLowerCase().includes("email") ? "email" : "text"}
+              type={
+                key.toLowerCase().includes("password")
+                  ? "password"
+                  : key.toLowerCase().includes("email")
+                    ? "email"
+                    : "text"
+              }
               value={form[key]}
               error={fieldErrors[key]}
               onChange={(event) => {
@@ -82,14 +82,14 @@ export const RegisterPage = () => {
               }}
             />
           ))}
-          {error ? <p className="md:col-span-2 text-sm text-rose-300">{error}</p> : null}
+          {error ? <div className="md:col-span-2 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{error}</div> : null}
           <div className="md:col-span-2 flex flex-col gap-4 pt-2 md:flex-row md:items-center md:justify-between">
             <Button disabled={loading} type="submit">
               {loading ? "Creating workspace..." : "Register company"}
             </Button>
             <p className="text-sm text-slate-300/75">
               Already have access?{" "}
-              <Link className="font-semibold text-cyan-200" to="/login">
+              <Link className="font-semibold text-sky-200" to="/login">
                 Back to login
               </Link>
             </p>

@@ -28,25 +28,25 @@ export const Sidebar = () => {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="glass flex w-full flex-col rounded-[2rem] p-5 lg:h-full">
-      <div className="mb-8 rounded-3xl border border-white/10 bg-white/5 p-5">
+    <aside className="glass flex w-full flex-col rounded-[var(--radius-panel)] p-4 md:p-5 lg:min-h-[calc(100vh-2rem)]">
+      <div className="mb-6 rounded-[28px] border border-white/10 bg-white/5 p-5">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-gradient-to-br from-cyan-300/20 to-emerald-300/20 p-3">
-            <ReceiptText className="text-cyan-100" size={22} />
+          <div className="rounded-2xl bg-gradient-to-br from-sky-400/20 to-cyan-300/10 p-3">
+            <ReceiptText className="text-sky-100" size={22} />
           </div>
           <div>
-            <p className="text-sm uppercase tracking-[0.35em] text-cyan-200/70">NovaBill</p>
-            <h2 className="text-2xl font-extrabold gradient-text">Revenue OS</h2>
+            <p className="text-xs uppercase tracking-[0.4em] text-sky-200/70">NovaBill</p>
+            <h2 className="text-2xl font-extrabold tracking-tight gradient-text">Billing Suite</h2>
           </div>
         </div>
         <div className="mt-6 text-sm text-slate-300/80">
           <p className="font-semibold text-white">{user?.fullName}</p>
-          <p>{user?.role.replaceAll("_", " ")}</p>
+          <p className="mt-1 text-slate-400">{user?.role.replace(/_/g, " ")}</p>
           <p className="mt-2 text-slate-400">{user?.company?.name ?? "Platform Access"}</p>
         </div>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-2">
+      <nav className="flex flex-1 flex-col gap-1.5">
         {navItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -54,10 +54,10 @@ export const Sidebar = () => {
             end={end}
             className={({ isActive }) =>
               [
-                "neon-border rounded-2xl px-4 py-3 text-sm font-semibold transition flex items-center gap-3",
+                "rounded-[22px] px-4 py-3 text-sm font-semibold transition flex items-center gap-3",
                 isActive
-                  ? "bg-gradient-to-r from-cyan-400/25 to-emerald-300/15 text-white border border-white/15"
-                  : "border border-transparent text-slate-300/80 hover:bg-white/8 hover:text-white"
+                  ? "neon-border border border-sky-300/20 bg-sky-400/14 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  : "border border-transparent text-slate-300/80 hover:bg-white/6 hover:text-white"
               ].join(" ")
             }
           >
@@ -68,7 +68,7 @@ export const Sidebar = () => {
       </nav>
 
       <button
-        className="mt-6 flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300/80 transition hover:bg-white/8 hover:text-white"
+        className="mt-6 flex min-h-11 items-center gap-3 rounded-[22px] border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300/80 transition hover:bg-white/6 hover:text-white"
         onClick={() => void logout()}
       >
         <LogOut size={18} />

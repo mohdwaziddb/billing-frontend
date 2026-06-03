@@ -2,20 +2,21 @@ import { Search, ShoppingBag } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { createCustomer, getCustomerByMobile } from "../api/customers";
-import { createInvoice, getInvoices } from "../api/invoices";
+import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from "../api/customers";
+import { createInvoice } from "../api/invoices";
 import { getProducts } from "../api/products";
 import { Button } from "../components/Button";
-import { Header } from "../components/Header";
 import { GlassCard } from "../components/GlassCard";
+import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { Select } from "../components/Select";
+import { StatusBadge } from "../components/StatusBadge";
+import { Table } from "../components/Table";
+import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
-import { useApiFormFeedback } from "../hooks/useApiFeedback";
-import { useApiMessage } from "../hooks/useApiFeedback";
-import type { Customer, CustomerRequest, Invoice, InvoiceRequest, Product } from "../types/api";
+import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, Product } from "../types/api";
 
 type FormValues = {
   customerId: string;
@@ -36,7 +37,7 @@ export const CreateInvoicePage = () => {
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [purchaseHistory, setPurchaseHistory] = useState<Invoice[]>([]);
+  const [purchaseHistory, setPurchaseHistory] = useState<CustomerPurchaseHistory | null>(null);
   const { message: serverError, clearMessage, setApiError } = useApiMessage();
   const {
     message: customerCreateError,
@@ -90,10 +91,13 @@ export const CreateInvoicePage = () => {
       return sum + product.sellingPrice * Number(item.qty || 0);
     }, 0);
   }, [products, watchItems]);
+  const selectedLineCount = watchItems.filter((item) => item.productId).length;
+  const selectedQuantity = watchItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
 
   const lookupCustomerByMobile = async () => {
     clearMessage();
     setSelectedCustomer(null);
+    setPurchaseHistory(null);
     setValue("customerId", "");
 
     const mobile = customerMobile.trim();
@@ -175,8 +179,8 @@ export const CreateInvoicePage = () => {
     setHistoryOpen(true);
     setHistoryLoading(true);
     try {
-      const invoices = await getInvoices({ customerId: selectedCustomer.id });
-      setPurchaseHistory(invoices);
+      const history = await getCustomerPurchaseHistory(selectedCustomer.id);
+      setPurchaseHistory(history);
     } catch (err: any) {
       setApiError(err, "Unable to load purchase history");
     } finally {
@@ -206,12 +210,15 @@ export const CreateInvoicePage = () => {
   };
 
   return (
-    <div className="space-y-4">
-      <Header title="Create invoice" subtitle="Find customers by mobile number, inspect purchase history, and submit invoice data while the backend remains the final authority for totals, tax, balance, and stock reduction." />
-      <div className="grid gap-4 xl:grid-cols-[1fr_0.38fr]">
-        <GlassCard className="p-6">
+    <div className="space-y-4 pb-6">
+      <Header
+        title="Create invoice"
+        subtitle="Search customers by mobile, review purchase history, and submit invoice items through a focused billing workflow."
+      />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <GlassCard className="p-6 md:p-7">
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_160px]">
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
               <Input
                 label="Customer Mobile Number"
                 requiredMark
@@ -237,27 +244,47 @@ export const CreateInvoicePage = () => {
             <input type="hidden" {...register("customerId", { required: "Customer is required" })} />
 
             {selectedCustomer ? (
-              <div className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="rounded-[26px] border border-sky-300/20 bg-sky-400/10 p-4 md:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-cyan-100/70">Selected customer</p>
+                    <p className="text-xs uppercase tracking-[0.3em] text-sky-100/70">Selected customer</p>
                     <h3 className="mt-2 text-xl font-bold text-white">{selectedCustomer.name}</h3>
                     <p className="mt-1 text-sm text-slate-300/80">{selectedCustomer.mobile}</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Total Purchase</p>
+                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.totalPurchaseAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Total Paid</p>
+                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.totalPaidAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Discount Given</p>
+                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.totalDiscountGiven)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Outstanding Balance</p>
+                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.outstandingBalance)}</p>
+                      </div>
+                    </div>
                   </div>
-                  <Button type="button" variant="ghost" onClick={() => void openPurchaseHistory()}>
-                    <ShoppingBag size={16} />
-                    Purchase History
-                  </Button>
+                  {selectedCustomer.hasPurchaseHistory ? (
+                    <Button type="button" variant="ghost" onClick={() => void openPurchaseHistory()}>
+                      <ShoppingBag size={16} />
+                      View Purchase History
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ) : null}
 
             {showNewCustomerForm && !selectedCustomer ? (
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-4 md:p-5">
+              <div className="rounded-[26px] border border-white/10 bg-white/5 p-4 md:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-400">New customer</p>
-                    <h3 className="mt-2 text-lg font-bold text-white">Add Customer for This Invoice</h3>
+                    <h3 className="mt-2 text-lg font-bold text-white">Add customer for this invoice</h3>
                   </div>
                   <Button type="button" variant="ghost" onClick={() => setShowNewCustomerForm(false)}>
                     Close
@@ -265,59 +292,16 @@ export const CreateInvoicePage = () => {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input
-                    label="Customer Name"
-                    requiredMark
-                    error={customerCreateFieldErrors.name}
-                    value={newCustomer.name}
-                    onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))}
-                  />
-                  <Input
-                    label="Mobile Number"
-                    requiredMark
-                    error={customerCreateFieldErrors.mobile}
-                    value={newCustomer.mobile}
-                    onChange={(event) => setNewCustomer((current) => ({ ...current, mobile: event.target.value }))}
-                  />
-                  <Input
-                    label="Email Address"
-                    type="email"
-                    error={customerCreateFieldErrors.email}
-                    value={newCustomer.email}
-                    onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))}
-                  />
-                  <Input
-                    label="GST Number"
-                    error={customerCreateFieldErrors.gstNo}
-                    value={newCustomer.gstNo}
-                    onChange={(event) => setNewCustomer((current) => ({ ...current, gstNo: event.target.value }))}
-                  />
-                  <Input
-                    label="Address"
-                    className="md:col-span-2"
-                    error={customerCreateFieldErrors.address}
-                    value={newCustomer.address}
-                    onChange={(event) => setNewCustomer((current) => ({ ...current, address: event.target.value }))}
-                  />
-                  <Input
-                    label="Opening Balance"
-                    type="number"
-                    step="0.01"
-                    error={customerCreateFieldErrors.openingBalance}
-                    value={newCustomer.openingBalance}
-                    onChange={(event) => setNewCustomer((current) => ({ ...current, openingBalance: event.target.value }))}
-                  />
-                  <Input
-                    label="Credit Limit"
-                    type="number"
-                    step="0.01"
-                    error={customerCreateFieldErrors.creditLimit}
-                    value={newCustomer.creditLimit}
-                    onChange={(event) => setNewCustomer((current) => ({ ...current, creditLimit: event.target.value }))}
-                  />
+                  <Input label="Customer Name" requiredMark error={customerCreateFieldErrors.name} value={newCustomer.name} onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))} />
+                  <Input label="Mobile Number" requiredMark error={customerCreateFieldErrors.mobile} value={newCustomer.mobile} onChange={(event) => setNewCustomer((current) => ({ ...current, mobile: event.target.value }))} />
+                  <Input label="Email Address" type="email" error={customerCreateFieldErrors.email} value={newCustomer.email} onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))} />
+                  <Input label="GST Number" error={customerCreateFieldErrors.gstNo} value={newCustomer.gstNo} onChange={(event) => setNewCustomer((current) => ({ ...current, gstNo: event.target.value }))} />
+                  <Input label="Address" className="md:col-span-2" error={customerCreateFieldErrors.address} value={newCustomer.address} onChange={(event) => setNewCustomer((current) => ({ ...current, address: event.target.value }))} />
+                  <Input label="Opening Balance" type="number" step="0.01" error={customerCreateFieldErrors.openingBalance} value={newCustomer.openingBalance} onChange={(event) => setNewCustomer((current) => ({ ...current, openingBalance: event.target.value }))} />
+                  <Input label="Credit Limit" type="number" step="0.01" error={customerCreateFieldErrors.creditLimit} value={newCustomer.creditLimit} onChange={(event) => setNewCustomer((current) => ({ ...current, creditLimit: event.target.value }))} />
                 </div>
 
-                {customerCreateError ? <p className="mt-4 text-sm text-rose-300">{customerCreateError}</p> : null}
+                {customerCreateError ? <div className="mt-4 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{customerCreateError}</div> : null}
 
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Button type="button" disabled={creatingCustomer} onClick={() => void handleCreateCustomer()}>
@@ -333,14 +317,14 @@ export const CreateInvoicePage = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-xl font-bold text-white">Invoice items</h2>
                 <Button type="button" variant="secondary" onClick={() => append({ productId: "", qty: "", discountPercent: "" })}>
                   Add item
                 </Button>
               </div>
               {fields.map((field, index) => (
-                <div key={field.id} className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                <div key={field.id} className="rounded-[26px] border border-white/10 bg-white/5 p-4">
                   <div className="grid gap-4 md:grid-cols-4">
                     <Select
                       label="Product"
@@ -362,58 +346,106 @@ export const CreateInvoicePage = () => {
               ))}
             </div>
 
-            {serverError ? <p className="text-sm text-rose-300">{serverError}</p> : null}
-            <Button disabled={isSubmitting} type="submit">{isSubmitting ? "Submitting..." : "Create invoice"}</Button>
+            {serverError ? <div className="rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{serverError}</div> : null}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button disabled={isSubmitting} type="submit">{isSubmitting ? "Submitting..." : "Create invoice"}</Button>
+              <Button type="button" variant="ghost" onClick={() => navigate("/invoices")}>Back to invoices</Button>
+            </div>
           </form>
         </GlassCard>
 
-        <GlassCard className="p-6">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Preview only</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">UI estimate</h2>
-          <p className="mt-3 text-sm text-slate-300/70">
-            This card is only for rough display. Final subtotal, tax, stock impact, balance, and payment status always come from the backend.
-          </p>
+        <GlassCard className="h-fit p-6 md:p-7">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Invoice context</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">Submission summary</h2>
+          <p className="mt-3 text-sm text-slate-300/70">Review the selected customer and invoice composition before submitting to the backend.</p>
           <div className="mt-6 space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-slate-400">Approximate line subtotal</p>
+            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <p className="text-sm text-slate-400">Customer</p>
+              <p className="mt-2 text-lg font-bold text-white">{selectedCustomer?.name ?? "No customer selected"}</p>
+              <p className="mt-1 text-sm text-slate-400">{selectedCustomer?.mobile ?? "Search by mobile to continue."}</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Selected lines</p>
+                <p className="mt-2 text-2xl font-bold text-white">{selectedLineCount}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Total quantity</p>
+                <p className="mt-2 text-2xl font-bold text-white">{selectedQuantity}</p>
+              </div>
+            </div>
+            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <p className="text-sm text-slate-400">Estimated line subtotal</p>
               <p className="mt-2 text-2xl font-bold text-white">{formatCurrency(previewSubtotal)}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-400">Final totals, tax, discounts, stock adjustments, and balances are computed after validation.</p>
             </div>
-            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">
-              Backend will validate customer status, stock, tax, discounts, total, and balance after submission.
-            </div>
+            {selectedCustomer ? (
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Customer summary</p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <p className="text-slate-300">Total Purchase: <span className="font-semibold text-white">{formatCurrency(selectedCustomer.totalPurchaseAmount)}</span></p>
+                  <p className="text-slate-300">Total Paid: <span className="font-semibold text-white">{formatCurrency(selectedCustomer.totalPaidAmount)}</span></p>
+                  <p className="text-slate-300">Discount Given: <span className="font-semibold text-white">{formatCurrency(selectedCustomer.totalDiscountGiven)}</span></p>
+                  <p className="text-slate-300">Outstanding Balance: <span className="font-semibold text-rose-200">{formatCurrency(selectedCustomer.outstandingBalance)}</span></p>
+                </div>
+              </div>
+            ) : null}
           </div>
         </GlassCard>
       </div>
 
       <Modal
         open={historyOpen}
-        title={selectedCustomer ? `${selectedCustomer.name} Purchase History` : "Purchase History"}
+        title={purchaseHistory ? `${purchaseHistory.customerName} Purchase History` : "Purchase History"}
         onClose={() => setHistoryOpen(false)}
       >
         {historyLoading ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">
-            Loading purchase history...
-          </div>
-        ) : purchaseHistory.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">
-            No purchase history found for this customer.
-          </div>
+          <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">Loading purchase history...</div>
+        ) : !purchaseHistory || purchaseHistory.invoices.length === 0 ? (
+          <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">No purchase history found for this customer.</div>
         ) : (
-          <div className="max-h-[460px] space-y-3 overflow-auto pr-1 scrollbar-thin">
-            {purchaseHistory.map((invoice) => (
-              <div key={invoice.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-semibold text-white">{invoice.invoiceNo}</p>
-                    <p className="text-sm text-slate-400">{formatDate(invoice.invoiceDate)}</p>
-                  </div>
-                  <div className="text-left md:text-right">
-                    <p className="font-semibold text-cyan-100">{formatCurrency(invoice.totalAmount)}</p>
-                    <p className="text-xs text-slate-400">{invoice.paymentStatus}</p>
-                  </div>
-                </div>
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Customer Name</p>
+                <p className="mt-2 font-semibold text-white">{purchaseHistory.customerName}</p>
+                <p className="mt-1 text-sm text-slate-400">{purchaseHistory.mobile}</p>
               </div>
-            ))}
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Address</p>
+                <p className="mt-2 font-semibold text-white">{purchaseHistory.address ?? "--"}</p>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Total Purchase</p>
+                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(purchaseHistory.summary.totalPurchaseAmount)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Total Paid</p>
+                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(purchaseHistory.summary.totalPaidAmount)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Total Discount</p>
+                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(purchaseHistory.summary.totalDiscountGiven)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Outstanding Balance</p>
+                <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(purchaseHistory.summary.outstandingBalance)}</p>
+              </div>
+            </div>
+            <Table
+              data={purchaseHistory.invoices}
+              columns={[
+                { key: "invoice", header: "Invoice Number", render: (item) => <span className="font-semibold text-white">{item.invoiceNo}</span> },
+                { key: "date", header: "Invoice Date", render: (item) => formatDate(item.invoiceDate) },
+                { key: "total", header: "Total Amount", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.totalAmount)}</span> },
+                { key: "discount", header: "Discount", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.discountAmount)}</span> },
+                { key: "paid", header: "Paid Amount", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.paidAmount)}</span> },
+                { key: "pending", header: "Pending Amount", className: "text-right", render: (item) => <span className="block text-right text-rose-200">{formatCurrency(item.balanceAmount)}</span> },
+                { key: "status", header: "Payment Status", render: (item) => <StatusBadge label={item.paymentStatus} /> }
+              ]}
+            />
           </div>
         )}
       </Modal>

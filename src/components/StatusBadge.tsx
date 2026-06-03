@@ -19,7 +19,7 @@ export const StatusBadge = ({ label }: { label: string }) => {
           "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
       )}
     >
-      {label.replaceAll("_", " ")}
+      {label.replace(/_/g, " ")}
     </span>
   );
 };

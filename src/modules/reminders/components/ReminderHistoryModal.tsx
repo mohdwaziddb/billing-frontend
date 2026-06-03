@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { getReminderHistory } from "../reminder.api";
-import type { ReminderHistoryItem } from "../reminder.types";
 import { Modal } from "../../../components/Modal";
-import { Table } from "../../../components/Table";
 import { StatusBadge } from "../../../components/StatusBadge";
+import { Table } from "../../../components/Table";
 import { formatCurrency } from "../../../lib/currency";
 import { formatDateTime } from "../../../lib/format";
+import { getReminderHistory } from "../reminder.api";
+import type { ReminderHistoryItem } from "../reminder.types";
 
 export const ReminderHistoryModal = ({
   customerId,
@@ -32,9 +32,9 @@ export const ReminderHistoryModal = ({
   }, [open, customerId]);
 
   return (
-    <Modal open={open} title={`Reminder History • ${customerName}`} onClose={onClose}>
+    <Modal open={open} title={`Reminder history - ${customerName}`} onClose={onClose}>
       {loading ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-slate-300/75">
+        <div className="rounded-[24px] border border-white/10 bg-white/5 p-6 text-sm text-slate-300/75">
           Loading reminder history...
         </div>
       ) : (
@@ -44,9 +44,18 @@ export const ReminderHistoryModal = ({
           columns={[
             { key: "channel", header: "Channel", render: (item) => item.channel },
             { key: "status", header: "Status", render: (item) => <StatusBadge label={item.status} /> },
-            { key: "amount", header: "Amount", render: (item) => formatCurrency(item.amount) },
+            {
+              key: "amount",
+              header: "Amount",
+              className: "text-right",
+              render: (item) => <span className="block text-right">{formatCurrency(item.amount)}</span>
+            },
             { key: "sentAt", header: "Created At", render: (item) => formatDateTime(item.createdAt) },
-            { key: "message", header: "Message", render: (item) => <span className="max-w-md text-sm text-slate-300/80">{item.message}</span> }
+            {
+              key: "message",
+              header: "Message",
+              render: (item) => <span className="max-w-md text-sm text-slate-300/80">{item.message}</span>
+            }
           ]}
         />
       )}

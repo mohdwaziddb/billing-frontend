@@ -3,26 +3,66 @@
 @tailwind utilities;
 
 :root {
-  font-family: "Manrope", sans-serif;
-  color: #f8fafc;
+  font-family: "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", sans-serif;
+  color: #e2e8f0;
   background:
-    radial-gradient(circle at top left, rgba(56, 189, 248, 0.28), transparent 32%),
-    radial-gradient(circle at 85% 10%, rgba(244, 114, 182, 0.18), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.18), transparent 28%),
-    linear-gradient(135deg, #020617 0%, #07111f 48%, #0f172a 100%);
+    radial-gradient(circle at top left, rgba(30, 64, 175, 0.22), transparent 30%),
+    radial-gradient(circle at 82% 8%, rgba(8, 145, 178, 0.14), transparent 24%),
+    linear-gradient(180deg, #071120 0%, #0b1729 52%, #0f1b2e 100%);
+  --app-bg: #09111f;
+  --panel-bg: rgba(9, 17, 31, 0.82);
+  --panel-strong: rgba(11, 23, 40, 0.96);
+  --panel-soft: rgba(255, 255, 255, 0.045);
+  --panel-border: rgba(148, 163, 184, 0.18);
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #f43f5e;
+  --shadow-panel: 0 24px 80px rgba(2, 6, 23, 0.28);
+  --radius-panel: 28px;
+  --radius-control: 18px;
+}
+
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  color: #f8fafc;
+  overflow-x: hidden;
+  color: var(--text-secondary);
+  background: var(--app-bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 input,
 select,
 textarea {
-  color: #f8fafc;
-  caret-color: #f8fafc;
+  color: var(--text-primary);
+  caret-color: var(--text-primary);
+  font: inherit;
+}
+
+button {
+  font: inherit;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(56, 189, 248, 0.28);
+  color: #ffffff;
 }
 
 select {
@@ -73,15 +113,17 @@ select:-webkit-autofill {
 }
 
 .glass {
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.35);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--shadow-panel);
 }
 
 .gradient-text {
-  background: linear-gradient(90deg, #67e8f9 0%, #a7f3d0 50%, #fda4af 100%);
+  background: linear-gradient(90deg, #dbeafe 0%, #7dd3fc 55%, #38bdf8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -92,11 +134,11 @@ select:-webkit-autofill {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  opacity: 0.2;
+  opacity: 0.18;
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-size: 28px 28px;
 }
 
 .neon-border {
@@ -110,7 +152,7 @@ select:-webkit-autofill {
   pointer-events: none;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(103, 232, 249, 0.6), rgba(167, 243, 208, 0.3), rgba(244, 114, 182, 0.45));
+  background: linear-gradient(135deg, rgba(125, 211, 252, 0.55), rgba(56, 189, 248, 0.18), rgba(148, 163, 184, 0.22));
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
@@ -138,4 +180,8 @@ select:-webkit-autofill {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.35);
   border-radius: 999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
 }

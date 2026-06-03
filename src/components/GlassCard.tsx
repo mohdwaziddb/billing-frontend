@@ -8,5 +8,5 @@ export const GlassCard = ({
   children: ReactNode;
   className?: string;
 }) => {
-  return <div className={clsx("glass rounded-3xl", className)}>{children}</div>;
+  return <div className={clsx("glass rounded-[var(--radius-panel)]", className)}>{children}</div>;
 };

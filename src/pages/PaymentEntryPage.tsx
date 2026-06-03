@@ -88,12 +88,16 @@ export const PaymentEntryPage = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-6">
       <Header
         title="Payment entry"
-        subtitle="Record collections against customers and invoices while the backend validates balances and updates payment status."
+        subtitle="Record customer collections and map them to invoices with consistent validation and clean form layout."
       />
-      <GlassCard className="max-w-3xl p-6">
+      <GlassCard className="mx-auto max-w-4xl p-6 md:p-8">
+        <div className="mb-6">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Payment form</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">Record a payment</h2>
+        </div>
         <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
           <Select
             label="Customer"
@@ -103,7 +107,13 @@ export const PaymentEntryPage = () => {
             options={customers.map((customer) => ({ label: customer.name, value: customer.id }))}
             {...register("customerId", { required: "Customer is required" })}
           />
-          <Select label="Invoice" placeholder="Select Invoice" options={invoiceOptions} {...register("invoiceId")} />
+          <Select
+            label="Invoice"
+            placeholder="Select Invoice"
+            hint="Optional if you are recording an unapplied customer payment."
+            options={invoiceOptions}
+            {...register("invoiceId")}
+          />
           <Input
             label="Amount"
             requiredMark
@@ -134,8 +144,8 @@ export const PaymentEntryPage = () => {
             {...register("mode")}
           />
           <Input label="Remarks" className="md:col-span-2" {...register("remarks")} />
-          {serverError ? <p className="md:col-span-2 text-sm text-rose-300">{serverError}</p> : null}
-          {successMessage ? <p className="md:col-span-2 text-sm text-emerald-300">{successMessage}</p> : null}
+          {serverError ? <div className="md:col-span-2 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{serverError}</div> : null}
+          {successMessage ? <div className="md:col-span-2 rounded-[24px] border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">{successMessage}</div> : null}
           <div className="md:col-span-2">
             <Button disabled={isSubmitting} type="submit">
               {isSubmitting ? "Saving..." : "Add payment"}

@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { deleteProduct, getProducts } from "../api/products";
 import { Button } from "../components/Button";
-import { Header } from "../components/Header";
 import { GlassCard } from "../components/GlassCard";
+import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
-import { formatCurrency } from "../lib/currency";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { formatCurrency } from "../lib/currency";
 import type { Product } from "../types/api";
 
 export const ProductListPage = () => {
@@ -19,8 +19,7 @@ export const ProductListPage = () => {
   const { message: error, clearMessage, setApiError } = useApiMessage();
 
   const loadProducts = async () => {
-    const active =
-      statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
+    const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
     setProducts(await getProducts({ search: search.trim() || undefined, active }));
   };
 
@@ -39,9 +38,12 @@ export const ProductListPage = () => {
   }, [statusFilter]);
 
   return (
-    <div className="space-y-4">
-      <Header title="Product catalog" subtitle="Manage pricing, tax percentages, stock depth, and low-stock risk in a polished inventory workspace." />
-      <GlassCard className="p-6">
+    <div className="space-y-4 pb-6">
+      <Header
+        title="Products"
+        subtitle="Manage pricing, stock depth, tax settings, and product availability from a structured catalog view."
+      />
+      <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
@@ -52,7 +54,7 @@ export const ProductListPage = () => {
               <Button>Add product</Button>
             </Link>
           </div>
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px_140px]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
             <Input
               label="Search Product"
               placeholder="Enter Product Name or SKU"
@@ -83,14 +85,50 @@ export const ProductListPage = () => {
             </div>
           </div>
         </div>
-        {error ? <p className="mb-4 text-sm text-rose-300">{error}</p> : null}
+        {error ? (
+          <div className="mb-4 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
+            {error}
+          </div>
+        ) : null}
         <Table
           data={products}
+          emptyText="No products match the current filters."
           columns={[
-            { key: "product", header: "Product", render: (item) => <div><p className="font-semibold text-white">{item.name}</p><p className="text-xs text-slate-400">{item.sku}</p></div> },
+            {
+              key: "product",
+              header: "Product",
+              render: (item) => (
+                <div className="min-w-[180px]">
+                  <p className="font-semibold text-white">{item.name}</p>
+                  <p className="text-xs text-slate-400">{item.sku}</p>
+                </div>
+              )
+            },
             { key: "brand", header: "Brand / Category", render: (item) => `${item.brand ?? "--"} / ${item.category ?? "--"}` },
-            { key: "price", header: "Selling Price", render: (item) => formatCurrency(item.sellingPrice) },
-            { key: "stock", header: "Stock", render: (item) => <span className={item.stockQty <= item.minStockQty ? "text-amber-200" : "text-white"}>{item.stockQty}</span> },
+            {
+              key: "price",
+              header: "Selling Price",
+              className: "text-right",
+              render: (item) => (
+                <span className="block text-right font-semibold text-white">
+                  {formatCurrency(item.sellingPrice)}
+                </span>
+              )
+            },
+            {
+              key: "stock",
+              header: "Stock",
+              className: "text-right",
+              render: (item) => (
+                <span
+                  className={`block text-right font-semibold ${
+                    item.stockQty <= item.minStockQty ? "text-amber-200" : "text-white"
+                  }`}
+                >
+                  {item.stockQty}
+                </span>
+              )
+            },
             { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
             {
               key: "actions",

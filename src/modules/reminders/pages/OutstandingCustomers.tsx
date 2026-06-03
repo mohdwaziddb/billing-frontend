@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { BellRing, Filter, History } from "lucide-react";
+import { useApiMessage } from "../../../hooks/useApiFeedback";
+import { formatCurrency } from "../../../lib/currency";
+import { formatDate, formatDateTime } from "../../../lib/format";
 import { Button } from "../../../components/Button";
 import { GlassCard } from "../../../components/GlassCard";
 import { Header } from "../../../components/Header";
@@ -7,15 +10,11 @@ import { Input } from "../../../components/Input";
 import { Select } from "../../../components/Select";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
-import { formatCurrency } from "../../../lib/currency";
-import { formatDate, formatDateTime } from "../../../lib/format";
-import { useApiMessage } from "../../../hooks/useApiFeedback";
-import { getOverdueCustomers, sendReminder } from "../reminder.api";
 import { ReminderHistoryModal } from "../components/ReminderHistoryModal";
+import { getOverdueCustomers, sendReminder } from "../reminder.api";
 import type { OverdueCustomer, ReminderChannel } from "../reminder.types";
 
 const channelOptions = [
-  { label: "MOCK", value: "MOCK" },
   { label: "SMS", value: "SMS" },
   { label: "WHATSAPP", value: "WHATSAPP" },
   { label: "EMAIL", value: "EMAIL" }
@@ -30,13 +29,11 @@ export const OutstandingCustomersReminderPage = () => {
     search: "",
     minBalance: "",
     overdueDays: "",
-    channel: "MOCK" as ReminderChannel
+    channel: "SMS" as ReminderChannel
   });
   const [historyTarget, setHistoryTarget] = useState<{ id: number; name: string } | null>(null);
 
-  const loadCustomers = async (
-    nextFilters: typeof filters = filters
-  ) => {
+  const loadCustomers = async (nextFilters: typeof filters = filters) => {
     setLoading(true);
     clearMessage();
     try {
@@ -76,10 +73,10 @@ export const OutstandingCustomersReminderPage = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-6">
       <Header
         title="Outstanding reminders"
-        subtitle="Search overdue customers, review due balances, and trigger secure reminder attempts that are generated and logged entirely by the backend."
+        subtitle="Search overdue customers, review due balances, and trigger reminder workflows that are logged by the backend."
       />
 
       {errorToast ? (
@@ -94,9 +91,9 @@ export const OutstandingCustomersReminderPage = () => {
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-        <GlassCard className="p-6">
+        <GlassCard className="p-6 md:p-7">
           <div className="mb-5 flex items-center gap-3">
-            <Filter className="text-cyan-100" size={18} />
+            <Filter className="text-sky-100" size={18} />
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder filters</p>
               <h2 className="mt-2 text-2xl font-bold text-white">Find due customers</h2>
@@ -127,7 +124,9 @@ export const OutstandingCustomersReminderPage = () => {
               placeholder="Select Reminder Channel"
               options={channelOptions.map((item) => ({ label: item.label, value: item.value }))}
               value={filters.channel}
-              onChange={(event) => setFilters((current) => ({ ...current, channel: event.target.value as ReminderChannel }))}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, channel: event.target.value as ReminderChannel }))
+              }
             />
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
@@ -135,7 +134,12 @@ export const OutstandingCustomersReminderPage = () => {
             <Button
               variant="ghost"
               onClick={() => {
-                const resetFilters = { search: "", minBalance: "", overdueDays: "", channel: "MOCK" as ReminderChannel };
+                const resetFilters = {
+                  search: "",
+                  minBalance: "",
+                  overdueDays: "",
+                  channel: "SMS" as ReminderChannel
+                };
                 setFilters(resetFilters);
                 void loadCustomers(resetFilters);
               }}
@@ -145,20 +149,20 @@ export const OutstandingCustomersReminderPage = () => {
           </div>
         </GlassCard>
 
-        <GlassCard className="p-6">
+        <GlassCard className="p-6 md:p-7">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder overview</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-400">Outstanding customers</p>
               <p className="mt-3 text-3xl font-extrabold text-white">{customers.length}</p>
             </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+            <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-400">Total due amount</p>
               <p className="mt-3 text-3xl font-extrabold text-white">{formatCurrency(outstandingTotal)}</p>
             </div>
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 md:col-span-2">
+            <div className="rounded-[26px] border border-white/10 bg-white/5 p-5 md:col-span-2">
               <p className="text-sm text-slate-400">Selected reminder channel</p>
-              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-semibold text-cyan-100">
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-400/10 px-4 py-2 text-sm font-semibold text-sky-100">
                 <BellRing size={16} />
                 {filters.channel}
               </div>
@@ -167,14 +171,14 @@ export const OutstandingCustomersReminderPage = () => {
         </GlassCard>
       </div>
 
-      <GlassCard className="p-6">
+      <GlassCard className="p-6 md:p-7">
         <div className="mb-5">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder candidates</p>
           <h2 className="mt-2 text-2xl font-bold text-white">Overdue customers table</h2>
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-slate-300/75">
+          <div className="rounded-[24px] border border-white/10 bg-white/5 p-6 text-sm text-slate-300/75">
             Loading overdue customers...
           </div>
         ) : (
@@ -186,13 +190,22 @@ export const OutstandingCustomersReminderPage = () => {
                 key: "customer",
                 header: "Customer",
                 render: (item) => (
-                  <div>
+                  <div className="min-w-[180px]">
                     <p className="font-semibold text-white">{item.customerName}</p>
                     <p className="text-xs text-slate-400">{item.mobile}</p>
                   </div>
                 )
               },
-              { key: "balance", header: "Balance", render: (item) => <span className="font-semibold text-rose-200">{formatCurrency(item.currentBalance)}</span> },
+              {
+                key: "balance",
+                header: "Balance",
+                className: "text-right",
+                render: (item) => (
+                  <span className="block text-right font-semibold text-rose-200">
+                    {formatCurrency(item.currentBalance)}
+                  </span>
+                )
+              },
               { key: "overdue", header: "Overdue Days", render: (item) => item.overdueDays },
               { key: "oldest", header: "Oldest Due", render: (item) => formatDate(item.oldestOutstandingInvoiceDate) },
               {

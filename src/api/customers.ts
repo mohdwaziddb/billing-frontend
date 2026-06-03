@@ -3,6 +3,7 @@ import type {
   ApiResponse,
   Customer,
   CustomerLedger,
+  CustomerPurchaseHistory,
   CustomerRequest
 } from "../types/api";
 
@@ -41,6 +42,11 @@ export const deleteCustomer = async (id: number) => {
 
 export const getCustomerLedger = async (id: number) => {
   const response = await apiClient.get<ApiResponse<CustomerLedger>>(`/v1/customers/${id}/ledger`);
+  return response.data.data;
+};
+
+export const getCustomerPurchaseHistory = async (id: number) => {
+  const response = await apiClient.get<ApiResponse<CustomerPurchaseHistory>>(`/v1/customers/${id}/purchase-history`);
   return response.data.data;
 };
 

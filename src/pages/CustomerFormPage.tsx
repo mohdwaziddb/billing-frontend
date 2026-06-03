@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { createCustomer, getCustomer, updateCustomer } from "../api/customers";
@@ -42,12 +42,7 @@ export const CustomerFormPage = () => {
       active: "true"
     }
   });
-  const {
-    message: serverError,
-    fieldErrors,
-    clearFeedback,
-    applyApiError
-  } = useApiFormFeedback();
+  const { message: serverError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
 
   useEffect(() => {
     if (!customerId) {
@@ -95,10 +90,10 @@ export const CustomerFormPage = () => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-6">
       <Header
         title={editing ? "Edit customer" : "Add customer"}
-        subtitle="Create clean customer records with clear fields, visible text, and backend-owned validation."
+        subtitle="Create and update customer records with clear validation, balanced spacing, and consistent controls."
       />
 
       <GlassCard className="mx-auto max-w-5xl p-6 md:p-8">
@@ -139,6 +134,7 @@ export const CustomerFormPage = () => {
           <div className="grid gap-4">
             <Input
               label="Address"
+              hint="Store the billing or communication address for this customer."
               error={fieldErrors.address ?? errors.address?.message}
               {...register("address")}
             />
@@ -177,7 +173,7 @@ export const CustomerFormPage = () => {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
             <Button disabled={isSubmitting} type="submit">
               {isSubmitting ? "Saving..." : editing ? "Update Customer" : "Create Customer"}
             </Button>

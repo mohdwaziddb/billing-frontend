@@ -5,6 +5,7 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
   error?: string;
   requiredMark?: boolean;
+  hint?: string;
 };
 
 const buildPlaceholder = (label?: string, placeholder?: string, type?: string) => {
@@ -20,11 +21,11 @@ const buildPlaceholder = (label?: string, placeholder?: string, type?: string) =
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className, requiredMark = false, placeholder, type, ...props }, ref) => {
+  ({ label, error, className, requiredMark = false, placeholder, type, hint, ...props }, ref) => {
   return (
-    <label className="block">
+    <label className="block space-y-2">
       {label ? (
-        <span className="mb-2 block text-sm font-semibold text-slate-100">
+        <span className="block text-sm font-semibold text-slate-100">
           {label}
           {requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}
         </span>
@@ -32,7 +33,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <input
         ref={ref}
         className={clsx(
-          "w-full rounded-2xl border bg-slate-950/85 px-4 py-3 text-sm font-medium text-slate-50 outline-none transition placeholder:text-slate-400 focus:border-cyan-300/60 focus:bg-slate-900/95",
+          "w-full rounded-[var(--radius-control)] border bg-[var(--panel-strong)] px-4 py-3 text-sm font-medium text-slate-50 outline-none transition placeholder:text-slate-500 focus:border-sky-300/50 focus:bg-slate-900/98 focus:ring-2 focus:ring-sky-300/20",
           error ? "border-rose-400/60" : "border-white/10",
           className
         )}
@@ -40,7 +41,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         type={type}
         {...props}
       />
-      {error ? <span className="mt-2 block text-xs text-rose-300">{error}</span> : null}
+      {error ? <span className="block text-xs text-rose-300">{error}</span> : hint ? <span className="block text-xs text-slate-400">{hint}</span> : null}
     </label>
   );
 });

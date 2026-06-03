@@ -4,12 +4,15 @@ import type {
   ApiResponse,
   CustomerDue,
   LowStockProduct,
+  OwnerAnalytics,
   SalesChartPoint,
   TopSellingProduct
 } from "../types/api";
 
-export const getAnalyticsSummary = async () => {
-  const response = await apiClient.get<ApiResponse<AnalyticsSummary>>("/v1/analytics/summary");
+export const getAnalyticsSummary = async (params?: { startDate?: string; endDate?: string }) => {
+  const response = await apiClient.get<ApiResponse<AnalyticsSummary>>("/v1/analytics/summary", {
+    params
+  });
   return response.data.data;
 };
 
@@ -44,6 +47,13 @@ export const getLowStockProducts = async (limit = 5) => {
 export const getCustomerDueList = async (limit = 10) => {
   const response = await apiClient.get<ApiResponse<CustomerDue[]>>("/v1/analytics/customer-due-list", {
     params: { limit }
+  });
+  return response.data.data;
+};
+
+export const getOwnerAnalytics = async (params?: { startDate?: string; endDate?: string }) => {
+  const response = await apiClient.get<ApiResponse<OwnerAnalytics>>("/v1/analytics/owner-overview", {
+    params
   });
   return response.data.data;
 };

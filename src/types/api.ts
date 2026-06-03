@@ -33,24 +33,68 @@ export type AuthPayload = {
 };
 
 export type DashboardSummary = {
+  startDate: string | null;
+  endDate: string | null;
+  totalSales: number;
+  totalCollection: number;
+  outstandingAmount: number;
+  newCustomers: number;
   totalInvoices: number;
   totalProducts: number;
   totalRevenue: number;
   outstandingBalance: number;
+  topCustomers: DashboardTopCustomer[];
+};
+
+export type DashboardTopCustomer = {
+  customerId: number;
+  customerName: string;
+  mobile: string;
+  totalPurchaseAmount: number;
+  totalPaidAmount: number;
+  outstandingBalance: number;
+  lastPurchaseDate: string | null;
 };
 
 export type TrendStatus = "UP" | "DOWN" | "FLAT";
 
 export type AnalyticsSummary = {
+  startDate: string | null;
+  endDate: string | null;
   todaySales: number;
   yesterdaySales: number;
   thisMonthSales: number;
   lastMonthSales: number;
+  totalSales: number;
+  totalCollection: number;
   totalOutstandingBalance: number;
+  newCustomers: number;
+  totalInvoices: number;
   lowStockProducts: number;
   dueCustomers: number;
   salesTrendPercentage: number;
   trendStatus: TrendStatus;
+};
+
+export type MetricPoint = {
+  label: string;
+  index: number;
+  value: number;
+};
+
+export type OwnerAnalytics = {
+  startDate: string;
+  endDate: string;
+  totalSales: number;
+  totalCollection: number;
+  outstandingAmount: number;
+  newCustomers: number;
+  totalInvoices: number;
+  salesTrend: MetricPoint[];
+  collectionTrend: MetricPoint[];
+  outstandingTrend: MetricPoint[];
+  customerGrowthTrend: MetricPoint[];
+  monthlyRevenue: MetricPoint[];
 };
 
 export type SalesChartPoint = {
@@ -96,6 +140,12 @@ export type Customer = {
   openingBalance: number;
   currentBalance: number;
   creditLimit: number;
+  totalPurchaseAmount: number;
+  totalPaidAmount: number;
+  totalDiscountGiven: number;
+  outstandingBalance: number;
+  lastPurchaseDate: string | null;
+  hasPurchaseHistory: boolean;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -131,6 +181,24 @@ export type CustomerLedger = {
   openingBalance: number;
   currentBalance: number;
   entries: LedgerEntry[];
+};
+
+export type CustomerSummaryMetrics = {
+  totalPurchaseAmount: number;
+  totalPaidAmount: number;
+  totalDiscountGiven: number;
+  outstandingBalance: number;
+  lastPurchaseDate: string | null;
+  hasPurchaseHistory: boolean;
+};
+
+export type CustomerPurchaseHistory = {
+  customerId: number;
+  customerName: string;
+  mobile: string;
+  address: string | null;
+  summary: CustomerSummaryMetrics;
+  invoices: Invoice[];
 };
 
 export type Product = {
@@ -182,6 +250,8 @@ export type Invoice = {
   invoiceNo: string;
   customerId: number;
   customerName: string;
+  customerMobile: string;
+  customerAddress: string | null;
   subtotal: number;
   taxAmount: number;
   discountAmount: number;
