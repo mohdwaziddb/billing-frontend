@@ -14,6 +14,7 @@ import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
+import { UserManagementPage } from "./pages/UserManagementPage";
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
           <Route path="/payments/new" element={<PaymentEntryPage />} />
           <Route path="/outstanding-customers" element={<OutstandingCustomersPage />} />
           <Route path="/sales-analytics" element={<SalesAnalyticsPage />} />
+          <Route path="/users" element={<UserManagementPage />} />
         </Route>
       </Route>
 

@@ -69,6 +69,14 @@ export const InvoiceDetailPage = () => {
               <p className="text-sm text-slate-400">Created by</p>
               <p className="mt-2 font-semibold text-white">{invoice?.createdBy ?? "--"}</p>
             </div>
+            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <p className="text-sm text-slate-400">Updated at</p>
+              <p className="mt-2 font-semibold text-white">{formatDateTime(invoice?.updatedAt)}</p>
+            </div>
+            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <p className="text-sm text-slate-400">Updated by</p>
+              <p className="mt-2 font-semibold text-white">{invoice?.updatedBy ?? "--"}</p>
+            </div>
           </div>
 
           <div className="mt-6 space-y-3">
@@ -98,7 +106,7 @@ export const InvoiceDetailPage = () => {
             </div>
           </div>
           <div className="mt-6">
-            <Link to="/payments/new">
+            <Link to={invoice ? `/payments/new?invoiceId=${invoice.id}` : "/payments/new"}>
               <Button>Record payment</Button>
             </Link>
           </div>

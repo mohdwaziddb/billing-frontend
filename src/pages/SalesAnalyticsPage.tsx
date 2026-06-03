@@ -1,5 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 import { getAnalyticsSummary, getCustomerDueList, getLowStockProducts, getOwnerAnalytics, getTopProducts } from "../api/analytics";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
@@ -49,6 +65,8 @@ const chartTooltip = {
   contentStyle: { background: "rgba(15,23,42,0.96)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16 }
 };
 
+const chartColors = ["#38bdf8", "#10b981", "#f97316", "#a78bfa", "#f43f5e"];
+
 export const SalesAnalyticsPage = () => {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [overview, setOverview] = useState<OwnerAnalytics | null>(null);
@@ -82,6 +100,26 @@ export const SalesAnalyticsPage = () => {
     }
     return `${lowStockProducts.length} product${lowStockProducts.length > 1 ? "s" : ""} already at or below threshold.`;
   }, [lowStockProducts]);
+
+  const salesVsPayments = useMemo(() => {
+    const collectionsByLabel = new Map((overview?.collectionTrend ?? []).map((point) => [point.label, point.value]));
+    return (overview?.salesTrend ?? []).map((point) => ({
+      label: point.label,
+      sales: point.value,
+      payments: collectionsByLabel.get(point.label) ?? 0
+    }));
+  }, [overview]);
+
+  const revenueMix = useMemo(() => {
+    const sales = overview?.totalSales ?? 0;
+    const collections = overview?.totalCollection ?? 0;
+    const outstanding = overview?.outstandingAmount ?? 0;
+    return [
+      { name: "Sales", value: sales },
+      { name: "Payments", value: collections },
+      { name: "Outstanding", value: outstanding }
+    ].filter((item) => item.value > 0);
+  }, [overview]);
 
   return (
     <div className="space-y-4 pb-6">
@@ -127,6 +165,48 @@ export const SalesAnalyticsPage = () => {
         <StatCard label="Invoices" value={String(overview?.totalInvoices ?? 0)} caption="Invoices issued during the selected date range." />
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <GlassCard className="p-6 md:p-7">
+          <div className="mb-5">
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Revenue mix</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">Sales, payments, and dues</h2>
+          </div>
+          <div className="h-80 min-w-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={revenueMix} dataKey="value" nameKey="name" innerRadius={68} outerRadius={110} paddingAngle={4}>
+                  {revenueMix.map((entry, index) => (
+                    <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                  ))}
+                </Pie>
+                <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
+                <Legend iconType="circle" wrapperStyle={{ color: "#cbd5e1", fontSize: 12 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-6 md:p-7">
+          <div className="mb-5">
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Sales vs payments</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">Collection performance</h2>
+          </div>
+          <div className="h-80 min-w-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={salesVsPayments}>
+                <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+                <XAxis dataKey="label" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
+                <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
+                <Legend wrapperStyle={{ color: "#cbd5e1", fontSize: 12 }} />
+                <Bar dataKey="sales" name="Sales" fill="#38bdf8" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="payments" name="Payments" fill="#10b981" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5 flex items-center justify-between gap-4">
@@ -138,13 +218,13 @@ export const SalesAnalyticsPage = () => {
           </div>
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={overview?.salesTrend ?? []}>
+              <AreaChart data={overview?.salesTrend ?? []}>
                 <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
                 <XAxis dataKey="label" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" />
                 <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
-                <Line type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={3} dot={false} />
-              </LineChart>
+                <Area type="monotone" dataKey="value" name="Sales" stroke="#38bdf8" strokeWidth={3} fill="#38bdf8" fillOpacity={0.18} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="mt-6 h-80 min-w-0">
@@ -198,13 +278,13 @@ export const SalesAnalyticsPage = () => {
           </div>
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={overview?.monthlyRevenue ?? []}>
+              <AreaChart data={overview?.monthlyRevenue ?? []}>
                 <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
                 <XAxis dataKey="label" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" />
                 <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
-                <Bar dataKey="value" fill="#0ea5e9" radius={[10, 10, 0, 0]} />
-              </BarChart>
+                <Area type="monotone" dataKey="value" name="Revenue" stroke="#0ea5e9" strokeWidth={3} fill="#0ea5e9" fillOpacity={0.2} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </GlassCard>

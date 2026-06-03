@@ -129,14 +129,15 @@ export const CustomerListPage = () => {
               key: "actions",
               header: "Actions",
               render: (item) => (
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="ghost" onClick={() => void getCustomerLedger(item.id).then(setSelectedLedger)}>
+                <div className="grid min-w-[230px] grid-cols-3 items-center gap-2">
+                  <Button className="w-full min-h-10 px-3" variant="ghost" onClick={() => void getCustomerLedger(item.id).then(setSelectedLedger)}>
                     Ledger
                   </Button>
-                  <Link to={`/customers/${item.id}/edit`}>
-                    <Button variant="secondary">Edit</Button>
+                  <Link className="block" to={`/customers/${item.id}/edit`}>
+                    <Button className="w-full min-h-10 px-3" variant="secondary">Edit</Button>
                   </Link>
                   <Button
+                    className="w-full min-h-10 px-3"
                     variant="danger"
                     onClick={() =>
                       void deleteCustomer(item.id)

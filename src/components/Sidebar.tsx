@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   ReceiptText,
+  ShieldCheck,
   Users,
   Wallet
 } from "lucide-react";
@@ -21,7 +22,8 @@ const navItems = [
   { to: "/invoices", label: "Invoices", icon: FileText, end: true },
   { to: "/payments/new", label: "Payments", icon: CreditCard, end: true },
   { to: "/outstanding-customers", label: "Outstanding", icon: Wallet, end: true },
-  { to: "/sales-analytics", label: "Analytics", icon: BarChart3, end: true }
+  { to: "/sales-analytics", label: "Analytics", icon: BarChart3, end: true },
+  { to: "/users", label: "Users", icon: ShieldCheck, end: true, ownerOnly: true }
 ];
 
 export const Sidebar = () => {
@@ -47,7 +49,7 @@ export const Sidebar = () => {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1.5">
-        {navItems.map(({ to, label, icon: Icon, end }) => (
+        {navItems.filter((item) => !item.ownerOnly || user?.role === "OWNER").map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
-import { createCustomer, getCustomer, updateCustomer } from "../api/customers";
+import { createCustomer, getCustomer, getCustomers, updateCustomer } from "../api/customers";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -42,7 +42,7 @@ export const CustomerFormPage = () => {
       active: "true"
     }
   });
-  const { message: serverError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
+  const { message: serverError, fieldErrors, setFieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
 
   useEffect(() => {
     if (!customerId) {
@@ -78,6 +78,28 @@ export const CustomerFormPage = () => {
     };
 
     try {
+      const existingCustomers = await getCustomers();
+      const currentId = editing ? Number(customerId) : null;
+      const mobileExists = existingCustomers.some(
+        (customer) => customer.id !== currentId && customer.mobile.trim().toLowerCase() === payload.mobile.toLowerCase()
+      );
+      const normalizedEmail = payload.email?.toLowerCase();
+      const emailExists = Boolean(normalizedEmail) && existingCustomers.some(
+        (customer) => customer.id !== currentId && (customer.email ?? "").trim().toLowerCase() === normalizedEmail
+      );
+
+      if (mobileExists || emailExists) {
+        const nextErrors: Record<string, string> = {};
+        if (mobileExists) {
+          nextErrors.mobile = "This phone number is already registered.";
+        }
+        if (emailExists) {
+          nextErrors.email = "This email address is already registered.";
+        }
+        setFieldErrors(nextErrors);
+        return;
+      }
+
       if (editing) {
         await updateCustomer(Number(customerId), payload);
       } else {

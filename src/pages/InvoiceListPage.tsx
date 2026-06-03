@@ -54,6 +54,8 @@ export const InvoiceListPage = () => {
             },
             { key: "mobile", header: "Mobile Number", render: (item) => item.customerMobile },
             { key: "date", header: "Invoice Date", render: (item) => formatDate(item.invoiceDate) },
+            { key: "createdBy", header: "Created By", render: (item) => item.createdBy ?? "--" },
+            { key: "updatedBy", header: "Updated By", render: (item) => item.updatedBy ?? "--" },
             {
               key: "total",
               header: "Amount",

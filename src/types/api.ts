@@ -5,7 +5,7 @@ export type ApiResponse<T> = {
   timestamp: string;
 };
 
-export type Role = "SUPER_ADMIN" | "COMPANY_ADMIN" | "STAFF";
+export type Role = "OWNER" | "ADMIN" | "USER";
 
 export type CompanySummary = {
   id: number;
@@ -21,6 +21,7 @@ export type UserProfile = {
   fullName: string;
   email: string;
   role: Role;
+  active: boolean;
   company: CompanySummary | null;
 };
 
@@ -261,7 +262,9 @@ export type Invoice = {
   paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
   invoiceDate: string;
   createdAt: string;
+  updatedAt: string;
   createdBy: string | null;
+  updatedBy: string | null;
   items: InvoiceItem[];
 };
 
@@ -301,4 +304,12 @@ export type PaymentRequest = {
   paymentDate: string;
   mode: PaymentMode;
   remarks?: string;
+};
+
+export type CompanyUserRequest = {
+  fullName: string;
+  email: string;
+  password?: string;
+  role: Role;
+  active: boolean;
 };

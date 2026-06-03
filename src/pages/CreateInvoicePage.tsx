@@ -1,4 +1,4 @@
-import { Search, ShoppingBag } from "lucide-react";
+import { Eye, Search, ShoppingBag } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +35,7 @@ export const CreateInvoicePage = () => {
   const [customerMobile, setCustomerMobile] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+  const [customerDetailsOpen, setCustomerDetailsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [purchaseHistory, setPurchaseHistory] = useState<CustomerPurchaseHistory | null>(null);
@@ -109,6 +110,7 @@ export const CreateInvoicePage = () => {
     try {
       const customer = await getCustomerByMobile(mobile);
       setSelectedCustomer(customer);
+      setCustomerDetailsOpen(false);
       setShowNewCustomerForm(false);
       setNewCustomer({
         name: customer.name,
@@ -160,6 +162,7 @@ export const CreateInvoicePage = () => {
     try {
       const createdCustomer = await createCustomer(payload);
       setSelectedCustomer(createdCustomer);
+      setCustomerDetailsOpen(false);
       setCustomerMobile(createdCustomer.mobile);
       setValue("customerId", String(createdCustomer.id), { shouldValidate: true });
       setShowNewCustomerForm(false);
@@ -245,36 +248,24 @@ export const CreateInvoicePage = () => {
 
             {selectedCustomer ? (
               <div className="rounded-[26px] border border-sky-300/20 bg-sky-400/10 p-4 md:p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-sky-100/70">Selected customer</p>
                     <h3 className="mt-2 text-xl font-bold text-white">{selectedCustomer.name}</h3>
                     <p className="mt-1 text-sm text-slate-300/80">{selectedCustomer.mobile}</p>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Total Purchase</p>
-                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.totalPurchaseAmount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Total Paid</p>
-                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.totalPaidAmount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Discount Given</p>
-                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.totalDiscountGiven)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-sky-100/70">Outstanding Balance</p>
-                        <p className="mt-1 font-semibold text-white">{formatCurrency(selectedCustomer.outstandingBalance)}</p>
-                      </div>
-                    </div>
                   </div>
-                  {selectedCustomer.hasPurchaseHistory ? (
-                    <Button type="button" variant="ghost" onClick={() => void openPurchaseHistory()}>
-                      <ShoppingBag size={16} />
-                      View Purchase History
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="ghost" className="min-h-10 px-3" onClick={() => setCustomerDetailsOpen(true)}>
+                      <Eye size={16} />
+                      View Details
                     </Button>
-                  ) : null}
+                    {selectedCustomer.hasPurchaseHistory ? (
+                      <Button type="button" variant="ghost" className="min-h-10 px-3" onClick={() => void openPurchaseHistory()}>
+                        <ShoppingBag size={16} />
+                        History
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -382,17 +373,91 @@ export const CreateInvoicePage = () => {
             {selectedCustomer ? (
               <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Customer summary</p>
-                <div className="mt-3 space-y-2 text-sm">
-                  <p className="text-slate-300">Total Purchase: <span className="font-semibold text-white">{formatCurrency(selectedCustomer.totalPurchaseAmount)}</span></p>
-                  <p className="text-slate-300">Total Paid: <span className="font-semibold text-white">{formatCurrency(selectedCustomer.totalPaidAmount)}</span></p>
-                  <p className="text-slate-300">Discount Given: <span className="font-semibold text-white">{formatCurrency(selectedCustomer.totalDiscountGiven)}</span></p>
-                  <p className="text-slate-300">Outstanding Balance: <span className="font-semibold text-rose-200">{formatCurrency(selectedCustomer.outstandingBalance)}</span></p>
-                </div>
+                <p className="mt-2 font-semibold text-white">{selectedCustomer.name}</p>
+                <p className="mt-1 text-sm text-slate-400">{selectedCustomer.mobile}</p>
+                <Button type="button" variant="ghost" className="mt-3 min-h-10 px-3" onClick={() => setCustomerDetailsOpen(true)}>
+                  <Eye size={16} />
+                  View Details
+                </Button>
               </div>
             ) : null}
           </div>
         </GlassCard>
       </div>
+
+      <Modal
+        open={customerDetailsOpen}
+        title={selectedCustomer ? `${selectedCustomer.name} Details` : "Customer Details"}
+        onClose={() => setCustomerDetailsOpen(false)}
+      >
+        {selectedCustomer ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Customer</p>
+                <p className="mt-2 font-semibold text-white">{selectedCustomer.name}</p>
+                <p className="mt-1 text-sm text-slate-400">{selectedCustomer.mobile}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Contact</p>
+                <p className="mt-2 font-semibold text-white">{selectedCustomer.email ?? "--"}</p>
+                <p className="mt-1 text-sm text-slate-400">{selectedCustomer.address ?? "--"}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Total Purchase</p>
+                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedCustomer.totalPurchaseAmount)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Total Paid</p>
+                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedCustomer.totalPaidAmount)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Discount Given</p>
+                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedCustomer.totalDiscountGiven)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Outstanding Balance</p>
+                <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(selectedCustomer.outstandingBalance)}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Opening Balance</p>
+                <p className="mt-2 font-semibold text-white">{formatCurrency(selectedCustomer.openingBalance)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Current Balance</p>
+                <p className="mt-2 font-semibold text-white">{formatCurrency(selectedCustomer.currentBalance)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Credit Limit</p>
+                <p className="mt-2 font-semibold text-white">{formatCurrency(selectedCustomer.creditLimit)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Status</p>
+                <div className="mt-2">
+                  <StatusBadge label={selectedCustomer.active ? "ACTIVE" : "INACTIVE"} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">GST Number</p>
+                <p className="mt-2 font-semibold text-white">{selectedCustomer.gstNo ?? "--"}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Last Purchase</p>
+                <p className="mt-2 font-semibold text-white">{formatDate(selectedCustomer.lastPurchaseDate)}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={historyOpen}

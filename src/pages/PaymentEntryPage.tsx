@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import { getCustomers } from "../api/customers";
 import { getInvoices } from "../api/invoices";
 import { createPayment } from "../api/payments";
@@ -9,6 +10,7 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { formatCurrency } from "../lib/currency";
 import type { Customer, Invoice, PaymentMode, PaymentRequest } from "../types/api";
 
 type FormValues = {
@@ -21,6 +23,7 @@ type FormValues = {
 };
 
 export const PaymentEntryPage = () => {
+  const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [successMessage, setSuccessMessage] = useState("");
@@ -29,6 +32,7 @@ export const PaymentEntryPage = () => {
     register,
     watch,
     handleSubmit,
+    setValue,
     reset,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
@@ -50,13 +54,44 @@ export const PaymentEntryPage = () => {
   }, []);
 
   const selectedCustomerId = watch("customerId");
+  const selectedInvoiceId = watch("invoiceId");
   const invoiceOptions = useMemo(() => {
     const customerInvoices = invoices.filter((invoice) => String(invoice.customerId) === selectedCustomerId);
     return customerInvoices.map((invoice) => ({
-      label: `${invoice.invoiceNo} | ${invoice.paymentStatus}`,
+      label: `${invoice.invoiceNo} | ${invoice.paymentStatus} | Due ${formatCurrency(invoice.balanceAmount)}`,
       value: invoice.id
     }));
   }, [invoices, selectedCustomerId]);
+
+  useEffect(() => {
+    const invoiceId = searchParams.get("invoiceId");
+    if (!invoiceId || invoices.length === 0) {
+      return;
+    }
+
+    const invoice = invoices.find((item) => String(item.id) === invoiceId);
+    if (!invoice) {
+      return;
+    }
+
+    setValue("customerId", String(invoice.customerId), { shouldValidate: true });
+    setValue("invoiceId", String(invoice.id), { shouldValidate: true });
+    setValue("amount", String(invoice.balanceAmount), { shouldValidate: true });
+  }, [invoices, searchParams, setValue]);
+
+  useEffect(() => {
+    if (!selectedInvoiceId) {
+      return;
+    }
+
+    const invoice = invoices.find((item) => String(item.id) === selectedInvoiceId);
+    if (!invoice) {
+      return;
+    }
+
+    setValue("customerId", String(invoice.customerId), { shouldValidate: true });
+    setValue("amount", String(invoice.balanceAmount), { shouldValidate: true });
+  }, [invoices, selectedInvoiceId, setValue]);
 
   const onSubmit = async (values: FormValues) => {
     clearMessage();
