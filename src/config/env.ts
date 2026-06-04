@@ -4,6 +4,6 @@ const getEnv = (key: "VITE_API_BASE_URL" | "VITE_APP_ENV", fallback: string) => 
 };
 
 export const env = {
-  apiBaseUrl: getEnv("VITE_API_BASE_URL", "http://localhost:8080/api"),
+  apiBaseUrl: getEnv("VITE_API_BASE_URL", "http://localhost:9009/api"),
   appEnv: getEnv("VITE_APP_ENV", "local")
 } as const;

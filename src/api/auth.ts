@@ -1,7 +1,7 @@
 import { apiClient } from "./apiClient";
 import type { ApiResponse, AuthPayload, UserProfile } from "../types/api";
 
-export const loginRequest = async (payload: { email: string; password: string }) => {
+export const loginRequest = async (payload: { username: string; password: string }) => {
   const response = await apiClient.post<ApiResponse<AuthPayload>>("/v1/auth/login", payload);
   return response.data.data;
 };
@@ -13,6 +13,7 @@ export const registerRequest = async (payload: {
   companyAddress: string;
   taxId: string;
   adminFullName: string;
+  adminMobileNumber: string;
   adminEmail: string;
   adminPassword: string;
 }) => {

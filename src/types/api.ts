@@ -19,6 +19,7 @@ export type CompanySummary = {
 export type UserProfile = {
   id: number;
   fullName: string;
+  mobileNumber: string;
   email: string;
   role: Role;
   active: boolean;
@@ -308,6 +309,7 @@ export type PaymentRequest = {
 
 export type CompanyUserRequest = {
   fullName: string;
+  mobileNumber: string;
   email: string;
   password?: string;
   role: Role;

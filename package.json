@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
+    "preview:prod": "vite preview --config vite.config.ts --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
     "axios": "^1.7.2",

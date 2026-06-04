@@ -10,7 +10,7 @@ export const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const { message: error, clearMessage, setApiError } = useApiMessage();
 
@@ -48,11 +48,12 @@ export const LoginPage = () => {
           <h2 className="mt-4 text-3xl font-extrabold text-white">Sign in to NovaBill</h2>
           <form className="mt-8 space-y-4" onSubmit={submit}>
             <Input
-              label="Email"
+              label="Mobile Number or Email ID"
               requiredMark
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              type="text"
+              inputMode="email"
+              value={form.username}
+              onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
             />
             <Input
               label="Password"

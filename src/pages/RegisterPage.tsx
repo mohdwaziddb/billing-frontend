@@ -13,6 +13,7 @@ const initialForm = {
   companyAddress: "",
   taxId: "",
   adminFullName: "",
+  adminMobileNumber: "",
   adminEmail: "",
   adminPassword: ""
 };
@@ -45,6 +46,7 @@ export const RegisterPage = () => {
     ["companyAddress", "Company Address", true],
     ["taxId", "Tax ID", true],
     ["adminFullName", "Admin Name", true],
+    ["adminMobileNumber", "Admin Mobile Number", true],
     ["adminEmail", "Admin Email", true],
     ["adminPassword", "Admin Password", true]
   ];
@@ -71,6 +73,8 @@ export const RegisterPage = () => {
                   ? "password"
                   : key.toLowerCase().includes("email")
                     ? "email"
+                    : key.toLowerCase().includes("mobile") || key.toLowerCase().includes("phone")
+                      ? "tel"
                     : "text"
               }
               value={form[key]}

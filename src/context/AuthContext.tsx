@@ -6,7 +6,7 @@ import type { AuthPayload, UserProfile } from "../types/api";
 type AuthContextValue = {
   auth: AuthPayload | null;
   user: UserProfile | null;
-  login: (payload: { email: string; password: string }) => Promise<void>;
+  login: (payload: { username: string; password: string }) => Promise<void>;
   register: (payload: {
     companyName: string;
     companyEmail: string;
@@ -14,6 +14,7 @@ type AuthContextValue = {
     companyAddress: string;
     taxId: string;
     adminFullName: string;
+    adminMobileNumber: string;
     adminEmail: string;
     adminPassword: string;
   }) => Promise<void>;

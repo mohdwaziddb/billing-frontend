@@ -16,6 +16,7 @@ import type { CompanyUserRequest, Role, UserProfile } from "../types/api";
 
 type FormValues = {
   fullName: string;
+  mobileNumber: string;
   email: string;
   password: string;
   role: Role;
@@ -43,6 +44,7 @@ export const UserManagementPage = () => {
   } = useForm<FormValues>({
     defaultValues: {
       fullName: "",
+      mobileNumber: "",
       email: "",
       password: "",
       role: "USER",
@@ -67,6 +69,7 @@ export const UserManagementPage = () => {
     setEditingUser(null);
     reset({
       fullName: "",
+      mobileNumber: "",
       email: "",
       password: "",
       role: "USER",
@@ -80,6 +83,7 @@ export const UserManagementPage = () => {
     setEditingUser(target);
     reset({
       fullName: target.fullName,
+      mobileNumber: target.mobileNumber,
       email: target.email,
       password: "",
       role: target.role,
@@ -93,6 +97,7 @@ export const UserManagementPage = () => {
 
     const payload: CompanyUserRequest = {
       fullName: values.fullName.trim(),
+      mobileNumber: values.mobileNumber.trim(),
       email: values.email.trim(),
       role: values.role,
       active: values.active === "true"
@@ -184,6 +189,7 @@ export const UserManagementPage = () => {
               render: (item) => (
                 <div className="min-w-[220px]">
                   <p className="font-semibold text-white">{item.fullName}</p>
+                  <p className="text-xs text-slate-300">{item.mobileNumber}</p>
                   <p className="text-xs text-slate-400">{item.email}</p>
                 </div>
               )
@@ -224,6 +230,13 @@ export const UserManagementPage = () => {
             type="email"
             error={fieldErrors.email ?? errors.email?.message}
             {...register("email", { required: "Email address is required" })}
+          />
+          <Input
+            label="Mobile Number"
+            requiredMark
+            type="tel"
+            error={fieldErrors.mobileNumber ?? errors.mobileNumber?.message}
+            {...register("mobileNumber", { required: "Mobile number is required" })}
           />
           <Input
             label={editingUser ? "New Password" : "Password"}
