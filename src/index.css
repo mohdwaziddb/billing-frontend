@@ -3,20 +3,17 @@
 @tailwind utilities;
 
 :root {
-  font-family: "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", sans-serif;
-  color: #e2e8f0;
-  background:
-    radial-gradient(circle at top left, rgba(30, 64, 175, 0.22), transparent 30%),
-    radial-gradient(circle at 82% 8%, rgba(8, 145, 178, 0.14), transparent 24%),
-    linear-gradient(180deg, #071120 0%, #0b1729 52%, #0f1b2e 100%);
-  --app-bg: #09111f;
-  --panel-bg: rgba(9, 17, 31, 0.82);
-  --panel-strong: rgba(11, 23, 40, 0.96);
-  --panel-soft: rgba(255, 255, 255, 0.045);
-  --panel-border: rgba(148, 163, 184, 0.18);
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #94a3b8;
+  font-family: Inter, "Segoe UI Variable Display", "Segoe UI", "Helvetica Neue", sans-serif;
+  color: #16213e;
+  background: #f6f8fc;
+  --app-bg: #f6f8fc;
+  --panel-bg: #ffffff;
+  --panel-strong: #ffffff;
+  --panel-soft: #f6f8fc;
+  --panel-border: #e6ebf2;
+  --text-primary: #071330;
+  --text-secondary: #536179;
+  --text-tertiary: #8792a8;
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
   --theme-color: #0ea5e9;
@@ -24,12 +21,31 @@
   --theme-dark: #075985;
   --theme-hover: #38bdf8;
   --theme-border: #bae6fd;
-  --success: #10b981;
+  --success: #16a34a;
   --warning: #f59e0b;
-  --danger: #f43f5e;
-  --shadow-panel: 0 24px 80px rgba(2, 6, 23, 0.28);
-  --radius-panel: 28px;
-  --radius-control: 18px;
+  --danger: #ef4444;
+  --shadow-panel: 0 18px 50px rgba(10, 37, 64, 0.08);
+  --shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.06);
+  --radius-panel: 18px;
+  --radius-card: 18px;
+  --radius-control: 12px;
+  --theme-contrast: #ffffff;
+  --theme-light-contrast: #111827;
+  --theme-dark-contrast: #ffffff;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --app-bg: #0f172a;
+  --panel-bg: #111827;
+  --panel-strong: #1f2937;
+  --panel-soft: #0b1220;
+  --panel-border: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --shadow-panel: 0 18px 50px rgba(0, 0, 0, 0.22);
+  --shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 html {
@@ -71,20 +87,72 @@ button {
 }
 
 select {
+  color-scheme: light;
+}
+
+:root.dark select {
   color-scheme: dark;
+}
+
+h1,
+.page-title {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+h2,
+h3,
+.card-title,
+.section-title {
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+p,
+label,
+input,
+select,
+textarea,
+button,
+td {
+  font-weight: 400;
+}
+
+button,
+th,
+.table-header {
+  font-weight: 600;
+}
+
+.grand-total-row {
+  background: #fef3c7 !important;
+  color: #111827;
+  font-weight: 700;
+}
+
+:root.dark .grand-total-row {
+  background: #78350f !important;
+  color: #ffffff;
+}
+
+:root.dark .grand-total-row td,
+:root.dark .grand-total-row span,
+:root.dark .grand-total-row p {
+  color: #ffffff !important;
+  font-weight: 700;
 }
 
 select option,
 select optgroup {
-  background-color: #020617;
-  color: #f8fafc;
+  background-color: #ffffff;
+  color: #071330;
 }
 
 select option:checked,
 select option:hover,
 select option:focus {
-  background: linear-gradient(135deg, rgba(8, 47, 73, 0.98), rgba(15, 23, 42, 0.98));
-  color: #f8fafc;
+  background: color-mix(in srgb, var(--theme-color) 12%, #ffffff);
+  color: #071330;
 }
 
 input[type="number"]::-webkit-outer-spin-button,
@@ -104,7 +172,7 @@ input[type="number"] {
 
 input::placeholder,
 textarea::placeholder {
-  color: rgba(148, 163, 184, 0.9);
+  color: #9aa5b8;
 }
 
 input:-webkit-autofill,
@@ -112,8 +180,8 @@ input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
 select:-webkit-autofill {
-  -webkit-text-fill-color: #f8fafc;
-  box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.92) inset;
+  -webkit-text-fill-color: #071330;
+  box-shadow: 0 0 0 1000px #ffffff inset;
   transition: background-color 9999s ease-in-out 0s;
 }
 
@@ -122,32 +190,28 @@ select:-webkit-autofill {
 }
 
 .glass {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
-    var(--panel-bg);
+  background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
   box-shadow: var(--shadow-panel);
 }
 
+.glass .text-rose-200 {
+  color: #b91c1c;
+}
+
+.glass .text-emerald-200 {
+  color: #047857;
+}
+
 .gradient-text {
-  background: linear-gradient(90deg, #ffffff 0%, var(--theme-light) 55%, var(--theme-color) 100%);
+  background: linear-gradient(90deg, var(--theme-dark) 0%, var(--theme-color) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .noise::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.18;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 28px 28px;
+  content: none;
 }
 
 .neon-border {
@@ -173,7 +237,265 @@ select:-webkit-autofill {
 
 .neon-border:hover::after,
 .neon-border:focus-within::after {
-  opacity: 1;
+  opacity: 0.55;
+}
+
+.saas-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+:root.dark .saas-card {
+  color: var(--text-secondary);
+}
+
+:root.dark .bg-white,
+:root.dark .bg-white\/92 {
+  background-color: var(--panel-bg);
+}
+
+:root.dark .bg-slate-50,
+:root.dark .bg-slate-50\/55,
+:root.dark .bg-slate-100 {
+  background-color: var(--panel-strong);
+}
+
+:root.dark .border-slate-100,
+:root.dark .border-slate-200,
+:root.dark .border-slate-300 {
+  border-color: var(--panel-border);
+}
+
+:root.dark .text-slate-950,
+:root.dark .text-slate-900,
+:root.dark .text-slate-800,
+:root.dark .text-slate-700 {
+  color: #f8fafc;
+}
+
+:root.dark .text-slate-600,
+:root.dark .text-slate-500,
+:root.dark .text-slate-400 {
+  color: #cbd5e1;
+}
+
+:root.dark input,
+:root.dark select,
+:root.dark textarea {
+  background-color: #0f172a;
+  border-color: var(--panel-border);
+  color: #f8fafc;
+}
+
+:root.dark select option,
+:root.dark select optgroup {
+  background-color: #111827;
+  color: #f8fafc;
+}
+
+.theme-soft {
+  background: color-mix(in srgb, var(--theme-color) 9%, #ffffff);
+  color: var(--theme-dark);
+}
+
+.theme-bg {
+  background: var(--theme-color);
+  color: var(--theme-contrast);
+}
+
+.theme-bg-light {
+  background: var(--theme-light);
+  color: var(--theme-light-contrast);
+}
+
+.theme-bg-dark {
+  background: var(--theme-dark);
+  color: var(--theme-dark-contrast);
+}
+
+.saas-card .text-white {
+  color: #071330;
+}
+
+:root.dark .saas-card .text-white {
+  color: #ffffff;
+}
+
+.saas-card .text-slate-100,
+.saas-card .text-slate-200,
+.saas-card .text-slate-300 {
+  color: #334155;
+}
+
+.saas-card .text-slate-400 {
+  color: #64748b;
+}
+
+.saas-card .text-slate-500 {
+  color: #718096;
+}
+
+:root.dark .saas-card .text-slate-100,
+:root.dark .saas-card .text-slate-200,
+:root.dark .saas-card .text-slate-300 {
+  color: #e2e8f0;
+}
+
+:root.dark .saas-card .text-slate-400,
+:root.dark .saas-card .text-slate-500 {
+  color: #cbd5e1;
+}
+
+:root.dark table {
+  color: #ffffff;
+}
+
+:root.dark thead,
+:root.dark thead tr {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+}
+
+:root.dark th,
+:root.dark th button {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+:root.dark tbody tr,
+:root.dark tbody tr.odd\:bg-white,
+:root.dark tbody tr.even\:bg-slate-50\/55 {
+  background-color: #111827 !important;
+}
+
+:root.dark tbody tr:nth-child(even):not(.grand-total-row) {
+  background-color: #172033 !important;
+}
+
+:root.dark tbody tr:hover:not(.grand-total-row) {
+  background-color: #1f2937 !important;
+}
+
+:root.dark td {
+  border-color: #334155 !important;
+  color: #ffffff !important;
+}
+
+:root.dark td p,
+:root.dark td span,
+:root.dark td div {
+  color: inherit;
+}
+
+:root.dark td .text-slate-300,
+:root.dark td .text-slate-400,
+:root.dark td .text-slate-500,
+:root.dark td .text-slate-600 {
+  color: #d1d5db !important;
+}
+
+:root.dark td .text-rose-200,
+:root.dark .saas-card .text-rose-200 {
+  color: #fca5a5 !important;
+}
+
+.status-badge-success {
+  border-color: #bbf7d0;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge-warning {
+  border-color: #fde68a;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge-danger {
+  border-color: #fecaca;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge-active {
+  border-color: color-mix(in srgb, var(--theme-color) 22%, #bfdbfe);
+  background: color-mix(in srgb, var(--theme-color) 12%, #ffffff);
+  color: var(--theme-dark);
+}
+
+.status-badge-muted {
+  border-color: #cbd5e1;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+:root.dark .status-badge-success {
+  border-color: #34d399;
+  background: #064e3b;
+  color: #d1fae5 !important;
+}
+
+:root.dark .status-badge-warning {
+  border-color: #fbbf24;
+  background: #78350f;
+  color: #fef3c7 !important;
+}
+
+:root.dark .status-badge-danger {
+  border-color: #f87171;
+  background: #7f1d1d;
+  color: #fee2e2 !important;
+}
+
+:root.dark .status-badge-active {
+  border-color: color-mix(in srgb, var(--theme-color) 65%, #ffffff);
+  background: color-mix(in srgb, var(--theme-color) 34%, #111827);
+  color: #ffffff !important;
+}
+
+:root.dark .status-badge-muted {
+  border-color: #64748b;
+  background: #334155;
+  color: #e5e7eb !important;
+}
+
+.saas-card .border-white\/10,
+.saas-card .border-white\/5 {
+  border-color: #e6ebf2;
+}
+
+.saas-card .bg-white\/5,
+.saas-card .bg-white\/8 {
+  background-color: #f8fafc;
+}
+
+:root.dark .saas-card .bg-white\/5,
+:root.dark .saas-card .bg-white\/8,
+:root.dark .saas-card .bg-white\/10,
+:root.dark .saas-card .bg-white\/12 {
+  background-color: #1f2937;
+}
+
+:root.dark .saas-card .border-white\/5,
+:root.dark .saas-card .border-white\/10,
+:root.dark .saas-card .border-white\/12,
+:root.dark .saas-card .border-white\/20 {
+  border-color: #334155;
+}
+
+:root.dark .glass .text-rose-200 {
+  color: #fca5a5;
+}
+
+:root.dark .glass .text-emerald-200 {
+  color: #86efac;
+}
+
+.saas-card .text-sky-100,
+.saas-card .text-sky-200 {
+  color: var(--theme-dark);
 }
 
 .stat-card {

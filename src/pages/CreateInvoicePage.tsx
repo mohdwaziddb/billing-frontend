@@ -16,8 +16,10 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
+import { notificationService } from "../services/notificationService";
 import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, Product } from "../types/api";
 
 type FormValues = {
@@ -162,6 +164,7 @@ export const CreateInvoicePage = () => {
       setValue("customerId", String(createdCustomer.id), { shouldValidate: true });
       setShowNewCustomerForm(false);
       clearMessage();
+      notificationService.showSuccess(CommonSuccessMessageUtil.created("Customer"));
     } catch (err: any) {
       applyCustomerCreateError(err, "Unable to create customer");
     } finally {
@@ -205,6 +208,7 @@ export const CreateInvoicePage = () => {
 
     try {
       const invoice = await createInvoice(payload);
+      notificationService.showSuccess(CommonSuccessMessageUtil.created("Invoice"));
       navigate(`/invoices/${invoice.id}`);
     } catch (err: any) {
       setApiError(err, "Unable to create invoice");
@@ -214,7 +218,7 @@ export const CreateInvoicePage = () => {
   return (
     <div className="space-y-4 pb-6">
       <Header
-        title="Create invoice"
+        title="Create Invoice"
         subtitle="Search customers by mobile, review purchase history, and submit invoice items through a focused billing workflow."
       />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -344,7 +348,7 @@ export const CreateInvoicePage = () => {
 
             {serverError ? <div className="rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{serverError}</div> : null}
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button disabled={isSubmitting} type="submit">{isSubmitting ? "Submitting..." : "Create invoice"}</Button>
+              <Button disabled={isSubmitting} type="submit">{isSubmitting ? "Submitting..." : "Create Invoice"}</Button>
               <Button type="button" variant="ghost" onClick={() => navigate("/invoices")}>Back to invoices</Button>
             </div>
           </form>

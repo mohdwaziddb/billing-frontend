@@ -1,16 +1,15 @@
-import clsx from "clsx";
-import { Building2, ChevronDown, ShieldCheck, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { getCompanyOwners, getCompanySettings, updateCompanyOwners, updateCompanySettings, uploadCompanyLogo, type CompanySettingsRequest } from "../api/company";
-import { getCompanyUsers } from "../api/users";
+import { Building2, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getCompanySettings, updateCompanySettings, uploadCompanyLogo, type CompanySettingsRequest } from "../api/company";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { env } from "../config/env";
-import type { UserProfile } from "../types/api";
+import { notificationService } from "../services/notificationService";
 
 type FormState = CompanySettingsRequest;
 
@@ -45,10 +44,6 @@ export const AboutCompanyPage = () => {
   const { can, refreshProfile } = useAuth();
   const canEdit = can("ABOUT_COMPANY", "EDIT");
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [ownerIds, setOwnerIds] = useState<number[]>([]);
-  const [ownersOpen, setOwnersOpen] = useState(false);
-  const ownersRef = useRef<HTMLDivElement | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,10 +58,6 @@ export const AboutCompanyPage = () => {
     setLoading(true);
     try {
       const company = await getCompanySettings();
-      const [ownerData, userData] = await Promise.all([
-        getCompanyOwners().catch(() => []),
-        canEdit ? getCompanyUsers({ size: 1000 }).catch(() => []) : Promise.resolve([])
-      ]);
       setForm({
         name: company.name ?? "",
         legalName: company.legalName ?? "",
@@ -86,16 +77,6 @@ export const AboutCompanyPage = () => {
         websiteUrl: company.websiteUrl ?? "",
       });
       setLogoUrl(company.logoUrl ?? null);
-      setOwnerIds(ownerData.map((owner) => owner.userId));
-      setUsers(canEdit ? userData : ownerData.map((owner) => ({
-        id: owner.userId,
-        fullName: owner.fullName,
-        mobileNumber: owner.mobileNumber,
-        email: owner.email,
-        role: owner.role,
-        active: owner.active,
-        company: null
-      })));
     } catch (err: any) {
       setApiError(err, "Unable to load company profile");
     } finally {
@@ -103,30 +84,9 @@ export const AboutCompanyPage = () => {
     }
   };
 
-  const toggleOwner = (userId: number) => {
-    setOwnerIds((current) => current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId]);
-  };
-
   useEffect(() => {
     void loadCompany();
   }, [canEdit]);
-
-  useEffect(() => {
-    if (!ownersOpen) {
-      return;
-    }
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (!ownersRef.current?.contains(event.target as Node)) {
-        setOwnersOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-    };
-  }, [ownersOpen]);
 
   const saveProfile = async () => {
     clearMessage();
@@ -137,12 +97,11 @@ export const AboutCompanyPage = () => {
         ...form,
         address: form.addressLine1 || form.address
       });
-      if (canEdit && ownerIds.length) {
-        await updateCompanyOwners(ownerIds);
-      }
       setLogoUrl(updated.logoUrl ?? null);
       await refreshProfile();
-      setSuccess("Company profile updated successfully.");
+      const message = CommonSuccessMessageUtil.updated("Company Profile");
+      setSuccess(message);
+      notificationService.showSuccess(message);
     } catch (err: any) {
       setApiError(err, "Unable to update company profile");
     } finally {
@@ -164,7 +123,9 @@ export const AboutCompanyPage = () => {
       const updated = await uploadCompanyLogo(file);
       setLogoUrl(updated.logoUrl ?? null);
       await refreshProfile();
-      setSuccess("Company logo uploaded successfully.");
+      const message = CommonSuccessMessageUtil.updated("Company Logo");
+      setSuccess(message);
+      notificationService.showSuccess(message);
     } catch (err: any) {
       setApiError(err, "Unable to upload company logo");
     }
@@ -190,7 +151,7 @@ export const AboutCompanyPage = () => {
                 <div>
                   <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Branding</p>
                   <h2 className="mt-2 text-2xl font-bold text-white">{form.name || "Company Profile"}</h2>
-                  <p className="mt-1 text-sm text-slate-400">Company profile and ownership settings</p>
+                  <p className="mt-1 text-sm text-slate-400">Company profile settings</p>
                 </div>
               </div>
               {canEdit ? (
@@ -229,61 +190,8 @@ export const AboutCompanyPage = () => {
               <Input disabled={!canEdit} label="Pincode" value={form.pincode} onChange={(event) => setField("pincode", event.target.value)} />
             </section>
 
-            <section className="space-y-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Company owners</p>
-                <p className="mt-2 text-sm text-slate-400">Select one or more active users who can manage company profile, theme, users, and setup settings.</p>
-              </div>
-              <div ref={ownersRef} className="relative max-w-2xl">
-                <button
-                  type="button"
-                  disabled={!canEdit}
-                  className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-control)] border border-white/10 bg-[var(--panel-strong)] px-4 py-3 text-left text-sm font-semibold text-slate-100 transition hover:border-white/20 disabled:cursor-not-allowed disabled:opacity-70"
-                  onClick={() => setOwnersOpen((current) => !current)}
-                >
-                  <span className="min-w-0 truncate">
-                    {ownerIds.length
-                      ? users.filter((user) => ownerIds.includes(user.id)).map((user) => user.fullName).join(", ")
-                      : "Select company owners"}
-                  </span>
-                  <ChevronDown className={ownersOpen ? "shrink-0 rotate-180 transition" : "shrink-0 transition"} size={18} />
-                </button>
-
-                {ownersOpen ? (
-                  <div className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-[20px] border border-white/10 bg-slate-950/95 p-2 shadow-[0_24px_70px_rgba(2,6,23,0.55)] backdrop-blur-xl">
-                    {users.map((user) => {
-                      const checked = ownerIds.includes(user.id);
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          className={clsx(
-                            "flex w-full items-start gap-3 rounded-[16px] px-3 py-3 text-left transition hover:bg-white/8",
-                            checked ? "bg-[color-mix(in_srgb,var(--theme-color)_16%,transparent)]" : ""
-                          )}
-                          onClick={() => toggleOwner(user.id)}
-                        >
-                          <span className={clsx("mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border", checked ? "border-[var(--theme-border)] bg-[var(--theme-color)]" : "border-white/20")}>
-                            {checked ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2 font-semibold text-white">
-                              {user.fullName}
-                              {checked ? <ShieldCheck className="text-[var(--theme-light)]" size={15} /> : null}
-                            </span>
-                            <span className="mt-1 block truncate text-xs text-slate-400">{user.email}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-              {canEdit && ownerIds.length === 0 ? <p className="text-sm text-rose-300">At least one owner is required.</p> : null}
-            </section>
-
             <div className="flex flex-wrap gap-3">
-              {canEdit ? <Button disabled={saving || ownerIds.length === 0} onClick={() => void saveProfile()}>{saving ? "Saving..." : "Save company profile"}</Button> : null}
+              {canEdit ? <Button disabled={saving} onClick={() => void saveProfile()}>{saving ? "Saving..." : "Save company profile"}</Button> : null}
               {!canEdit ? <p className="text-sm text-slate-400">You have view-only access to company profile details.</p> : null}
             </div>
           </div>

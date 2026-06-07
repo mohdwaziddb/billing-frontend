@@ -2,17 +2,23 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { getCompanyTheme } from "../api/company";
 import { getMyMenus } from "../api/permissions";
 import { loginRequest, logoutRequest, meRequest, registerRequest } from "../api/auth";
+import { defaultPlatformSettings, getPlatformSettings } from "../api/platform";
+import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
 import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
 import { authStorage } from "../lib/storage";
-import type { AuthPayload, CompanyTheme, PermissionMatrix, UserProfile } from "../types/api";
+import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
+import type { AuthPayload, CompanyTheme, PermissionMatrix, PlatformSettings, UserPreference, UserProfile } from "../types/api";
 
 type AuthContextValue = {
   auth: AuthPayload | null;
   user: UserProfile | null;
   permissions: PermissionMatrix | null;
   theme: CompanyTheme;
+  platform: PlatformSettings;
+  preferences: UserPreference;
   refreshProfile: () => Promise<void>;
   refreshTheme: () => Promise<void>;
+  setDarkMode: (enabled: boolean) => Promise<void>;
   refreshPermissions: () => Promise<void>;
   can: (menuCode: string, actionCode?: string) => boolean;
   firstAccessibleRoute: () => string | null;
@@ -34,34 +40,53 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const cachedThemeState = ThemeBootstrapService.getCachedState();
   const [auth, setAuth] = useState<AuthPayload | null>(authStorage.get());
   const [user, setUser] = useState<UserProfile | null>(authStorage.get()?.user ?? null);
   const [permissions, setPermissions] = useState<PermissionMatrix | null>(null);
-  const [theme, setTheme] = useState<CompanyTheme>({ themeColor: DEFAULT_THEME_COLOR });
+  const [theme, setTheme] = useState<CompanyTheme>({ themeColor: cachedThemeState.themeColor });
+  const [platform, setPlatform] = useState<PlatformSettings>(defaultPlatformSettings);
+  const [preferences, setPreferences] = useState<UserPreference>({ darkModeEnabled: cachedThemeState.darkModeEnabled });
 
   useEffect(() => {
     applyThemeColor(theme.themeColor);
   }, [theme.themeColor]);
 
   useEffect(() => {
+    document.documentElement.classList.toggle("dark", preferences.darkModeEnabled);
+  }, [preferences.darkModeEnabled]);
+
+  useEffect(() => {
     if (!auth?.accessToken) {
       setUser(null);
       setPermissions(null);
-      setTheme({ themeColor: DEFAULT_THEME_COLOR });
+      setPlatform(defaultPlatformSettings);
       return;
     }
-    Promise.all([meRequest(), getMyMenus(), getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR }))])
-      .then(([profile, permissionData, themeData]) => {
+    Promise.all([
+      meRequest(),
+      getMyMenus(),
+      getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
+      getPlatformSettings().catch(() => defaultPlatformSettings),
+      getMyPreferences().catch(() => ({ darkModeEnabled: false }))
+    ])
+      .then(([profile, permissionData, themeData, platformData, preferenceData]) => {
         setUser(profile);
         setPermissions(permissionData);
         setTheme(themeData);
+        setPlatform(platformData);
+        setPreferences(preferenceData);
+        ThemeBootstrapService.save(themeData, preferenceData);
       })
       .catch(() => {
         authStorage.clear();
         setAuth(null);
         setUser(null);
         setPermissions(null);
+        ThemeBootstrapService.clear();
         setTheme({ themeColor: DEFAULT_THEME_COLOR });
+        setPlatform(defaultPlatformSettings);
+        setPreferences({ darkModeEnabled: false });
       });
   }, [auth?.accessToken]);
 
@@ -71,6 +96,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       permissions,
       theme,
+      platform,
+      preferences,
       async refreshProfile() {
         if (!auth?.accessToken) {
           setUser(null);
@@ -94,9 +121,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async refreshTheme() {
         if (!auth?.accessToken) {
           setTheme({ themeColor: DEFAULT_THEME_COLOR });
+          ThemeBootstrapService.clear();
           return;
         }
-        setTheme(await getCompanyTheme());
+        const nextTheme = await getCompanyTheme();
+        setTheme(nextTheme);
+        ThemeBootstrapService.save(nextTheme, preferences);
+      },
+      async setDarkMode(enabled) {
+        setPreferences({ darkModeEnabled: enabled });
+        ThemeBootstrapService.saveDarkMode(enabled);
+        if (auth?.accessToken) {
+          const nextPreferences = await updateMyPreferences({ darkModeEnabled: enabled });
+          setPreferences(nextPreferences);
+          ThemeBootstrapService.save(theme, nextPreferences);
+        }
       },
       can(menuCode, actionCode = "VIEW") {
         const menu = findMenu(permissions?.menus ?? [], menuCode);
@@ -116,9 +155,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         authStorage.set(nextAuth);
         setAuth(nextAuth);
         setUser(nextAuth.user);
-        const [nextPermissions, nextTheme] = await Promise.all([getMyMenus(), getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR }))]);
+        const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
+          getMyMenus(),
+          getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
+          getPlatformSettings().catch(() => defaultPlatformSettings),
+          getMyPreferences().catch(() => ({ darkModeEnabled: false }))
+        ]);
         setPermissions(nextPermissions);
         setTheme(nextTheme);
+        setPlatform(nextPlatform);
+        setPreferences(nextPreferences);
+        ThemeBootstrapService.save(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
       async register(payload) {
@@ -126,9 +173,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         authStorage.set(nextAuth);
         setAuth(nextAuth);
         setUser(nextAuth.user);
-        const [nextPermissions, nextTheme] = await Promise.all([getMyMenus(), getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR }))]);
+        const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
+          getMyMenus(),
+          getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
+          getPlatformSettings().catch(() => defaultPlatformSettings),
+          getMyPreferences().catch(() => ({ darkModeEnabled: false }))
+        ]);
         setPermissions(nextPermissions);
         setTheme(nextTheme);
+        setPlatform(nextPlatform);
+        setPreferences(nextPreferences);
+        ThemeBootstrapService.save(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
       async logout() {
@@ -140,13 +195,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         authStorage.clear();
+        ThemeBootstrapService.clear();
         setAuth(null);
         setUser(null);
         setPermissions(null);
         setTheme({ themeColor: DEFAULT_THEME_COLOR });
+        setPlatform(defaultPlatformSettings);
+        setPreferences({ darkModeEnabled: false });
       }
     }),
-    [auth, user, permissions]
+    [auth, user, permissions, theme, platform, preferences]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

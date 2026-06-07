@@ -88,7 +88,7 @@ export const OutstandingCustomersReminderPage = () => {
   return (
     <div className="space-y-4 pb-6">
       <Header
-        title="Outstanding reminders"
+        title="Outstanding Reminders"
         subtitle="Search overdue customers, review due balances, and trigger reminder workflows that are logged by the backend."
       />
 
@@ -109,7 +109,7 @@ export const OutstandingCustomersReminderPage = () => {
             <Filter className="text-sky-100" size={18} />
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder filters</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">Find due customers</h2>
+              <h2 className="mt-2 text-2xl font-bold text-white">Customer Reminder Filters</h2>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -187,7 +187,7 @@ export const OutstandingCustomersReminderPage = () => {
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder candidates</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">Overdue customers table</h2>
+          <h2 className="mt-2 text-2xl font-bold text-white">Overdue Customer List</h2>
         </div>
 
         {loading ? (

@@ -1,14 +1,43 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { getPaymentsPage } from "../api/payments";
+import { useEffect, useMemo, useState } from "react";
+import { CreditCard, Download, Trash2, Wallet } from "lucide-react";
+import { deletePayment, getPaymentsPage, type PaymentFilterParams } from "../api/payments";
+import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
+import { Input } from "../components/Input";
+import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { Select } from "../components/Select";
+import { StatCard } from "../components/StatCard";
+import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
+import { useApiMessage } from "../hooks/useApiFeedback";
+import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
+import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
+import { notificationService } from "../services/notificationService";
 import type { PageResponse, Payment } from "../types/api";
+
+type DatePreset = "" | "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
+type SummaryKey = "total" | "collection" | "cash" | "upi" | "outstanding";
+
+type PaymentFilters = {
+  search: string;
+  paymentStatus: string;
+  datePreset: DatePreset;
+  startDate: string;
+  endDate: string;
+  minAmount: string;
+  maxAmount: string;
+  mode: string;
+  createdByRole: string;
+};
 
 const emptyPaymentPage: PageResponse<Payment> = {
   records: [],
@@ -18,74 +47,335 @@ const emptyPaymentPage: PageResponse<Payment> = {
   totalPages: 0
 };
 
+const emptyFilters: PaymentFilters = {
+  search: "",
+  paymentStatus: "",
+  datePreset: "",
+  startDate: "",
+  endDate: "",
+  minAmount: "",
+  maxAmount: "",
+  mode: "",
+  createdByRole: ""
+};
+
+const toIso = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+
+const dateRangeForPreset = (preset: DatePreset) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (preset === "today") return { startDate: toIso(today), endDate: toIso(today) };
+  if (preset === "yesterday") {
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return { startDate: toIso(yesterday), endDate: toIso(yesterday) };
+  }
+  if (preset === "thisWeek") {
+    const start = new Date(today);
+    const day = start.getDay() || 7;
+    start.setDate(start.getDate() - day + 1);
+    return { startDate: toIso(start), endDate: toIso(today) };
+  }
+  if (preset === "thisMonth") return { startDate: toIso(new Date(today.getFullYear(), today.getMonth(), 1)), endDate: toIso(today) };
+  if (preset === "thisYear") return { startDate: toIso(new Date(today.getFullYear(), 0, 1)), endDate: toIso(today) };
+  return { startDate: "", endDate: "" };
+};
+
+const paymentRef = (payment: Payment) => `PAY-${String(payment.id).padStart(6, "0")}`;
+
+const buildGrandTotal = (rows: Payment[]) => ({
+  paymentRef: "Grand Total",
+  customerName: "",
+  customerMobile: "",
+  invoiceNo: "",
+  paymentDate: "",
+  mode: "",
+  status: "",
+  amount: rows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
+  createdBy: "",
+  __rowType: "grandTotal"
+});
+
 export const PaymentListPage = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentPage, setPaymentPage] = useState<PageResponse<Payment>>(emptyPaymentPage);
   const [page, setPage] = useState(0);
+  const [draftFilters, setDraftFilters] = useState<PaymentFilters>(emptyFilters);
+  const [appliedFilters, setAppliedFilters] = useState<PaymentFilters>(emptyFilters);
+  const [exportRows, setExportRows] = useState<Payment[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [activeSummary, setActiveSummary] = useState<SummaryKey | null>(null);
+  const [modalPage, setModalPage] = useState(0);
+  const [modalSearch, setModalSearch] = useState("");
+  const [modalPayments, setModalPayments] = useState<Payment[]>([]);
+  const [modalPaymentPage, setModalPaymentPage] = useState<PageResponse<Payment>>(emptyPaymentPage);
+  const { can } = useAuth();
+  const { setApiError } = useApiMessage();
+  const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
+  const summary = useMemo(() => ({
+    total: exportRows.length,
+    collection: exportRows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
+    cash: exportRows.filter((item) => item.mode === "CASH").reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
+    upi: exportRows.filter((item) => item.mode === "UPI").reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
+    outstandingCollection: exportRows.filter((item) => item.invoiceNo).reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
+  }), [exportRows]);
 
-  const loadPayments = async (nextPage = page) => {
-    const response = await getPaymentsPage({ page: nextPage, size: DEFAULT_PAGE_SIZE });
+  const loadPayments = async (nextPage = page, params = baseParams) => {
+    const response = await getPaymentsPage({ ...params, page: nextPage, size: DEFAULT_PAGE_SIZE });
     setPaymentPage(response);
     setPayments(response.records);
   };
 
+  const loadExportRows = async (params = baseParams) => {
+    const response = await getPaymentsPage({ ...params, page: 0, size: 1000 });
+    setExportRows(response.records);
+  };
+
   useEffect(() => {
-    void loadPayments(0);
-  }, []);
+    void Promise.all([loadPayments(0), loadExportRows()]).catch((err: any) => setApiError(err, "Unable to load payments"));
+  }, [baseParams]);
+
+  useEffect(() => {
+    if (!activeSummary) return;
+    const params = summaryParams(baseParams, activeSummary, modalSearch);
+    void getPaymentsPage({ ...params, page: modalPage, size: DEFAULT_PAGE_SIZE })
+      .then((response) => {
+        setModalPaymentPage(response);
+        setModalPayments(response.records);
+      })
+      .catch((err: any) => setApiError(err, "Unable to load payment details"));
+  }, [activeSummary, baseParams, modalPage, modalSearch]);
+
+  const applyFilters = () => {
+    setPage(0);
+    setAppliedFilters(draftFilters);
+  };
+
+  const resetFilters = () => {
+    setPage(0);
+    setDraftFilters(emptyFilters);
+    setAppliedFilters(emptyFilters);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleting(true);
+      await deletePayment(deleteTarget.id);
+      await loadPayments(page);
+      await loadExportRows();
+      setDeleteTarget(null);
+      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Payment"));
+    } catch (err: any) {
+      setApiError(err, CommonErrorMessageUtil.deleteFailed);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const exportPayments = (fileName: string, rows: Payment[]) => {
+    exportToExcel(fileName, rows.length ? [...rows, buildGrandTotal(rows)] : [], paymentExportColumns);
+  };
+
+  const openSummary = (key: SummaryKey) => {
+    setActiveSummary(key);
+    setModalPage(0);
+    setModalSearch("");
+  };
 
   return (
     <div className="space-y-4 pb-6">
-      <Header
-        title="Payments"
-        subtitle="Review customer collections and invoice-linked payment activity."
-      />
+      <Header title="Payments" subtitle="Review customer collections and invoice-linked payment activity." />
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Total Payments" value={String(summary.total)} caption="Current filtered payments" icon={<CreditCard size={18} />} onClick={() => openSummary("total")} />
+        <StatCard label="Total Collection" value={formatCurrency(summary.collection)} caption="All payment modes" icon={<Wallet size={18} />} onClick={() => openSummary("collection")} />
+        <StatCard label="Cash Collection" value={formatCurrency(summary.cash)} caption="Cash payments" icon={<Wallet size={18} />} onClick={() => openSummary("cash")} />
+        <StatCard label="UPI Collection" value={formatCurrency(summary.upi)} caption="UPI payments" icon={<Wallet size={18} />} onClick={() => openSummary("upi")} />
+        <StatCard label="Outstanding Collection" value={formatCurrency(summary.outstandingCollection)} caption="Invoice-linked payments" icon={<Wallet size={18} />} onClick={() => openSummary("outstanding")} />
+      </div>
+
+      <GlassCard className="p-6 md:p-7">
+        <div className="mb-5">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Payment Filters</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">Advanced Payment Search</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Input label="Search Payment" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} />
+          <Select label="Payment Status" value={draftFilters.paymentStatus} options={[
+            { label: "All", value: "" },
+            { label: "Success", value: "SUCCESS" },
+            { label: "Pending", value: "PENDING" },
+            { label: "Failed", value: "FAILED" },
+            { label: "Cancelled", value: "CANCELLED" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, paymentStatus: event.target.value }))} />
+          <Select label="Payment Date" value={draftFilters.datePreset} options={[
+            { label: "All", value: "" },
+            { label: "Today", value: "today" },
+            { label: "Yesterday", value: "yesterday" },
+            { label: "This Week", value: "thisWeek" },
+            { label: "This Month", value: "thisMonth" },
+            { label: "This Year", value: "thisYear" },
+            { label: "Custom Date Range", value: "custom" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, datePreset: event.target.value as DatePreset }))} />
+          <Select label="Payment Method" value={draftFilters.mode} options={[
+            { label: "All", value: "" },
+            { label: "Cash", value: "CASH" },
+            { label: "UPI", value: "UPI" },
+            { label: "Bank Transfer", value: "BANK_TRANSFER" },
+            { label: "Card", value: "CARD" },
+            { label: "Cheque", value: "CHEQUE" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, mode: event.target.value }))} />
+          {draftFilters.datePreset === "custom" ? (
+            <>
+              <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
+              <Input label="End Date" type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} />
+            </>
+          ) : null}
+          <Input label="Min Amount" placeholder="Enter minimum amount" type="number" value={draftFilters.minAmount} onChange={(event) => setDraftFilters((current) => ({ ...current, minAmount: event.target.value }))} />
+          <Input label="Max Amount" placeholder="Enter maximum amount" type="number" value={draftFilters.maxAmount} onChange={(event) => setDraftFilters((current) => ({ ...current, maxAmount: event.target.value }))} />
+          <Select label="Created By" value={draftFilters.createdByRole} options={[
+            { label: "All Users", value: "" },
+            { label: "Owner", value: "OWNER" },
+            { label: "Admin", value: "ADMIN" },
+            { label: "User", value: "USER" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button type="button" onClick={applyFilters}>Apply Filters</Button>
+          <Button type="button" variant="secondary" onClick={resetFilters}>Reset Filters</Button>
+        </div>
+      </GlassCard>
+
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Collections</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Payment records</h2>
+            <h2 className="mt-2 text-2xl font-bold text-white">Payment Records</h2>
           </div>
-          <Link to="/payments/new">
-            <Button>Add payment</Button>
-          </Link>
+          {can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
+            <div className="flex flex-wrap gap-2">
+              {can("PAYMENTS", "EXPORT") ? (
+                <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportPayments("payments.xlsx", exportRows)}>
+                  <Download size={16} />
+                  Export Excel
+                </Button>
+              ) : null}
+              {can("PAYMENTS", "ADD") ? (
+                <Link to="/payments/new">
+                  <Button>Add Payment</Button>
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-
-        <Table
-          data={payments}
-          emptyText="No payments recorded yet."
-          columns={[
-            {
-              key: "customer",
-              header: "Customer",
-              render: (item) => (
-                <div>
-                  <p className="font-semibold text-white">{item.customerName}</p>
-                  <p className="text-xs text-slate-400">{item.invoiceNo ?? "Unapplied"}</p>
-                </div>
-              )
-            },
-            { key: "date", header: "Payment Date", render: (item) => formatDate(item.paymentDate) },
-            { key: "mode", header: "Mode", render: (item) => item.mode.replace(/_/g, " ") },
-            { key: "remarks", header: "Remarks", render: (item) => item.remarks ?? "--" },
-            {
-              key: "amount",
-              header: "Amount",
-              className: "text-right",
-              render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.amount)}</span>
-            }
-          ]}
-        />
-        <Pagination
-          page={paymentPage.page}
-          size={paymentPage.size}
-          totalRecords={paymentPage.totalRecords}
-          totalPages={paymentPage.totalPages}
-          onPageChange={(nextPage) => {
-            setPage(nextPage);
-            void loadPayments(nextPage);
-          }}
-        />
+        <PaymentTable payments={payments} canDelete={can("PAYMENTS", "DELETE")} onDelete={setDeleteTarget} />
+        <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => {
+          setPage(nextPage);
+          void loadPayments(nextPage);
+        }} />
       </GlassCard>
+
+      <Modal open={Boolean(activeSummary)} title={summaryTitle(activeSummary)} onClose={() => setActiveSummary(null)}>
+        <div className="space-y-5">
+          <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+            <span className="font-semibold text-slate-950">Active Filters:</span>
+            <span className="min-w-0 flex-1 text-slate-600">{summaryTitle(activeSummary)}</span>
+            <span className="font-semibold text-slate-950">Records: {modalPaymentPage.totalRecords}</span>
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <Input label="Search Modal Payments" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={modalSearch} onChange={(event) => {
+              setModalPage(0);
+              setModalSearch(event.target.value);
+            }} />
+            <Button type="button" variant="secondary" disabled={!modalPayments.length} onClick={() => exportPayments(`${activeSummary ?? "payment"}-details.xlsx`, modalPayments)}>
+              <Download size={17} />
+              Export Excel
+            </Button>
+          </div>
+          <PaymentTable payments={modalPayments} canDelete={false} onDelete={setDeleteTarget} />
+          <Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
+        </div>
+      </Modal>
+
+      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );
 };
+
+const PaymentTable = ({ payments, canDelete, onDelete }: { payments: Payment[]; canDelete: boolean; onDelete: (payment: Payment) => void }) => (
+  <Table
+    data={payments}
+    emptyText="No payments match the selected filters."
+    columns={[
+      { key: "ref", header: "Payment Ref", render: (item) => <span className="font-semibold text-white">{paymentRef(item)}</span> },
+      {
+        key: "customer",
+        header: "Customer",
+        render: (item) => (
+          <div>
+            <p className="font-semibold text-white">{item.customerName}</p>
+            <p className="text-xs text-slate-400">{item.customerMobile ?? "--"}</p>
+          </div>
+        )
+      },
+      { key: "invoice", header: "Invoice Number", render: (item) => item.invoiceNo ?? "Unapplied" },
+      { key: "date", header: "Payment Date", render: (item) => formatDate(item.paymentDate) },
+      { key: "mode", header: "Method", render: (item) => item.mode.replace(/_/g, " ") },
+      { key: "status", header: "Status", render: () => <StatusBadge label="SUCCESS" /> },
+      { key: "createdBy", header: "Created By", render: (item) => item.createdBy ?? "--" },
+      { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.amount)}</span> },
+      {
+        key: "actions",
+        header: "Actions",
+        className: "text-right",
+        render: (item) => (
+          <ActionDropdown actions={[{ label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }]} />
+        )
+      }
+    ]}
+  />
+);
+
+const buildParams = (filters: PaymentFilters): PaymentFilterParams => {
+  const presetRange = filters.datePreset === "custom" ? { startDate: filters.startDate, endDate: filters.endDate } : dateRangeForPreset(filters.datePreset);
+  return {
+    search: filters.search.trim() || undefined,
+    paymentStatus: filters.paymentStatus || undefined,
+    startDate: presetRange.startDate || undefined,
+    endDate: presetRange.endDate || undefined,
+    minAmount: filters.minAmount || undefined,
+    maxAmount: filters.maxAmount || undefined,
+    mode: filters.mode || undefined,
+    createdByRole: filters.createdByRole || undefined
+  };
+};
+
+const summaryParams = (params: PaymentFilterParams, key: SummaryKey, search: string): PaymentFilterParams => {
+  const next: PaymentFilterParams = { ...params, search: search.trim() || params.search };
+  if (key === "cash") next.mode = "CASH";
+  if (key === "upi") next.mode = "UPI";
+  if (key === "outstanding") next.invoiceLinked = true;
+  return next;
+};
+
+const summaryTitle = (key: SummaryKey | null) => {
+  if (key === "collection") return "Total Collection Details";
+  if (key === "cash") return "Cash Collection Details";
+  if (key === "upi") return "UPI Collection Details";
+  if (key === "outstanding") return "Outstanding Collection Details";
+  return "Payment Details";
+};
+
+const paymentExportColumns = [
+  { key: "paymentRef", header: "Payment Reference No", value: (row: Payment | Record<string, unknown>) => String((row as Record<string, unknown>).paymentRef ?? ("id" in row ? paymentRef(row as Payment) : "")) },
+  { key: "invoiceNo", header: "Invoice Number" },
+  { key: "customerName", header: "Customer Name" },
+  { key: "customerMobile", header: "Mobile Number" },
+  { key: "paymentDate", header: "Payment Date", type: "date" as const },
+  { key: "mode", header: "Method" },
+  { key: "status", header: "Status", value: (row: Payment | Record<string, unknown>) => String((row as Record<string, unknown>).status ?? "Success") },
+  { key: "amount", header: "Amount", type: "amount" as const },
+  { key: "createdBy", header: "Created By" }
+];

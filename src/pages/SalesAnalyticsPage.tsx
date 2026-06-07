@@ -155,7 +155,7 @@ export const SalesAnalyticsPage = () => {
   return (
     <div className="space-y-4 pb-6">
       <Header
-        title="Owner analytics"
+        title="Analytics Overview"
         subtitle="Monitor sales, collections, outstanding risk, customer growth, and revenue trends with date-based reporting."
       />
 
@@ -163,7 +163,7 @@ export const SalesAnalyticsPage = () => {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Filters</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Analytics range</h2>
+            <h2 className="mt-2 text-2xl font-bold text-white">Dashboard Filters</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {[
@@ -305,7 +305,7 @@ export const SalesAnalyticsPage = () => {
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Monthly revenue</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">12 month revenue trend</h2>
+            <h2 className="mt-2 text-2xl font-bold text-white">12-Month Revenue Trend</h2>
           </div>
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">

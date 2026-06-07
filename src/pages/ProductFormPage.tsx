@@ -9,7 +9,9 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import type { ProductCategory, ProductRequest } from "../types/api";
+import { notificationService } from "../services/notificationService";
 
 type FormValues = {
   name: string;
@@ -103,8 +105,10 @@ export const ProductFormPage = () => {
     try {
       if (editing) {
         await updateProduct(Number(productId), payload);
+        notificationService.showSuccess(CommonSuccessMessageUtil.updated("Product"));
       } else {
         await createProduct(payload);
+        notificationService.showSuccess(CommonSuccessMessageUtil.created("Product"));
       }
       navigate("/products");
     } catch (err: any) {

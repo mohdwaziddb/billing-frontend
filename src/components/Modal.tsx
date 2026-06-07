@@ -23,13 +23,13 @@ export const Modal = ({
         <GlassCard className="w-full max-w-6xl p-6 md:p-7">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Details</p>
-              <h3 className="mt-2 text-xl font-bold text-white">{title}</h3>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">Record Details</p>
+              <h3 className="card-title mt-2 text-xl text-slate-950">{title}</h3>
             </div>
             <button
               type="button"
               aria-label="Close dialog"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950"
               onClick={onClose}
             >
               <X size={18} />

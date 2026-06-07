@@ -24,7 +24,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   return (
     <label className="block space-y-2">
       {label ? (
-        <span className="block text-sm font-semibold text-slate-100">
+        <span className="block text-sm font-semibold text-slate-700">
           {label}
           {requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}
         </span>
@@ -33,8 +33,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           className={clsx(
-            "w-full appearance-none rounded-[var(--radius-control)] border bg-[var(--panel-strong)] px-4 py-3 pr-12 text-sm font-medium text-slate-50 outline-none transition focus:border-sky-300/50 focus:bg-slate-900/98 focus:ring-2 focus:ring-sky-300/20",
-            error ? "border-rose-400/60" : "border-white/10",
+            "w-full appearance-none rounded-[var(--radius-control)] border bg-white px-4 py-3 pr-12 text-sm font-medium text-slate-900 outline-none transition disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
+            error ? "border-rose-400/70" : "border-slate-200",
             className
           )}
           {...props}
@@ -45,9 +45,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
       </div>
-      {error ? <span className="block text-xs text-rose-300">{error}</span> : hint ? <span className="block text-xs text-slate-400">{hint}</span> : null}
+      {error ? <span className="block text-xs text-rose-600">{error}</span> : hint ? <span className="block text-xs text-slate-500">{hint}</span> : null}
     </label>
   );
 });

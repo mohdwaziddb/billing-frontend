@@ -8,6 +8,8 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiFormFeedback } from "../hooks/useApiFeedback";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { notificationService } from "../services/notificationService";
 import type { CustomerRequest } from "../types/api";
 
 type FormValues = {
@@ -94,8 +96,10 @@ export const CustomerFormPage = () => {
 
       if (editing) {
         await updateCustomer(Number(customerId), payload);
+        notificationService.showSuccess(CommonSuccessMessageUtil.updated("Customer"));
       } else {
         await createCustomer(payload);
+        notificationService.showSuccess(CommonSuccessMessageUtil.created("Customer"));
       }
       navigate("/customers");
     } catch (err: any) {

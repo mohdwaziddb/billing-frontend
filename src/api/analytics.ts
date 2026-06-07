@@ -6,6 +6,7 @@ import type {
   LowStockProduct,
   OwnerAnalytics,
   PageResponse,
+  SalesByCategory,
   SalesChartPoint,
   TopSellingProduct
 } from "../types/api";
@@ -54,6 +55,13 @@ export const getCustomerDueList = async (params?: { page?: number; size?: number
 
 export const getOwnerAnalytics = async (params?: { startDate?: string; endDate?: string }) => {
   const response = await apiClient.get<ApiResponse<OwnerAnalytics>>("/v1/analytics/owner-overview", {
+    params
+  });
+  return response.data.data;
+};
+
+export const getSalesByCategory = async (params?: { startDate?: string; endDate?: string; limit?: number }) => {
+  const response = await apiClient.get<ApiResponse<SalesByCategory[]>>("/v1/analytics/sales-by-category", {
     params
   });
   return response.data.data;

@@ -3,16 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NovaBill SaaS</title>
+    <title>Billing Workspace</title>
+    <script>
+      (function () {
+        var key = "billing_saas_theme_bootstrap";
+        var fallback = "#0EA5E9";
+        var root = document.documentElement;
+        var clamp = function (value) { return Math.max(0, Math.min(255, Math.round(value))); };
+        var normalize = function (value) {
+          return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim()) ? String(value).trim().toUpperCase() : fallback;
+        };
+        var hexToRgb = function (hex) {
+          var value = hex.replace("#", "");
+          return {
+            r: parseInt(value.slice(0, 2), 16),
+            g: parseInt(value.slice(2, 4), 16),
+            b: parseInt(value.slice(4, 6), 16)
+          };
+        };
+        var rgbToHex = function (rgb) {
+          return "#" + [rgb.r, rgb.g, rgb.b].map(function (part) {
+            return clamp(part).toString(16).padStart(2, "0");
+          }).join("");
+        };
+        var mix = function (hex, target, weight) {
+          var source = hexToRgb(hex);
+          return rgbToHex({
+            r: source.r + (target.r - source.r) * weight,
+            g: source.g + (target.g - source.g) * weight,
+            b: source.b + (target.b - source.b) * weight
+          });
+        };
+        var luminance = function (rgb) {
+          var channels = [rgb.r, rgb.g, rgb.b].map(function (channel) {
+            var value = channel / 255;
+            return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+          });
+          return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+        };
+        var contrast = function (hex) {
+          return luminance(hexToRgb(hex)) < 0.48 ? "#FFFFFF" : "#111827";
+        };
+        try {
+          var cached = JSON.parse(localStorage.getItem(key) || "{}");
+          var color = normalize(cached.themeColor);
+          var light = mix(color, { r: 255, g: 255, b: 255 }, 0.38);
+          var dark = mix(color, { r: 2, g: 6, b: 23 }, 0.42);
+          var hover = mix(color, { r: 255, g: 255, b: 255 }, 0.22);
+          var border = mix(color, { r: 255, g: 255, b: 255 }, 0.58);
+          root.style.setProperty("--theme-color", color);
+          root.style.setProperty("--theme-light", light);
+          root.style.setProperty("--theme-dark", dark);
+          root.style.setProperty("--theme-hover", hover);
+          root.style.setProperty("--theme-border", border);
+          root.style.setProperty("--theme-contrast", contrast(color));
+          root.style.setProperty("--theme-light-contrast", contrast(light));
+          root.style.setProperty("--theme-dark-contrast", contrast(dark));
+          root.classList.toggle("dark", Boolean(cached.darkModeEnabled));
+        } catch (error) {
+          root.classList.remove("dark");
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/index-CYK-msEU.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/react-B0L1ugCz.js">
+    <script type="module" crossorigin src="/assets/index-BePXrw2r.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-DpxBWkBZ.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-DcNlVx-A.js">
-    <link rel="modulepreload" crossorigin href="/assets/charts-DPX7RegX.js">
-    <link rel="modulepreload" crossorigin href="/assets/pdf-core-B7-nuLsM.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-CghxZMvs.css">
+    <link rel="modulepreload" crossorigin href="/assets/charts-D3eo0pMQ.js">
+    <link rel="modulepreload" crossorigin href="/assets/pdf-core-mFudnNN-.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DyO1SJwf.css">
   </head>
   <body class="bg-slate-950">
     <div id="root"></div>

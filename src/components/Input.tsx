@@ -27,7 +27,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   return (
     <label className="block space-y-2">
       {label ? (
-        <span className="block text-sm font-semibold text-slate-100">
+        <span className="block text-sm font-semibold text-slate-700">
           {label}
           {requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}
         </span>
@@ -35,8 +35,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       <input
         ref={ref}
         className={clsx(
-          "w-full rounded-[var(--radius-control)] border bg-[var(--panel-strong)] px-4 py-3 text-sm font-medium text-slate-50 outline-none transition placeholder:text-slate-500 focus:border-sky-300/50 focus:bg-slate-900/98 focus:ring-2 focus:ring-sky-300/20",
-          error ? "border-rose-400/60" : "border-white/10",
+          "w-full rounded-[var(--radius-control)] border bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
+          error ? "border-rose-400/70" : "border-slate-200",
           className
         )}
         placeholder={buildPlaceholder(label, placeholder, type)}
@@ -59,7 +59,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         }}
         {...props}
       />
-      {error ? <span className="block text-xs text-rose-300">{error}</span> : hint ? <span className="block text-xs text-slate-400">{hint}</span> : null}
+      {error ? <span className="block text-xs text-rose-600">{error}</span> : hint ? <span className="block text-xs text-slate-500">{hint}</span> : null}
     </label>
   );
 });

@@ -11,7 +11,13 @@ import { useApiMessage } from "../hooks/useApiFeedback";
 import type { ActionPermission, PermissionMatrix, Role, UserProfile } from "../types/api";
 
 const ACTION_COLUMNS = ["VIEW", "ADD", "EDIT", "DELETE", "EXPORT"];
-const toRoleOption = (role: Role) => ({ label: role.charAt(0) + role.slice(1).toLowerCase(), value: role });
+const toRoleOption = (role?: Role | string | null) => {
+  const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
+  return {
+    label: normalized ? normalized.charAt(0) + normalized.slice(1).toLowerCase() : "Unknown",
+    value: normalized
+  };
+};
 
 export const RolePermissionsPage = () => {
   const { can, refreshPermissions } = useAuth();

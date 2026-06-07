@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getApiErrorMessage, getFieldErrors } from "../lib/errors";
+import { notificationService } from "../services/notificationService";
 
 export const useApiMessage = () => {
   const [message, setMessage] = useState("");
@@ -11,7 +12,9 @@ export const useApiMessage = () => {
       setMessage("");
     },
     setApiError(error: unknown, fallback: string) {
-      setMessage(getApiErrorMessage(error, fallback));
+      const message = getApiErrorMessage(error, fallback);
+      setMessage(message);
+      notificationService.showError(message, error);
     }
   };
 };
@@ -45,11 +48,15 @@ export const useApiFormFeedback = () => {
 
       if (Object.keys(nextFieldErrors).length > 0) {
         const firstError = Object.values(nextFieldErrors)[0];
-        setMessage(typeof firstError === "string" ? firstError : "Please fix the highlighted fields");
+        const message = typeof firstError === "string" ? firstError : "Please fix the highlighted fields";
+        setMessage(message);
+        notificationService.showError(message, error);
         return;
       }
 
-      setMessage(getApiErrorMessage(error, fallback));
+      const message = getApiErrorMessage(error, fallback);
+      setMessage(message);
+      notificationService.showError(message, error);
     }
   };
 };

@@ -10,7 +10,9 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
+import { notificationService } from "../services/notificationService";
 import type { Customer, Invoice, PaymentMode, PaymentRequest } from "../types/api";
 
 type FormValues = {
@@ -113,7 +115,9 @@ export const PaymentEntryPage = () => {
 
     try {
       await createPayment(payload);
-      setSuccessMessage("Payment recorded successfully.");
+      const message = CommonSuccessMessageUtil.created("Payment");
+      setSuccessMessage(message);
+      notificationService.showSuccess("Payment Recorded Successfully");
       reset({
         customerId: "",
         invoiceId: "",

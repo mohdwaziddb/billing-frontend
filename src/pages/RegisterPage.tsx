@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Input } from "../components/Input";
+import { PasswordInput } from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback } from "../hooks/useApiFeedback";
 
@@ -52,48 +53,56 @@ export const RegisterPage = () => {
   ];
 
   return (
-    <div className="noise flex min-h-screen items-center justify-center px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-10">
       <GlassCard className="w-full max-w-5xl p-8 md:p-10">
         <div className="mb-8">
-          <p className="text-sm uppercase tracking-[0.35em] text-sky-200/70">Create your workspace</p>
-          <h1 className="mt-4 text-4xl font-extrabold text-white">Register your company</h1>
-          <p className="mt-3 max-w-2xl text-sm text-slate-300/70">
+          <p className="text-sm uppercase tracking-[0.35em] text-[var(--theme-color)]">Create your workspace</p>
+          <h1 className="mt-4 text-4xl font-extrabold text-slate-950">Register your company</h1>
+          <p className="mt-3 max-w-2xl text-sm text-slate-600">
             Set up your billing workspace and administrator account with backend validation for security and access.
           </p>
         </div>
 
         <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
-          {fields.map(([key, label, requiredMark]) => (
-            <Input
-              key={key}
-              label={label}
-              requiredMark={requiredMark}
-              type={
-                key.toLowerCase().includes("password")
-                  ? "password"
-                  : key.toLowerCase().includes("email")
-                    ? "email"
-                    : key.toLowerCase().includes("mobile") || key.toLowerCase().includes("phone")
-                      ? "tel"
-                    : "text"
-              }
-              value={form[key]}
-              error={fieldErrors[key]}
-              onChange={(event) => {
+          {fields.map(([key, label, requiredMark]) => {
+            const sharedProps = {
+              key,
+              label,
+              requiredMark,
+              value: form[key],
+              error: fieldErrors[key],
+              onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                 const value = event.target.value;
                 setForm((current) => ({ ...current, [key]: value }));
                 clearFieldError(key);
-              }}
-            />
-          ))}
-          {error ? <div className="md:col-span-2 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{error}</div> : null}
+              }
+            };
+
+            if (key.toLowerCase().includes("password")) {
+              return <PasswordInput {...sharedProps} />;
+            }
+
+            return (
+              <Input
+                {...sharedProps}
+                type={
+                  key.toLowerCase().includes("email")
+                    ? "email"
+                    : key.toLowerCase().includes("mobile") || key.toLowerCase().includes("phone")
+                      ? "tel"
+                      : "text"
+                }
+              />
+            );
+          })}
+          {error ? <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
           <div className="md:col-span-2 flex flex-col gap-4 pt-2 md:flex-row md:items-center md:justify-between">
             <Button disabled={loading} type="submit">
               {loading ? "Creating workspace..." : "Register company"}
             </Button>
-            <p className="text-sm text-slate-300/75">
+            <p className="text-sm text-slate-600">
               Already have access?{" "}
-              <Link className="font-semibold text-sky-200" to="/login">
+              <Link className="font-semibold text-[var(--theme-color)]" to="/login">
                 Back to login
               </Link>
             </p>

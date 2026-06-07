@@ -28,7 +28,7 @@ export const Pagination = ({
 
   return (
     <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-slate-500">
         Page {Math.min(page + 1, Math.max(totalPages, 1))} of {Math.max(totalPages, 1)} - Showing {fromRecord}-{toRecord} of {totalRecords} records
       </p>
       <div className="flex gap-2">

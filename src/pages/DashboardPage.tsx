@@ -1,5 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Search } from "lucide-react";
+import { Banknote, Boxes, ChevronDown, ChevronUp, CreditCard, Download, FileText, Search, TrendingUp, Users, Wallet } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
+import { getOwnerAnalytics, getSalesByCategory, getTopProducts } from "../api/analytics";
 import { getDashboardDetails, getDashboardSummary } from "../api/dashboard";
 import { getInvoices } from "../api/invoices";
 import { Button } from "../components/Button";
@@ -11,9 +26,11 @@ import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { formatAmount, formatCurrency } from "../lib/currency";
+import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
-import type { DashboardCardKey, DashboardDetail, DashboardDetailRow, DashboardSummary, Invoice } from "../types/api";
+import type { DashboardCardKey, DashboardDetail, DashboardDetailRow, DashboardSummary, Invoice, MetricPoint, SalesByCategory, TopSellingProduct } from "../types/api";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 
@@ -22,6 +39,36 @@ type DetailColumn = {
   header: string;
   type?: "currency" | "date" | "status";
   sortable?: boolean;
+};
+
+const DATE_PRESET_OPTIONS: Array<{ value: DatePreset; label: string }> = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "thisWeek", label: "This Week" },
+  { value: "thisMonth", label: "This Month" },
+  { value: "thisYear", label: "This Year" },
+  { value: "custom", label: "Custom Range" }
+];
+
+const GRAPH_PRESET_OPTIONS = DATE_PRESET_OPTIONS.filter((option) => option.value !== "custom");
+
+const CHART_COLORS = {
+  sales: "#2563eb",
+  collection: "#16a34a",
+  outstanding: "#ef4444",
+  customers: "#8b5cf6",
+  products: "#f97316",
+  palette: ["#2563eb", "#16a34a", "#f97316", "#8b5cf6", "#0d9488", "#f43f5e", "#64748b"]
+};
+
+const categoryColorFor = (categoryName: string, index: number) => {
+  const name = categoryName.toLowerCase();
+  if (name.includes("electronic")) return "#2563eb";
+  if (name.includes("cloth") || name.includes("apparel") || name.includes("fashion")) return "#16a34a";
+  if (name.includes("print")) return "#f97316";
+  if (name.includes("service")) return "#8b5cf6";
+  if (name.includes("other") || name.includes("misc")) return "#0d9488";
+  return CHART_COLORS.palette[index % CHART_COLORS.palette.length];
 };
 
 const detailConfig: Record<DashboardCardKey, { title: string; columns: DetailColumn[]; defaultSort: string }> = {
@@ -60,6 +107,18 @@ const detailConfig: Record<DashboardCardKey, { title: string; columns: DetailCol
       { key: "dueDate", header: "Due Date", type: "date", sortable: true }
     ]
   },
+  customers: {
+    title: "Total Customers Details",
+    defaultSort: "lastPurchaseDate",
+    columns: [
+      { key: "customerName", header: "Customer Name", sortable: true },
+      { key: "mobile", header: "Mobile", sortable: true },
+      { key: "invoiceCount", header: "Invoice Count", sortable: true },
+      { key: "totalPurchaseAmount", header: "Total Purchase Amount", type: "currency", sortable: true },
+      { key: "outstandingAmount", header: "Outstanding Amount", type: "currency", sortable: true },
+      { key: "lastPurchaseDate", header: "Last Purchase Date", type: "date", sortable: true }
+    ]
+  },
   newCustomers: {
     title: "New Customers Details",
     defaultSort: "firstPurchaseDate",
@@ -92,24 +151,60 @@ const detailConfig: Record<DashboardCardKey, { title: string; columns: DetailCol
       { key: "invoiceAmount", header: "Invoice Amount", type: "currency", sortable: true },
       { key: "status", header: "Status", type: "status", sortable: true }
     ]
+  },
+  products: {
+    title: "Product-wise Sales Summary",
+    defaultSort: "totalRevenue",
+    columns: [
+      { key: "productName", header: "Product Name", sortable: true },
+      { key: "quantitySold", header: "Quantity Sold", sortable: true },
+      { key: "totalRevenue", header: "Total Revenue", type: "currency", sortable: true },
+      { key: "numberOfInvoices", header: "Number of Invoices", sortable: true }
+    ]
   }
 };
 
 const formatCell = (row: DashboardDetailRow, column: DetailColumn) => {
   const value = row[column.key];
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
   if (column.type === "currency") {
     return formatAmount(Number(value ?? 0));
   }
   if (column.type === "date") {
     return formatDate(String(value ?? ""));
   }
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
   return String(value).replace(/_/g, " ");
 };
 
-const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+const isTotalColumn = (column: DetailColumn) => {
+  if (column.type === "currency") {
+    return true;
+  }
+  return /(amount|total|count|quantity|qty|paid|outstanding|collected|revenue)/i.test(column.key)
+    && column.type !== "date"
+    && column.type !== "status";
+};
+
+const buildGrandTotalRow = (rows: DashboardDetailRow[], columns: DetailColumn[]) => {
+  if (!rows.length || !columns.some(isTotalColumn)) {
+    return null;
+  }
+  const totalRow: DashboardDetailRow = { __rowType: "grandTotal" };
+  columns.forEach((column, index) => {
+    if (index === 0) {
+      totalRow[column.key] = "Grand Total";
+      return;
+    }
+    if (isTotalColumn(column)) {
+      totalRow[column.key] = rows.reduce((sum, row) => sum + Number(row[column.key] ?? 0), 0);
+      return;
+    }
+    totalRow[column.key] = null;
+  });
+  return totalRow;
+};
 
 const buildRange = (preset: DatePreset) => {
   const now = new Date();
@@ -143,11 +238,31 @@ const buildRange = (preset: DatePreset) => {
   return { startDate: toIso(start), endDate: toIso(today) };
 };
 
+const formatTrend = (value?: number | null) => {
+  const safeValue = Number(value ?? 0);
+  if (safeValue === 0) {
+    return "0%";
+  }
+  return `${safeValue > 0 ? "+" : ""}${safeValue.toFixed(2)}%`;
+};
+
 export const DashboardPage = () => {
+  const { preferences } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
+  const [salesTrendData, setSalesTrendData] = useState<MetricPoint[]>([]);
+  const [ownerAnalytics, setOwnerAnalytics] = useState<{
+    salesTrend: MetricPoint[];
+    collectionTrend: MetricPoint[];
+    outstandingTrend: MetricPoint[];
+    monthlyRevenue: MetricPoint[];
+  } | null>(null);
+  const [topProducts, setTopProducts] = useState<TopSellingProduct[]>([]);
+  const [salesByCategory, setSalesByCategory] = useState<SalesByCategory[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [preset, setPreset] = useState<DatePreset>("thisMonth");
   const [customRange, setCustomRange] = useState(() => buildRange("thisMonth"));
+  const [salesTrendPreset, setSalesTrendPreset] = useState<DatePreset>("thisMonth");
   const [activeCard, setActiveCard] = useState<DashboardCardKey | null>(null);
   const [details, setDetails] = useState<DashboardDetail | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -159,7 +274,15 @@ export const DashboardPage = () => {
   });
 
   const activeRange = useMemo(() => (preset === "custom" ? customRange : buildRange(preset)), [customRange, preset]);
+  const salesTrendRange = useMemo(() => buildRange(salesTrendPreset), [salesTrendPreset]);
   const selectedConfig = activeCard ? detailConfig[activeCard] : null;
+  const categoryTotal = useMemo(() => salesByCategory.reduce((sum, item) => sum + Number(item.totalAmount ?? 0), 0), [salesByCategory]);
+  const chartTextColor = preferences.darkModeEnabled ? "#CBD5E1" : "#64748B";
+  const chartGridColor = preferences.darkModeEnabled ? "#334155" : "#e8edf5";
+  const grandTotalRow = useMemo(
+    () => (selectedConfig && details ? buildGrandTotalRow(details.rows, selectedConfig.columns) : null),
+    [details, selectedConfig]
+  );
   const dashboardCards = useMemo(
     () =>
       [
@@ -167,52 +290,92 @@ export const DashboardPage = () => {
           key: "totalSales" as const,
           label: "Total Sales",
           value: formatCurrency(summary?.totalSales),
-          caption: "Invoiced sales in the selected period."
+          caption: "In selected period",
+          icon: <TrendingUp size={18} />,
+          growth: formatTrend(summary?.totalSalesTrendPercentage),
+          analyticsColor: CHART_COLORS.sales
         },
         {
           key: "collections" as const,
           label: "Collections",
           value: formatCurrency(summary?.totalCollection),
-          caption: "Payments recorded during the selected range."
+          caption: "Recorded payments",
+          icon: <CreditCard size={18} />,
+          growth: formatTrend(summary?.collectionTrendPercentage),
+          analyticsColor: CHART_COLORS.collection
         },
         {
           key: "outstanding" as const,
           label: "Outstanding",
           value: formatCurrency(summary?.outstandingAmount),
-          caption: "Current total pending customer balance."
+          caption: "Pending balance",
+          icon: <Wallet size={18} />,
+          growth: formatTrend(summary?.outstandingTrendPercentage),
+          analyticsColor: CHART_COLORS.outstanding
         },
         {
-          key: "newCustomers" as const,
-          label: "New Customers",
-          value: String(summary?.newCustomers ?? 0),
-          caption: "First purchase happened inside this range."
-        },
-        {
-          key: "existingCustomers" as const,
-          label: "Existing Customers",
-          value: String(summary?.existingCustomers ?? 0),
-          caption: "Earlier customers who purchased in this range.",
-          hideWhenZero: true,
-          count: summary?.existingCustomers ?? 0
-        },
-        {
-          key: "invoices" as const,
-          label: "Invoices",
-          value: String(summary?.totalInvoices ?? 0),
-          caption: "Invoices issued during the selected range.",
-          hideWhenZero: true,
-          count: summary?.totalInvoices ?? 0
+          key: "customers" as const,
+          label: "Total Customers",
+          value: String(summary?.totalCustomers ?? 0),
+          caption: "Purchased in range",
+          icon: <Users size={18} />,
+          growth: formatTrend(summary?.totalCustomersTrendPercentage),
+          analyticsColor: CHART_COLORS.customers
         }
-      ].filter((card) => !card.hideWhenZero || card.count > 0),
+      ],
+    [summary]
+  );
+  const compactMetrics = useMemo(
+    () => [
+      {
+        key: "newCustomers" as const,
+        label: "New Customers",
+        value: String(summary?.newCustomers ?? 0),
+        caption: "First purchase in range",
+        icon: <Users size={17} />
+      },
+      {
+        key: "existingCustomers" as const,
+        label: "Existing Customers",
+        value: String(summary?.existingCustomers ?? 0),
+        caption: "Repeat buyers",
+        icon: <Users size={17} />
+      },
+      {
+        key: "products" as const,
+        label: "Products",
+        value: String(summary?.totalProducts ?? 0),
+        caption: "Product-wise sales",
+        icon: <Boxes size={17} />
+      },
+      {
+        key: "invoices" as const,
+        label: "Invoices",
+        value: String(summary?.totalInvoices ?? 0),
+        caption: "Issued in range",
+        icon: <FileText size={17} />
+      }
+    ],
     [summary]
   );
 
   useEffect(() => {
     void Promise.all([
       getDashboardSummary(activeRange),
-      getInvoices({ size: 100 })
-    ]).then(([summaryData, invoicesData]) => {
+      getInvoices({ size: 100 }),
+      getOwnerAnalytics(activeRange).catch(() => null),
+      getTopProducts({ size: 5 }).catch(() => ({ records: [] })),
+      getSalesByCategory({ ...activeRange, limit: 5 }).catch(() => [])
+    ]).then(([summaryData, invoicesData, ownerData, productData, categoryData]) => {
       setSummary(summaryData);
+      setOwnerAnalytics(ownerData ? {
+        salesTrend: ownerData.salesTrend,
+        collectionTrend: ownerData.collectionTrend,
+        outstandingTrend: ownerData.outstandingTrend,
+        monthlyRevenue: ownerData.monthlyRevenue
+      } : null);
+      setTopProducts(productData.records);
+      setSalesByCategory(categoryData);
       const filtered = invoicesData.filter((invoice) => {
         if (activeRange.startDate && invoice.invoiceDate < activeRange.startDate) {
           return false;
@@ -222,6 +385,12 @@ export const DashboardPage = () => {
       setRecentInvoices(filtered.slice(0, 5));
     });
   }, [activeRange]);
+
+  useEffect(() => {
+    void getOwnerAnalytics(salesTrendRange)
+      .then((data) => setSalesTrendData(data.salesTrend))
+      .catch(() => setSalesTrendData([]));
+  }, [salesTrendRange]);
 
   useEffect(() => {
     if (!activeCard) {
@@ -264,45 +433,40 @@ export const DashboardPage = () => {
     if (!selectedConfig || !details) {
       return;
     }
-    const lines = [
-      selectedConfig.columns.map((column) => escapeCsv(column.header)).join(","),
-      ...details.rows.map((row) => selectedConfig.columns.map((column) => escapeCsv(formatCell(row, column))).join(","))
-    ];
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `${details.card}-dashboard-details.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    const exportRows = grandTotalRow ? [...details.rows, grandTotalRow] : details.rows;
+    exportToExcel(`${details.card}-dashboard-details.xlsx`, exportRows, selectedConfig.columns.map((column) => ({
+      key: column.key,
+      header: column.header,
+      type: column.type === "currency" ? "amount" : column.type === "date" ? "date" : "text",
+      value: (row) => row[column.key]
+    })));
   };
 
+  const modalFilters = [
+    activeRange.startDate && activeRange.endDate ? `Date Range = ${formatDate(activeRange.startDate)} to ${formatDate(activeRange.endDate)}` : null,
+    detailSearch ? `Search = ${detailSearch}` : null
+  ].filter(Boolean);
+
   return (
-    <div className="space-y-4 pb-6">
+    <div className="space-y-5 pb-6">
       <Header
         title="Dashboard"
         subtitle="Track sales, collections, open balances, and customer performance with date-based business visibility."
       />
 
-      <GlassCard className="p-6 md:p-7">
+      <GlassCard className="p-5 md:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Filters</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Dashboard range</h2>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Filters</p>
+              <h2 className="mt-2 text-2xl font-bold text-slate-950">Dashboard Filters</h2>
           </div>
           <div className="flex flex-wrap gap-2">
-            {[
-              ["today", "Today"],
-              ["yesterday", "Yesterday"],
-              ["thisWeek", "This Week"],
-              ["thisMonth", "This Month"],
-              ["thisYear", "This Year"],
-              ["custom", "Custom Range"]
-            ].map(([value, label]) => (
+            {DATE_PRESET_OPTIONS.map(({ value, label }) => (
               <Button
                 key={value}
                 type="button"
                 variant={preset === value ? "primary" : "secondary"}
-                onClick={() => setPreset(value as DatePreset)}
+                onClick={() => setPreset(value)}
               >
                 {label}
               </Button>
@@ -327,18 +491,113 @@ export const DashboardPage = () => {
         ) : null}
       </GlassCard>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {dashboardCards.map((card) => (
-          <StatCard key={card.key} label={card.label} value={card.value} caption={card.caption} onClick={() => openDetails(card.key)} />
+          <StatCard
+            key={card.label}
+            label={card.label}
+            value={card.value}
+            caption={card.caption}
+            icon={card.icon}
+            growth={card.growth}
+            analyticsColor={card.analyticsColor}
+            onClick={card.key ? () => openDetails(card.key) : undefined}
+          />
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <GlassCard className="p-6 md:p-7">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {compactMetrics.map((metric) => (
+          <button
+            key={metric.label}
+            type="button"
+            className="group flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--theme-color)_28%,white)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)]"
+            onClick={() => openDetails(metric.key)}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--theme-color)_10%,white)] text-[var(--theme-color)]">
+              {metric.icon}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{metric.label}</span>
+              <span className="mt-1 block text-2xl font-extrabold text-slate-950">{metric.value}</span>
+              <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{metric.caption}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.55fr_0.85fr]">
+        <GlassCard className="p-5 md:p-6">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Analytics</p>
+              <h2 className="mt-2 text-xl font-extrabold text-slate-950">Sales Trend</h2>
+            </div>
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_12%,transparent)]"
+              value={salesTrendPreset}
+              onChange={(event) => setSalesTrendPreset(event.target.value as DatePreset)}
+              aria-label="Sales trend range"
+            >
+              {GRAPH_PRESET_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={salesTrendData}>
+                <defs>
+                  <linearGradient id="salesArea" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor={CHART_COLORS.sales} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={CHART_COLORS.sales} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke={chartGridColor} strokeDasharray="4 4" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: chartTextColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: chartTextColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Area type="monotone" dataKey="value" stroke={CHART_COLORS.sales} strokeWidth={3} fill="url(#salesArea)" dot={{ r: 3, fill: CHART_COLORS.sales }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-5 md:p-6">
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Products</p>
+          <h2 className="mt-2 text-xl font-extrabold text-slate-950">Top Selling Products</h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_1fr] xl:grid-cols-1">
+            <div className="h-[210px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={topProducts} dataKey="totalSalesAmount" nameKey="productName" innerRadius={52} outerRadius={82} paddingAngle={3}>
+                    {topProducts.map((_, index) => <Cell key={index} fill={CHART_COLORS.palette[index % CHART_COLORS.palette.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="space-y-3">
+              {topProducts.map((product, index) => (
+                <div key={product.productId} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: CHART_COLORS.palette[index % CHART_COLORS.palette.length] }} />
+                    <p className="truncate text-sm font-bold text-slate-700">{product.productName}</p>
+                  </div>
+                  <p className="shrink-0 text-sm font-bold text-slate-950">{formatCurrency(product.totalSalesAmount)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        <GlassCard className="p-5 md:p-6">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Recent invoices</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">Billing activity</h2>
+              <h2 className="mt-2 text-xl font-extrabold text-slate-950">Billing activity</h2>
             </div>
             <p className="text-sm text-slate-400">{recentInvoices.length} invoice{recentInvoices.length === 1 ? "" : "s"}</p>
           </div>
@@ -346,13 +605,13 @@ export const DashboardPage = () => {
             data={recentInvoices}
             emptyText="No invoices fall within the selected range."
             columns={[
-              { key: "invoice", header: "Invoice", render: (item) => <span className="font-semibold text-white">{item.invoiceNo}</span> },
+              { key: "invoice", header: "Invoice", render: (item) => <span className="font-semibold text-slate-950">{item.invoiceNo}</span> },
               {
                 key: "customer",
                 header: "Customer",
                 render: (item) => (
                   <div>
-                    <p className="font-semibold text-white">{item.customerName}</p>
+                    <p className="font-semibold text-slate-950">{item.customerName}</p>
                     <p className="text-xs text-slate-400">{item.customerMobile}</p>
                   </div>
                 )
@@ -363,30 +622,30 @@ export const DashboardPage = () => {
                 key: "balance",
                 header: "Balance",
                 className: "text-right",
-                render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.balanceAmount)}</span>
+                render: (item) => <span className="block text-right font-semibold text-slate-950">{formatCurrency(item.balanceAmount)}</span>
               }
             ]}
           />
         </GlassCard>
 
-        <GlassCard className="p-6 md:p-7">
+        <GlassCard className="p-5 md:p-6">
           <div className="mb-5">
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Top customers</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Highest sales contribution</h2>
+            <h2 className="mt-2 text-xl font-extrabold text-slate-950">Highest sales contribution</h2>
           </div>
           <div className="space-y-3">
             {summary?.topCustomers?.length ? (
               summary.topCustomers.map((customer) => (
-                <div key={customer.customerId} className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <div key={customer.customerId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-white">{customer.customerName}</p>
+                      <p className="truncate font-semibold text-slate-950">{customer.customerName}</p>
                       <p className="mt-1 text-sm text-slate-400">{customer.mobile}</p>
                       <p className="mt-2 text-xs text-slate-500">Last purchase: {formatDate(customer.lastPurchaseDate)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Sales</p>
-                      <p className="mt-1 font-semibold text-white">{formatCurrency(customer.totalPurchaseAmount)}</p>
+                      <p className="mt-1 font-semibold text-slate-950">{formatCurrency(customer.totalPurchaseAmount)}</p>
                       <p className="mt-2 text-xs text-slate-400">Paid: {formatCurrency(customer.totalPaidAmount)}</p>
                       <p className="text-xs text-rose-200">Outstanding: {formatCurrency(customer.outstandingBalance)}</p>
                     </div>
@@ -394,7 +653,7 @@ export const DashboardPage = () => {
                 </div>
               ))
             ) : (
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-sm text-slate-400">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                 No customer activity found for the selected range.
               </div>
             )}
@@ -402,14 +661,122 @@ export const DashboardPage = () => {
         </GlassCard>
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <GlassCard className="p-5 md:p-6">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Categories</p>
+              <h2 className="mt-2 text-xl font-extrabold text-slate-950">Sales By Category</h2>
+            </div>
+            <p className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">Top 5</p>
+          </div>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={salesByCategory} dataKey="totalAmount" nameKey="categoryName" innerRadius={62} outerRadius={96} paddingAngle={3}>
+                  {salesByCategory.map((category, index) => (
+                    <Cell
+                      key={category.categoryId}
+                      fill={categoryColorFor(category.categoryName, index)}
+                      opacity={!activeCategoryId || activeCategoryId === category.categoryId ? 1 : 0.28}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-4 space-y-2">
+            {salesByCategory.length ? salesByCategory.map((category, index) => (
+              <button
+                key={category.categoryId}
+                type="button"
+                className={`flex w-full items-center justify-between gap-3 rounded-2xl border p-3 text-left transition ${activeCategoryId === category.categoryId ? "border-slate-300 bg-slate-100" : "border-transparent bg-slate-50 hover:bg-slate-100"}`}
+                onClick={() => setActiveCategoryId((current) => (current === category.categoryId ? null : category.categoryId))}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: categoryColorFor(category.categoryName, index) }} />
+                  <span className="truncate text-sm font-bold text-slate-700">{category.categoryName}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-sm font-extrabold text-slate-950">{formatCurrency(category.totalAmount)}</span>
+                  <span className="text-xs font-bold text-slate-400">{categoryTotal ? category.percentage.toFixed(0) : "0"}%</span>
+                </span>
+              </button>
+            )) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No category sales found for the selected range.</div>
+            )}
+          </div>
+        </GlassCard>
+        <GlassCard className="p-5 md:p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+              <Banknote size={20} />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Outstanding</p>
+              <h2 className="mt-1 text-xl font-extrabold text-slate-950">Outstanding Overview</h2>
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-rose-200/70 bg-[rgba(239,68,68,0.12)] p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Outstanding</p>
+              <p className="mt-2 text-xl font-extrabold text-slate-950">{formatCurrency(summary?.outstandingAmount)}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200/70 bg-[rgba(22,163,74,0.12)] p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Collections</p>
+              <p className="mt-2 text-xl font-extrabold text-slate-950">{formatCurrency(summary?.totalCollection)}</p>
+            </div>
+          </div>
+          <div className="mt-5 h-[170px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={ownerAnalytics?.outstandingTrend ?? []}>
+                <CartesianGrid stroke={chartGridColor} strokeDasharray="4 4" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: chartTextColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: chartTextColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Line type="monotone" dataKey="value" stroke={CHART_COLORS.outstanding} strokeWidth={3} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-extrabold text-slate-950">Collection Trend</p>
+              <p className="text-xs font-bold text-emerald-600">Range synced</p>
+            </div>
+            <div className="h-[120px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={ownerAnalytics?.collectionTrend ?? []}>
+                  <defs>
+                    <linearGradient id="collectionArea" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor={CHART_COLORS.collection} stopOpacity={0.22} />
+                      <stop offset="100%" stopColor={CHART_COLORS.collection} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="label" hide />
+                  <YAxis hide />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  <Area type="monotone" dataKey="value" stroke={CHART_COLORS.collection} strokeWidth={3} fill="url(#collectionArea)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+
       <Modal open={Boolean(activeCard)} title={selectedConfig?.title ?? "Dashboard Details"} onClose={() => setActiveCard(null)}>
         <div className="space-y-5">
+          <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+            <span className="font-semibold text-slate-950">Active Filters:</span>
+            <span className="min-w-0 flex-1 text-slate-600">{modalFilters.join(" | ") || "No filters applied"}</span>
+            <span className="font-semibold text-slate-950">Records: {details?.totalElements ?? 0}</span>
+          </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <label className="relative block min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={17} />
               <input
-                className="w-full rounded-[var(--radius-control)] border border-white/10 bg-[var(--panel-strong)] py-3 pl-11 pr-4 text-sm font-medium text-slate-50 outline-none transition placeholder:text-slate-500 focus:border-sky-300/50 focus:ring-2 focus:ring-sky-300/20"
-                placeholder="Search details"
+                className="w-full rounded-[var(--radius-control)] border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]"
+                placeholder={`Search ${selectedConfig?.title ?? "dashboard details"}`}
                 value={detailSearch}
                 onChange={(event) => {
                   setDetailPage(0);
@@ -419,34 +786,21 @@ export const DashboardPage = () => {
             </label>
             <Button type="button" variant="secondary" onClick={exportDetails} disabled={!details?.rows.length}>
               <Download size={17} />
-              Export CSV
+              Export Excel
             </Button>
           </div>
 
-          {activeCard === "totalSales" && details?.productSummary?.length ? (
-            <div>
-              <p className="mb-3 text-sm font-semibold text-white">Product-wise sales summary</p>
-              <Table
-                data={details.productSummary}
-                columns={[
-                  { key: "productName", header: "Product Name", render: (item) => String(item.productName ?? "--") },
-                  { key: "quantitySold", header: "Quantity Sold", render: (item) => String(item.quantitySold ?? 0) },
-                  { key: "totalRevenue", header: "Total Revenue", render: (item) => formatAmount(Number(item.totalRevenue ?? 0)) },
-                  { key: "numberOfInvoices", header: "Number of Invoices", render: (item) => String(item.numberOfInvoices ?? 0) }
-                ]}
-              />
-            </div>
-          ) : null}
-
-          <div className="scrollbar-thin overflow-x-auto">
-            <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-200/90">
-              <thead>
+          <div className="scrollbar-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+            <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
+              <thead className="sticky top-0 z-10 bg-slate-50">
                 <tr>
                   {selectedConfig?.columns.map((column) => (
-                    <th key={column.key} className="whitespace-nowrap border-b border-white/10 px-4 pb-3 pt-1 font-medium text-slate-400 first:pl-0 last:pr-0">
-                      <button type="button" className="text-left" onClick={() => toggleSort(column)}>
-                        {column.header}
-                        {detailSort.sortBy === column.key ? ` ${detailSort.sortDirection}` : ""}
+                    <th key={column.key} className="whitespace-nowrap border-b border-slate-200 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 first:pl-5 last:pr-5">
+                      <button type="button" className="inline-flex items-center gap-1 text-left transition hover:text-slate-950" onClick={() => toggleSort(column)}>
+                        <span>{column.header}</span>
+                        {detailSort.sortBy === column.key ? (
+                          detailSort.sortDirection === "desc" ? <ChevronDown className="text-slate-400" size={14} /> : <ChevronUp className="text-slate-400" size={14} />
+                        ) : null}
                       </button>
                     </th>
                   ))}
@@ -455,21 +809,32 @@ export const DashboardPage = () => {
               <tbody>
                 {detailsLoading ? (
                   <tr>
-                    <td className="px-4 py-10 text-center text-slate-400" colSpan={selectedConfig?.columns.length ?? 1}>Loading details...</td>
+                    <td className="px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={selectedConfig?.columns.length ?? 1}>Loading details...</td>
                   </tr>
                 ) : details?.rows.length ? (
-                  details.rows.map((row, index) => (
-                    <tr key={index} className="group">
-                      {selectedConfig?.columns.map((column) => (
-                        <td key={column.key} className="border-b border-white/5 px-4 py-4 align-top first:pl-0 last:pr-0 group-last:border-b-0">
-                          {column.type === "status" ? <StatusBadge label={formatCell(row, column)} /> : formatCell(row, column)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
+                  <>
+                    {details.rows.map((row, index) => (
+                      <tr key={index} className="group odd:bg-white even:bg-slate-50/55 transition hover:bg-[color-mix(in_srgb,var(--theme-color)_6%,white)]">
+                        {selectedConfig?.columns.map((column) => (
+                          <td key={column.key} className="border-b border-slate-100 px-4 py-4 align-top text-slate-700 first:pl-5 last:pr-5 group-last:border-b-0">
+                            {column.type === "status" ? <StatusBadge label={formatCell(row, column)} /> : formatCell(row, column)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {grandTotalRow ? (
+                      <tr className="grand-total-row">
+                        {selectedConfig?.columns.map((column) => (
+                          <td key={column.key} className="border-t border-slate-200 px-4 py-4 align-top first:pl-5 last:pr-5">
+                            {formatCell(grandTotalRow, column)}
+                          </td>
+                        ))}
+                      </tr>
+                    ) : null}
+                  </>
                 ) : (
                   <tr>
-                    <td className="px-4 py-10 text-center text-slate-400" colSpan={selectedConfig?.columns.length ?? 1}>No details found for this card.</td>
+                    <td className="px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={selectedConfig?.columns.length ?? 1}>No details found for this card.</td>
                   </tr>
                 )}
               </tbody>

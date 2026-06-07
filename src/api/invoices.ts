@@ -1,14 +1,30 @@
 import { apiClient } from "./apiClient";
 import type { ApiResponse, Invoice, InvoiceRequest, PageResponse } from "../types/api";
 
-export const getInvoicesPage = async (params?: { customerId?: number; page?: number; size?: number }) => {
+export type InvoiceFilterParams = {
+  customerId?: number;
+  search?: string;
+  invoiceStatus?: string;
+  paymentStatus?: string;
+  startDate?: string;
+  endDate?: string;
+  outstandingFilter?: string;
+  minAmount?: number | string;
+  maxAmount?: number | string;
+  categoryId?: number | string;
+  createdByRole?: string;
+  page?: number;
+  size?: number;
+};
+
+export const getInvoicesPage = async (params?: InvoiceFilterParams) => {
   const response = await apiClient.get<ApiResponse<PageResponse<Invoice>>>("/v1/invoices", {
     params
   });
   return response.data.data;
 };
 
-export const getInvoices = async (params?: { customerId?: number; page?: number; size?: number }) => {
+export const getInvoices = async (params?: InvoiceFilterParams) => {
   const response = await getInvoicesPage(params);
   return response.records;
 };

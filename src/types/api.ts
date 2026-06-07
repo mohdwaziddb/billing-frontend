@@ -34,13 +34,14 @@ export type CompanyTheme = {
   themeColor: string;
 };
 
-export type CompanyOwner = {
-  userId: number;
-  fullName: string;
-  email: string;
-  mobileNumber: string;
-  role: Role;
-  active: boolean;
+export type PlatformSettings = {
+  platformName: string;
+  platformLogo: string | null;
+  platformTagline: string | null;
+};
+
+export type UserPreference = {
+  darkModeEnabled: boolean;
 };
 
 export type UserProfile = {
@@ -50,6 +51,7 @@ export type UserProfile = {
   email: string;
   role: Role;
   active: boolean;
+  createdAt?: string | null;
   company: CompanySummary | null;
 };
 
@@ -67,12 +69,17 @@ export type DashboardSummary = {
   totalSales: number;
   totalCollection: number;
   outstandingAmount: number;
+  totalCustomers: number;
   newCustomers: number;
   existingCustomers: number;
   totalInvoices: number;
   totalProducts: number;
   totalRevenue: number;
   outstandingBalance: number;
+  totalSalesTrendPercentage: number;
+  collectionTrendPercentage: number;
+  outstandingTrendPercentage: number;
+  totalCustomersTrendPercentage: number;
   topCustomers: DashboardTopCustomer[];
 };
 
@@ -84,7 +91,7 @@ export type PageResponse<T> = {
   totalPages: number;
 };
 
-export type DashboardCardKey = "totalSales" | "collections" | "outstanding" | "newCustomers" | "existingCustomers" | "invoices";
+export type DashboardCardKey = "totalSales" | "collections" | "outstanding" | "customers" | "newCustomers" | "existingCustomers" | "invoices" | "products";
 
 export type DashboardDetailRow = Record<string, string | number | null>;
 
@@ -182,6 +189,13 @@ export type CustomerDue = {
   mobile: string;
   email: string | null;
   currentBalance: number;
+};
+
+export type SalesByCategory = {
+  categoryId: number;
+  categoryName: string;
+  totalAmount: number;
+  percentage: number;
 };
 
 export type Customer = {
@@ -362,6 +376,7 @@ export type Payment = {
   id: number;
   customerId: number;
   customerName: string;
+  customerMobile?: string | null;
   invoiceId: number | null;
   invoiceNo: string | null;
   amount: number;

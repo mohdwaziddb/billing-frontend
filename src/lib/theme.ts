@@ -12,6 +12,14 @@ const hexToRgb = (hex: string) => {
   };
 };
 
+const getRelativeLuminance = ({ r, g, b }: { r: number; g: number; b: number }) => {
+  const channels = [r, g, b].map((channel) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+};
+
 const rgbToHex = ({ r, g, b }: { r: number; g: number; b: number }) =>
   `#${[r, g, b].map((part) => clamp(part).toString(16).padStart(2, "0")).join("")}`;
 
@@ -31,6 +39,13 @@ export const normalizeHexColor = (value: string) => {
   return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed.toUpperCase() : DEFAULT_THEME_COLOR;
 };
 
+export const getContrastTextColor = (backgroundColor: string) => {
+  const color = normalizeHexColor(backgroundColor);
+  return getRelativeLuminance(hexToRgb(color)) < 0.48 ? "#FFFFFF" : "#111827";
+};
+
+export const getThemeAwareTextColor = (backgroundColor: string) => getContrastTextColor(backgroundColor);
+
 export const applyThemeColor = (themeColor?: string | null) => {
   const color = normalizeHexColor(themeColor ?? DEFAULT_THEME_COLOR);
   const root = document.documentElement;
@@ -38,10 +53,16 @@ export const applyThemeColor = (themeColor?: string | null) => {
   const dark = mix(color, { r: 2, g: 6, b: 23 }, 0.42);
   const hover = mix(color, { r: 255, g: 255, b: 255 }, 0.22);
   const border = mix(color, { r: 255, g: 255, b: 255 }, 0.58);
+  const contrast = getContrastTextColor(color);
+  const lightContrast = getContrastTextColor(light);
+  const darkContrast = getContrastTextColor(dark);
   root.style.setProperty("--theme-color", color);
   root.style.setProperty("--theme-light", light);
   root.style.setProperty("--theme-dark", dark);
   root.style.setProperty("--theme-hover", hover);
   root.style.setProperty("--theme-border", border);
-  return { color, light, dark, hover, border };
+  root.style.setProperty("--theme-contrast", contrast);
+  root.style.setProperty("--theme-light-contrast", lightContrast);
+  root.style.setProperty("--theme-dark-contrast", darkContrast);
+  return { color, light, dark, hover, border, contrast, lightContrast, darkContrast };
 };

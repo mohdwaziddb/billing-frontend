@@ -17,12 +17,12 @@ export const Table = <T,>({
   emptyText?: string;
 }) => {
   return (
-    <div className="scrollbar-thin overflow-x-auto">
-      <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-200/90">
-        <thead>
-          <tr className="border-b border-white/10 text-slate-400">
+    <div className="scrollbar-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
+        <thead className="sticky top-0 z-10 bg-slate-50">
+          <tr className="border-b border-slate-200 text-slate-500">
             {columns.map((column) => (
-              <th key={column.key} className={`whitespace-nowrap border-b border-white/10 px-4 pb-3 pt-1 font-medium first:pl-0 last:pr-0 ${column.className ?? ""}`}>
+              <th key={column.key} className={`table-header whitespace-nowrap border-b border-slate-200 px-4 py-3 text-xs font-bold uppercase tracking-wide first:pl-5 last:pr-5 ${column.className ?? ""}`}>
                 {column.header}
               </th>
             ))}
@@ -31,15 +31,15 @@ export const Table = <T,>({
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td className="px-4 py-10 text-center text-slate-400 first:pl-0 last:pr-0" colSpan={columns.length}>
+              <td className="px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={columns.length}>
                 {emptyText}
               </td>
             </tr>
           ) : (
             data.map((item, index) => (
-              <tr key={index} className="group">
+              <tr key={index} className="group odd:bg-white even:bg-slate-50/55 transition hover:bg-[color-mix(in_srgb,var(--theme-color)_6%,white)]">
                 {columns.map((column) => (
-                  <td key={column.key} className={`border-b border-white/5 px-4 py-4 align-top first:pl-0 last:pr-0 group-last:border-b-0 ${column.className ?? ""}`}>
+                  <td key={column.key} className={`border-b border-slate-100 px-4 py-4 align-top first:pl-5 last:pr-5 group-last:border-b-0 ${column.className ?? ""}`}>
                     {column.render(item)}
                   </td>
                 ))}

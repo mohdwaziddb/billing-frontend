@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { BookOpen, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Download, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteCustomer, getCustomerLedger, getCustomersPage } from "../api/customers";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -14,8 +15,12 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
+import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
+import { notificationService } from "../services/notificationService";
 import type { Customer, CustomerLedger, PageResponse } from "../types/api";
 
 const emptyCustomerPage: PageResponse<Customer> = {
@@ -34,6 +39,8 @@ export const CustomerListPage = () => {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { can } = useAuth();
   const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
 
@@ -47,6 +54,24 @@ export const CustomerListPage = () => {
   const loadLedger = async (customerId: number, nextPage = 0) => {
     setLedgerCustomerId(customerId);
     setSelectedLedger(await getCustomerLedger(customerId, { page: nextPage, size: DEFAULT_PAGE_SIZE }));
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+    try {
+      setDeleting(true);
+      clearMessage();
+      await deleteCustomer(deleteTarget.id);
+      await loadCustomers(page);
+      setDeleteTarget(null);
+      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Customer"));
+    } catch (err: any) {
+      setApiError(err, CommonErrorMessageUtil.deleteFailed);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   useEffect(() => {
@@ -72,10 +97,26 @@ export const CustomerListPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Customer registry</p>
               <h2 className="mt-2 text-2xl font-bold text-white">All customers</h2>
             </div>
-            {can("CUSTOMERS", "ADD") ? (
-              <Link to="/customers/new">
-                <Button>Add customer</Button>
-              </Link>
+            {can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
+              <div className="flex flex-wrap gap-2">
+                {can("CUSTOMERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!customers.length} onClick={() => exportToExcel("customers.xlsx", customers, [
+                  { key: "name", header: "Customer Name" },
+                  { key: "mobile", header: "Mobile" },
+                  { key: "email", header: "Email" },
+                  { key: "totalPurchaseAmount", header: "Total Purchase", type: "amount" },
+                  { key: "totalPaidAmount", header: "Total Paid", type: "amount" },
+                  { key: "totalDiscountGiven", header: "Discount Given", type: "amount" },
+                  { key: "outstandingBalance", header: "Outstanding Balance", type: "amount" },
+                  { key: "lastPurchaseDate", header: "Last Purchase", type: "date" },
+                  { key: "active", header: "Status", value: (row) => row.active ? "Active" : "Inactive" }
+                ])}>
+                  <Download size={16} />
+                  Export Excel
+                </Button> : null}
+                {can("CUSTOMERS", "ADD") ? <Link to="/customers/new">
+                  <Button>Add customer</Button>
+                </Link> : null}
+              </div>
             ) : null}
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
@@ -174,15 +215,7 @@ export const CustomerListPage = () => {
                       icon: <Trash2 size={15} />,
                       danger: true,
                       hidden: !can("CUSTOMERS", "DELETE"),
-                      onClick: () =>
-                        void deleteCustomer(item.id)
-                          .then(() => {
-                            clearMessage();
-                            return loadCustomers(page);
-                          })
-                          .catch((err: any) => {
-                            setApiError(err, "Unable to delete customer");
-                          })
+                      onClick: () => setDeleteTarget(item)
                     }
                   ]}
                 />
@@ -236,6 +269,7 @@ export const CustomerListPage = () => {
           ) : null}
         </div>
       </Modal>
+      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );
 };

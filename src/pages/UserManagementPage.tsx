@@ -1,19 +1,26 @@
-import { Edit3, Plus, UserX } from "lucide-react";
+import { Download, Edit3, Plus, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { createCompanyUser, deactivateCompanyUser, getCompanyUsersPage, getRoles, updateCompanyUser } from "../api/users";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { PasswordInput } from "../components/PasswordInput";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
+import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { exportToExcel } from "../lib/excelExport";
+import { formatDateTime } from "../lib/format";
+import { notificationService } from "../services/notificationService";
 import type { CompanyUserRequest, PageResponse, Role, UserProfile } from "../types/api";
 
 type FormValues = {
@@ -25,7 +32,30 @@ type FormValues = {
   active: string;
 };
 
-const toRoleOption = (role: Role) => ({ label: role.charAt(0) + role.slice(1).toLowerCase(), value: role });
+const formatRoleLabel = (role?: string | null) => {
+  const normalized = typeof role === "string" ? role.trim() : "";
+  if (!normalized) {
+    return "Unknown";
+  }
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
+};
+
+const toRoleOption = (role?: Role | string | null) => ({
+  label: formatRoleLabel(role),
+  value: typeof role === "string" ? role.trim().toUpperCase() : ""
+});
+
+type UserFilters = {
+  search: string;
+  role: Role | "";
+  active: "" | "true" | "false";
+};
+
+const emptyFilters: UserFilters = {
+  search: "",
+  role: "",
+  active: "true"
+};
 
 const emptyUserPage: PageResponse<UserProfile> = {
   records: [],
@@ -41,8 +71,17 @@ export const UserManagementPage = () => {
   const [userPage, setUserPage] = useState<PageResponse<UserProfile>>(emptyUserPage);
   const [page, setPage] = useState(0);
   const [roles, setRoles] = useState<Role[]>(["OWNER", "ADMIN", "USER"]);
+  const [filters, setFilters] = useState<UserFilters>(emptyFilters);
+  const [exportRows, setExportRows] = useState<UserProfile[]>([]);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [activeUserRole, setActiveUserRole] = useState<Role | "ALL" | null>(null);
+  const [modalSearch, setModalSearch] = useState("");
+  const [modalPage, setModalPage] = useState(0);
+  const [modalUsers, setModalUsers] = useState<UserProfile[]>([]);
+  const [modalUserPage, setModalUserPage] = useState<PageResponse<UserProfile>>(emptyUserPage);
   const { message: pageError, clearMessage, setApiError } = useApiMessage();
   const { message: formError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
   const {
@@ -61,19 +100,62 @@ export const UserManagementPage = () => {
     }
   });
 
-  const ownerCount = useMemo(() => users.filter((item) => item.role === "OWNER" && item.active).length, [users]);
+  const filterParams = useMemo(() => ({
+    search: filters.search.trim() || undefined,
+    role: filters.role || undefined,
+    active: filters.active === "" ? undefined : filters.active === "true"
+  }), [filters]);
+
+  const roleCounts = useMemo(() => {
+    const source = exportRows.length ? exportRows : users;
+    return {
+      owners: source.filter((item) => item.role === "OWNER").length,
+      admins: source.filter((item) => item.role === "ADMIN").length,
+      users: source.filter((item) => item.role === "USER").length
+    };
+  }, [exportRows, users]);
 
   const loadUsers = async (nextPage = page) => {
-    const response = await getCompanyUsersPage({ page: nextPage, size: DEFAULT_PAGE_SIZE });
+    const response = await getCompanyUsersPage({ page: nextPage, size: DEFAULT_PAGE_SIZE, ...filterParams });
     setUserPage(response);
     setUsers(response.records);
   };
 
+  const loadExportRows = async () => {
+    const response = await getCompanyUsersPage({ page: 0, size: 100, ...filterParams });
+    setExportRows(response.records);
+  };
+
   useEffect(() => {
     if (can("USERS", "VIEW")) {
-      void Promise.all([loadUsers(0), getRoles().then(setRoles)]).catch((err: any) => setApiError(err, "Unable to load users"));
+      void Promise.all([loadUsers(0), loadExportRows(), getRoles().then(setRoles)]).catch((err: any) => setApiError(err, "Unable to load users"));
     }
-  }, [can]);
+  }, [can, filterParams]);
+
+  useEffect(() => {
+    if (!activeUserRole) {
+      return;
+    }
+    void getCompanyUsersPage({
+      page: modalPage,
+      size: DEFAULT_PAGE_SIZE,
+      search: modalSearch.trim() || undefined,
+      role: activeUserRole === "ALL" ? undefined : activeUserRole
+    })
+      .then((response) => {
+        setModalUserPage(response);
+        setModalUsers(response.records);
+      })
+      .catch((err: any) => setApiError(err, "Unable to load user details"));
+  }, [activeUserRole, modalPage, modalSearch]);
+
+  const openUserSummary = (role: Role | "ALL") => {
+    setActiveUserRole(role);
+    setModalSearch("");
+    setModalPage(0);
+  };
+
+  const exportUsers = (fileName: string, rows: UserProfile[]) => exportToExcel(fileName, rows, userExportColumns);
 
   const openCreateModal = () => {
     clearFeedback();
@@ -121,24 +203,36 @@ export const UserManagementPage = () => {
     try {
       if (editingUser) {
         await updateCompanyUser(editingUser.id, payload);
+        notificationService.showSuccess(CommonSuccessMessageUtil.updated("User"));
       } else {
         await createCompanyUser({ ...payload, password: values.password.trim() });
+        notificationService.showSuccess(CommonSuccessMessageUtil.created("User"));
       }
       setModalOpen(false);
       clearMessage();
       await loadUsers(page);
+      await loadExportRows();
     } catch (err: any) {
       applyApiError(err, editingUser ? "Unable to update user" : "Unable to create user");
     }
   };
 
-  const deactivateUser = async (target: UserProfile) => {
+  const deactivateUser = async () => {
+    if (!deleteTarget) {
+      return;
+    }
     clearMessage();
     try {
-      await deactivateCompanyUser(target.id);
+      setDeleting(true);
+      await deactivateCompanyUser(deleteTarget.id);
       await loadUsers(page);
+      await loadExportRows();
+      setDeleteTarget(null);
+      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("User"));
     } catch (err: any) {
-      setApiError(err, "Unable to deactivate user");
+      setApiError(err, CommonErrorMessageUtil.deleteFailed);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -163,33 +257,88 @@ export const UserManagementPage = () => {
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <GlassCard className="p-5">
-          <p className="text-sm text-slate-400">Total users</p>
-          <p className="mt-3 text-3xl font-extrabold text-white">{userPage.totalRecords}</p>
-        </GlassCard>
-        <GlassCard className="p-5">
-          <p className="text-sm text-slate-400">Active owners</p>
-          <p className="mt-3 text-3xl font-extrabold text-white">{ownerCount}</p>
-        </GlassCard>
-        <GlassCard className="p-5">
-          <p className="text-sm text-slate-400">Active users</p>
-          <p className="mt-3 text-3xl font-extrabold text-white">{users.filter((item) => item.active).length}</p>
-        </GlassCard>
+      <div className="grid gap-4 md:grid-cols-4">
+        <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("ALL")}>
+          <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
+            <p className="text-sm text-slate-400">Total Users</p>
+            <p className="mt-3 text-3xl font-extrabold text-white">{userPage.totalRecords}</p>
+          </GlassCard>
+        </button>
+        <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("OWNER")}>
+          <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
+            <p className="text-sm text-slate-400">Owners</p>
+            <p className="mt-3 text-3xl font-extrabold text-white">{roleCounts.owners}</p>
+          </GlassCard>
+        </button>
+        <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("ADMIN")}>
+          <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
+            <p className="text-sm text-slate-400">Admins</p>
+            <p className="mt-3 text-3xl font-extrabold text-white">{roleCounts.admins}</p>
+          </GlassCard>
+        </button>
+        <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("USER")}>
+          <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
+            <p className="text-sm text-slate-400">Users</p>
+            <p className="mt-3 text-3xl font-extrabold text-white">{roleCounts.users}</p>
+          </GlassCard>
+        </button>
       </div>
 
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Access control</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Company users</h2>
+            <h2 className="mt-2 text-2xl font-bold text-white">Company Users</h2>
           </div>
-          {can("USERS", "ADD") ? (
-            <Button type="button" onClick={openCreateModal}>
-              <Plus size={16} />
-              Add user
-            </Button>
+          {can("USERS", "EXPORT") || can("USERS", "ADD") ? (
+            <div className="flex flex-wrap gap-2">
+              {can("USERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length && !users.length} onClick={() => exportUsers("users.xlsx", exportRows.length ? exportRows : users)}>
+                <Download size={16} />
+                Export Excel
+              </Button> : null}
+              {can("USERS", "ADD") ? <Button type="button" onClick={openCreateModal}>
+                <Plus size={16} />
+                Add user
+              </Button> : null}
+            </div>
           ) : null}
+        </div>
+
+        <div className="mb-5 grid gap-4 md:grid-cols-3">
+          <Input
+            label="Search Users"
+            placeholder="Search by name, mobile number or email"
+            value={filters.search}
+            onChange={(event) => {
+              setPage(0);
+              setFilters((current) => ({ ...current, search: event.target.value }));
+            }}
+          />
+          <Select
+            label="User Role"
+            value={filters.role}
+            options={[
+              { label: "All Roles", value: "" },
+              ...roles.filter(Boolean).map(toRoleOption)
+            ]}
+            onChange={(event) => {
+              setPage(0);
+              setFilters((current) => ({ ...current, role: event.target.value as Role | "" }));
+            }}
+          />
+          <Select
+            label="Status Filter"
+            value={filters.active}
+            options={[
+              { label: "All", value: "" },
+              { label: "Active", value: "true" },
+              { label: "Inactive", value: "false" }
+            ]}
+            onChange={(event) => {
+              setPage(0);
+              setFilters((current) => ({ ...current, active: event.target.value as UserFilters["active"] }));
+            }}
+          />
         </div>
 
         <Table
@@ -198,17 +347,22 @@ export const UserManagementPage = () => {
           columns={[
             {
               key: "name",
-              header: "User",
-              render: (item) => (
-                <div className="min-w-[220px]">
-                  <p className="font-semibold text-white">{item.fullName}</p>
-                  <p className="text-xs text-slate-300">{item.mobileNumber}</p>
-                  <p className="text-xs text-slate-400">{item.email}</p>
-                </div>
-              )
+              header: "Name",
+              render: (item) => <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
+            },
+            {
+              key: "mobileNumber",
+              header: "Mobile Number",
+              render: (item) => <span className="whitespace-nowrap text-slate-700">{item.mobileNumber || "--"}</span>
+            },
+            {
+              key: "email",
+              header: "Email Address",
+              render: (item) => <span className="break-all text-slate-700">{item.email || "--"}</span>
             },
             { key: "role", header: "Role", render: (item) => <StatusBadge label={item.role} /> },
             { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
+            { key: "createdAt", header: "Created Date", render: (item) => <span className="whitespace-nowrap text-slate-700">{formatDateTime(item.createdAt)}</span> },
             {
               key: "actions",
               header: "Actions",
@@ -228,7 +382,7 @@ export const UserManagementPage = () => {
                       danger: true,
                       disabled: !item.active,
                       hidden: !can("USERS", "DELETE"),
-                      onClick: () => void deactivateUser(item)
+                      onClick: () => setDeleteTarget(item)
                     }
                   ]}
                 />
@@ -270,10 +424,9 @@ export const UserManagementPage = () => {
             error={fieldErrors.mobileNumber ?? errors.mobileNumber?.message}
             {...register("mobileNumber", { required: "Mobile number is required" })}
           />
-          <Input
+          <PasswordInput
             label={editingUser ? "New Password" : "Password"}
             requiredMark={!editingUser}
-            type="password"
             hint={editingUser ? "Leave blank to keep the current password." : undefined}
             error={fieldErrors.password ?? errors.password?.message}
             {...register("password", {
@@ -286,7 +439,7 @@ export const UserManagementPage = () => {
             requiredMark
             placeholder={null}
             error={fieldErrors.role}
-            options={roles.map(toRoleOption)}
+            options={roles.filter(Boolean).map(toRoleOption)}
             {...register("role", { required: "Role is required" })}
           />
           <Select
@@ -316,6 +469,70 @@ export const UserManagementPage = () => {
           </div>
         </form>
       </Modal>
+      <Modal open={Boolean(activeUserRole)} title={userSummaryTitle(activeUserRole)} onClose={() => setActiveUserRole(null)}>
+        <div className="space-y-5">
+          <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+            <span className="font-semibold text-slate-950">Role Filter:</span>
+            <span className="min-w-0 flex-1 text-slate-600">{activeUserRole === "ALL" ? "All Users" : toRoleOption(activeUserRole as Role).label}</span>
+            <span className="font-semibold text-slate-950">Records: {modalUserPage.totalRecords}</span>
+          </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <Input
+              label="Search Modal Users"
+              placeholder="Search by name, mobile number or email"
+              value={modalSearch}
+              onChange={(event) => {
+                setModalPage(0);
+                setModalSearch(event.target.value);
+              }}
+            />
+            <Button type="button" variant="secondary" disabled={!modalUsers.length} onClick={() => exportUsers(`${activeUserRole ?? "users"}-users.xlsx`, modalUsers)}>
+              <Download size={17} />
+              Export Excel
+            </Button>
+          </div>
+          <Table
+            data={modalUsers}
+            emptyText="No users found for this role."
+            columns={[
+              {
+                key: "name",
+                header: "Name",
+                render: (item) => <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
+              },
+              {
+                key: "mobileNumber",
+                header: "Mobile Number",
+                render: (item) => <span className="whitespace-nowrap text-slate-700">{item.mobileNumber || "--"}</span>
+              },
+              {
+                key: "email",
+                header: "Email Address",
+                render: (item) => <span className="break-all text-slate-700">{item.email || "--"}</span>
+              },
+              { key: "role", header: "Role", render: (item) => <StatusBadge label={item.role} /> },
+              { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
+            ]}
+          />
+          <Pagination page={modalUserPage.page} size={modalUserPage.size} totalRecords={modalUserPage.totalRecords} totalPages={modalUserPage.totalPages} onPageChange={setModalPage} />
+        </div>
+      </Modal>
+      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void deactivateUser()} />
     </div>
   );
+};
+
+const userExportColumns = [
+  { key: "fullName", header: "Name" },
+  { key: "mobileNumber", header: "Mobile Number" },
+  { key: "email", header: "Email Address" },
+  { key: "role", header: "Role", value: (row: UserProfile) => formatRoleLabel(row.role) },
+  { key: "active", header: "Status", value: (row: UserProfile) => row.active ? "Active" : "Inactive" }
+];
+
+const userSummaryTitle = (role: Role | "ALL" | null) => {
+  if (role === "OWNER") return "Owner Users";
+  if (role === "ADMIN") return "Admin Users";
+  if (role === "USER") return "Users";
+  return "All Users";
 };

@@ -7,7 +7,9 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { applyThemeColor, DEFAULT_THEME_COLOR, normalizeHexColor } from "../lib/theme";
+import { notificationService } from "../services/notificationService";
 
 const presets = [
   { label: "Blue", value: "#0EA5E9" },
@@ -46,7 +48,9 @@ export const ThemeSettingsPage = () => {
       const updated = await updateCompanyTheme(normalizeHexColor(color));
       setColor(updated.themeColor);
       await refreshTheme();
-      setSuccess("Theme updated successfully.");
+      const message = CommonSuccessMessageUtil.updated("Theme");
+      setSuccess(message);
+      notificationService.showSuccess(message);
     } catch (err: any) {
       setApiError(err, "Unable to update theme");
     } finally {
@@ -62,7 +66,9 @@ export const ThemeSettingsPage = () => {
       const updated = await resetCompanyTheme();
       setColor(updated.themeColor);
       await refreshTheme();
-      setSuccess("Theme reset to default.");
+      const message = CommonSuccessMessageUtil.updated("Theme");
+      setSuccess(message);
+      notificationService.showSuccess(message);
     } catch (err: any) {
       setApiError(err, "Unable to reset theme");
     } finally {
@@ -150,15 +156,15 @@ export const ThemeSettingsPage = () => {
                   <p className="text-xs uppercase tracking-[0.28em] text-white/60">Header</p>
                   <h3 className="mt-2 text-2xl font-bold text-white">Company Workspace</h3>
                 </div>
-                <div className="rounded-2xl px-4 py-2 text-sm font-semibold text-slate-950" style={{ backgroundColor: preview.light }}>
+                <div className="rounded-2xl px-4 py-2 text-sm font-semibold" style={{ backgroundColor: preview.light, color: preview.lightContrast }}>
                   Active
                 </div>
               </div>
             </div>
             <div className="grid gap-4 bg-slate-950/70 p-5 md:grid-cols-[180px_1fr]">
               <div className="space-y-2">
-                <div className="rounded-2xl px-4 py-3 text-sm font-semibold text-white" style={{ backgroundColor: preview.dark }}>Dashboard</div>
-                <div className="rounded-2xl px-4 py-3 text-sm font-semibold text-slate-300" style={{ backgroundColor: `${preview.color}22` }}>Customers</div>
+                <div className="rounded-2xl px-4 py-3 text-sm font-semibold" style={{ backgroundColor: preview.dark, color: preview.darkContrast }}>Dashboard</div>
+                <div className="rounded-2xl px-4 py-3 text-sm font-semibold text-white" style={{ backgroundColor: preview.color }}>Customers</div>
                 <div className="rounded-2xl px-4 py-3 text-sm font-semibold text-slate-300">Invoices</div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -167,7 +173,7 @@ export const ThemeSettingsPage = () => {
                   <p className="mt-3 text-2xl font-bold text-white">Theme aware</p>
                 </div>
                 <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                  <button className="rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold text-slate-950" style={{ backgroundColor: preview.color }}>
+                  <button className="rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold" style={{ backgroundColor: preview.color, color: preview.contrast }}>
                     Primary Button
                   </button>
                 </div>

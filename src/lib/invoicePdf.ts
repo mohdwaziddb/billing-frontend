@@ -96,7 +96,7 @@ export const downloadInvoicePdf = async (invoice: Invoice, company: CompanySumma
 
   doc.setTextColor(15, 23, 42);
   doc.setFontSize(22);
-  doc.text(company?.name ?? "NovaBill", 112, 60);
+  doc.text(company?.name ?? "Billing Workspace", 112, 60);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(71, 85, 105);

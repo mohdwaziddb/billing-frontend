@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Download, Pencil, Trash2 } from "lucide-react";
 import { createProductCategory, deleteProductCategory, getProductCategoriesPage, updateProductCategory } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -13,7 +14,11 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
+import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { exportToExcel } from "../lib/excelExport";
 import { formatDateTime } from "../lib/format";
+import { notificationService } from "../services/notificationService";
 import type { PageResponse, ProductCategory, ProductCategoryRequest } from "../types/api";
 
 type FormState = {
@@ -47,12 +52,15 @@ export const ProductCategoryPage = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ProductCategory | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
   const { message: formError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
 
   const canAdd = can("PRODUCT_CATEGORY", "ADD");
   const canEdit = can("PRODUCT_CATEGORY", "EDIT");
   const canDelete = can("PRODUCT_CATEGORY", "DELETE");
+  const canExport = can("PRODUCT_CATEGORY", "EXPORT");
 
   const loadCategories = async (nextPage = page) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
@@ -96,8 +104,10 @@ export const ProductCategoryPage = () => {
     try {
       if (editingCategory) {
         await updateProductCategory(editingCategory.id, payload);
+        notificationService.showSuccess(CommonSuccessMessageUtil.updated("Product Category"));
       } else {
         await createProductCategory(payload);
+        notificationService.showSuccess(CommonSuccessMessageUtil.created("Product Category"));
       }
       setFormOpen(false);
       clearMessage();
@@ -109,16 +119,21 @@ export const ProductCategoryPage = () => {
     }
   };
 
-  const removeCategory = async (category: ProductCategory) => {
-    if (!window.confirm(`Delete ${category.categoryName}?`)) {
+  const removeCategory = async () => {
+    if (!deleteTarget) {
       return;
     }
     try {
-      await deleteProductCategory(category.id);
+      setDeleting(true);
+      await deleteProductCategory(deleteTarget.id);
       clearMessage();
       await loadCategories(page);
+      setDeleteTarget(null);
+      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Product Category"));
     } catch (err: any) {
-      setApiError(err, "Unable to delete product category");
+      setApiError(err, CommonErrorMessageUtil.deleteFailed);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -141,7 +156,21 @@ export const ProductCategoryPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Setup</p>
               <h2 className="mt-2 text-2xl font-bold text-white">Product Categories</h2>
             </div>
-            {canAdd ? <Button onClick={openCreate}>Add Category</Button> : null}
+            <div className="flex flex-wrap gap-2">
+              {canExport ? <Button type="button" variant="secondary" disabled={!categories.length} onClick={() => exportToExcel("product-categories.xlsx", categories, [
+                { key: "categoryName", header: "Category Name" },
+                { key: "description", header: "Description" },
+                { key: "active", header: "Status", value: (row) => row.active ? "Active" : "Inactive" },
+                { key: "createdAt", header: "Created At", type: "date" },
+                { key: "updatedAt", header: "Updated At", type: "date" },
+                { key: "createdBy", header: "Created By" },
+                { key: "updatedBy", header: "Updated By" }
+              ])}>
+                <Download size={16} />
+                Export Excel
+              </Button> : null}
+              {canAdd ? <Button onClick={openCreate}>Add Category</Button> : null}
+            </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
             <Input
@@ -202,7 +231,7 @@ export const ProductCategoryPage = () => {
                       icon: <Trash2 size={15} />,
                       danger: true,
                       hidden: !canDelete,
-                      onClick: () => void removeCategory(item)
+                      onClick: () => setDeleteTarget(item)
                     }
                   ]}
                 />
@@ -259,6 +288,7 @@ export const ProductCategoryPage = () => {
           </Button>
         </div>
       </Modal>
+      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void removeCategory()} />
     </div>
   );
 };

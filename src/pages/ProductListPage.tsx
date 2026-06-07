@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Download, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteProduct, getProductsPage } from "../api/products";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -13,7 +14,11 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
+import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
+import { exportToExcel } from "../lib/excelExport";
+import { notificationService } from "../services/notificationService";
 import type { PageResponse, Product } from "../types/api";
 
 const emptyProductPage: PageResponse<Product> = {
@@ -30,6 +35,8 @@ export const ProductListPage = () => {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { can } = useAuth();
   const { message: error, clearMessage, setApiError } = useApiMessage();
 
@@ -40,13 +47,21 @@ export const ProductListPage = () => {
     setProducts(response.records);
   };
 
-  const handleDelete = async (productId: number) => {
+  const handleDelete = async () => {
+    if (!deleteTarget) {
+      return;
+    }
     try {
+      setDeleting(true);
       clearMessage();
-      await deleteProduct(productId);
+      await deleteProduct(deleteTarget.id);
       await loadProducts(page);
+      setDeleteTarget(null);
+      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Product"));
     } catch (err: any) {
-      setApiError(err, "Unable to delete product");
+      setApiError(err, CommonErrorMessageUtil.deleteFailed);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -68,10 +83,27 @@ export const ProductListPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Inventory</p>
               <h2 className="mt-2 text-2xl font-bold text-white">Products</h2>
             </div>
-            {can("PRODUCTS", "ADD") ? (
-              <Link to="/products/new">
-                <Button>Add product</Button>
-              </Link>
+            {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") ? (
+              <div className="flex flex-wrap gap-2">
+                {can("PRODUCTS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!products.length} onClick={() => exportToExcel("products.xlsx", products, [
+                  { key: "name", header: "Product Name" },
+                  { key: "sku", header: "SKU" },
+                  { key: "brand", header: "Brand" },
+                  { key: "categoryName", header: "Category" },
+                  { key: "purchasePrice", header: "Purchase Price", type: "amount" },
+                  { key: "sellingPrice", header: "Selling Price", type: "amount" },
+                  { key: "stockQty", header: "Stock Qty", type: "number" },
+                  { key: "minStockQty", header: "Minimum Stock Qty", type: "number" },
+                  { key: "taxPercent", header: "Tax Percent", type: "number" },
+                  { key: "active", header: "Status", value: (row) => row.active ? "Active" : "Inactive" }
+                ])}>
+                  <Download size={16} />
+                  Export Excel
+                </Button> : null}
+                {can("PRODUCTS", "ADD") ? <Link to="/products/new">
+                  <Button>Add product</Button>
+                </Link> : null}
+              </div>
             ) : null}
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
@@ -169,7 +201,7 @@ export const ProductListPage = () => {
                       icon: <Trash2 size={15} />,
                       danger: true,
                       hidden: !can("PRODUCTS", "DELETE"),
-                      onClick: () => void handleDelete(item.id)
+                      onClick: () => setDeleteTarget(item)
                     }
                   ]}
                 />
@@ -188,6 +220,7 @@ export const ProductListPage = () => {
           }}
         />
       </GlassCard>
+      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );
 };

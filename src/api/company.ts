@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { ApiResponse, CompanyOwner, CompanySummary, CompanyTheme } from "../types/api";
+import type { ApiResponse, CompanySummary, CompanyTheme } from "../types/api";
 
 export type CompanySettingsRequest = {
   name: string;
@@ -37,16 +37,6 @@ export const uploadCompanyLogo = async (logo: File) => {
   const response = await apiClient.put<ApiResponse<CompanySummary>>("/v1/company/logo", formData, {
     headers: { "Content-Type": "multipart/form-data" }
   });
-  return response.data.data;
-};
-
-export const getCompanyOwners = async () => {
-  const response = await apiClient.get<ApiResponse<CompanyOwner[]>>("/v1/company/owners");
-  return response.data.data;
-};
-
-export const updateCompanyOwners = async (ownerUserIds: number[]) => {
-  const response = await apiClient.put<ApiResponse<CompanyOwner[]>>("/v1/company/owners", { ownerUserIds });
   return response.data.data;
 };
 
