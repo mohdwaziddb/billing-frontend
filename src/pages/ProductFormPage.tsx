@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
+import { getProductCategories } from "../api/productCategories";
 import { createProduct, getProduct, updateProduct } from "../api/products";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
@@ -8,11 +9,11 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
-import type { ProductRequest } from "../types/api";
+import type { ProductCategory, ProductRequest } from "../types/api";
 
 type FormValues = {
   name: string;
-  category: string;
+  categoryId: string;
   brand: string;
   sku: string;
   hsnCode: string;
@@ -28,6 +29,7 @@ export const ProductFormPage = () => {
   const navigate = useNavigate();
   const { productId } = useParams();
   const editing = Boolean(productId);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const {
     register,
     handleSubmit,
@@ -36,7 +38,7 @@ export const ProductFormPage = () => {
   } = useForm<FormValues>({
     defaultValues: {
       name: "",
-      category: "",
+      categoryId: "",
       brand: "",
       sku: "",
       hsnCode: "",
@@ -51,13 +53,19 @@ export const ProductFormPage = () => {
   const { message: serverError, clearMessage, setApiError } = useApiMessage();
 
   useEffect(() => {
+    void getProductCategories({ active: true, size: 1000 }).then((categoryData) => {
+      setCategories(categoryData.filter((category) => category.active));
+    });
+  }, []);
+
+  useEffect(() => {
     if (!productId) {
       return;
     }
     void getProduct(Number(productId)).then((product) => {
       reset({
         name: product.name,
-        category: product.category ?? "",
+        categoryId: product.categoryId ? String(product.categoryId) : "",
         brand: product.brand ?? "",
         sku: product.sku,
         hsnCode: product.hsnCode ?? "",
@@ -71,11 +79,16 @@ export const ProductFormPage = () => {
     });
   }, [productId, reset]);
 
+  const categoryOptions = useMemo(
+    () => categories.map((category) => ({ label: category.categoryName, value: String(category.id) })),
+    [categories]
+  );
+
   const onSubmit = async (values: FormValues) => {
     clearMessage();
     const payload: ProductRequest = {
       name: values.name,
-      category: values.category || undefined,
+      categoryId: Number(values.categoryId),
       brand: values.brand || undefined,
       sku: values.sku,
       hsnCode: values.hsnCode || undefined,
@@ -115,7 +128,16 @@ export const ProductFormPage = () => {
         <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
           <Input label="Name" requiredMark error={errors.name?.message} {...register("name", { required: "Name is required" })} />
           <Input label="SKU" requiredMark error={errors.sku?.message} {...register("sku", { required: "SKU is required" })} />
-          <Input label="Category" {...register("category")} />
+          <Select
+            label="Product Category"
+            requiredMark
+            placeholder={categoryOptions.length ? "Select Product Category" : "No product categories found"}
+            error={errors.categoryId?.message}
+            hint="Only active product categories are available."
+            disabled={!categoryOptions.length}
+            options={categoryOptions}
+            {...register("categoryId", { required: "Product category is required" })}
+          />
           <Input label="Brand" {...register("brand")} />
           <Input label="HSN Code" {...register("hsnCode")} />
           <Input label="Purchase Price" requiredMark type="number" step="0.01" error={errors.purchasePrice?.message} {...register("purchasePrice", { required: "Purchase price is required" })} />

@@ -16,8 +16,6 @@ type FormValues = {
   email: string;
   address: string;
   gstNo: string;
-  openingBalance: string;
-  creditLimit: string;
   active: string;
 };
 
@@ -37,8 +35,6 @@ export const CustomerFormPage = () => {
       email: "",
       address: "",
       gstNo: "",
-      openingBalance: "",
-      creditLimit: "",
       active: "true"
     }
   });
@@ -56,8 +52,6 @@ export const CustomerFormPage = () => {
         email: customer.email ?? "",
         address: customer.address ?? "",
         gstNo: customer.gstNo ?? "",
-        openingBalance: String(customer.openingBalance),
-        creditLimit: String(customer.creditLimit),
         active: customer.active ? "true" : "false"
       });
     });
@@ -72,13 +66,11 @@ export const CustomerFormPage = () => {
       email: values.email.trim() || undefined,
       address: values.address.trim() || undefined,
       gstNo: values.gstNo.trim() || undefined,
-      openingBalance: Number(values.openingBalance || 0),
-      creditLimit: Number(values.creditLimit || 0),
       active: values.active === "true"
     };
 
     try {
-      const existingCustomers = await getCustomers();
+      const existingCustomers = await getCustomers({ size: 1000 });
       const currentId = editing ? Number(customerId) : null;
       const mobileExists = existingCustomers.some(
         (customer) => customer.id !== currentId && customer.mobile.trim().toLowerCase() === payload.mobile.toLowerCase()
@@ -162,21 +154,7 @@ export const CustomerFormPage = () => {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Input
-              label="Opening Balance"
-              type="number"
-              step="0.01"
-              error={fieldErrors.openingBalance ?? errors.openingBalance?.message}
-              {...register("openingBalance")}
-            />
-            <Input
-              label="Credit Limit"
-              type="number"
-              step="0.01"
-              error={fieldErrors.creditLimit ?? errors.creditLimit?.message}
-              {...register("creditLimit")}
-            />
+          <div className="grid gap-4 md:grid-cols-2">
             <Select
               label="Status"
               placeholder="Select Status"

@@ -4,15 +4,19 @@ import { useApiMessage } from "../../../hooks/useApiFeedback";
 import { formatCurrency } from "../../../lib/currency";
 import { formatDate, formatDateTime } from "../../../lib/format";
 import { Button } from "../../../components/Button";
+import { ActionDropdown } from "../../../components/ActionDropdown";
 import { GlassCard } from "../../../components/GlassCard";
 import { Header } from "../../../components/Header";
 import { Input } from "../../../components/Input";
 import { Select } from "../../../components/Select";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../../../components/Pagination";
+import { useAuth } from "../../../context/AuthContext";
 import { ReminderHistoryModal } from "../components/ReminderHistoryModal";
 import { getOverdueCustomers, sendReminder } from "../reminder.api";
 import type { OverdueCustomer, ReminderChannel } from "../reminder.types";
+import type { PageResponse } from "../../../types/api";
 
 const channelOptions = [
   { label: "SMS", value: "SMS" },
@@ -21,10 +25,17 @@ const channelOptions = [
 ] as const;
 
 export const OutstandingCustomersReminderPage = () => {
-  const [customers, setCustomers] = useState<OverdueCustomer[]>([]);
+  const [customerPage, setCustomerPage] = useState<PageResponse<OverdueCustomer>>({
+    records: [],
+    page: 0,
+    size: DEFAULT_PAGE_SIZE,
+    totalRecords: 0,
+    totalPages: 0
+  });
   const [loading, setLoading] = useState(false);
   const [successToast, setSuccessToast] = useState("");
   const { message: errorToast, clearMessage, setApiError } = useApiMessage();
+  const { can } = useAuth();
   const [filters, setFilters] = useState({
     search: "",
     minBalance: "",
@@ -33,16 +44,18 @@ export const OutstandingCustomersReminderPage = () => {
   });
   const [historyTarget, setHistoryTarget] = useState<{ id: number; name: string } | null>(null);
 
-  const loadCustomers = async (nextFilters: typeof filters = filters) => {
+  const loadCustomers = async (nextFilters: typeof filters = filters, nextPage = 0) => {
     setLoading(true);
     clearMessage();
     try {
       const data = await getOverdueCustomers({
         search: nextFilters.search || undefined,
         minBalance: nextFilters.minBalance ? Number(nextFilters.minBalance) : undefined,
-        overdueDays: nextFilters.overdueDays ? Number(nextFilters.overdueDays) : undefined
+        overdueDays: nextFilters.overdueDays ? Number(nextFilters.overdueDays) : undefined,
+        page: nextPage,
+        size: DEFAULT_PAGE_SIZE
       });
-      setCustomers(data);
+      setCustomerPage(data);
     } catch (err: any) {
       setApiError(err, "Unable to load overdue customers");
     } finally {
@@ -56,8 +69,8 @@ export const OutstandingCustomersReminderPage = () => {
   }, []);
 
   const outstandingTotal = useMemo(
-    () => customers.reduce((sum, customer) => sum + customer.currentBalance, 0),
-    [customers]
+    () => customerPage.records.reduce((sum, customer) => sum + customer.currentBalance, 0),
+    [customerPage.records]
   );
 
   const sendCustomerReminder = async (customerId: number) => {
@@ -66,7 +79,7 @@ export const OutstandingCustomersReminderPage = () => {
     try {
       await sendReminder({ customerId, channel: filters.channel });
       setSuccessToast("Reminder saved successfully.");
-      await loadCustomers();
+      await loadCustomers(filters, customerPage.page);
     } catch (err: any) {
       setApiError(err, "Unable to send reminder");
     }
@@ -130,7 +143,7 @@ export const OutstandingCustomersReminderPage = () => {
             />
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button onClick={() => void loadCustomers()}>{loading ? "Filtering..." : "Apply filters"}</Button>
+            <Button onClick={() => void loadCustomers(filters, 0)}>{loading ? "Filtering..." : "Apply filters"}</Button>
             <Button
               variant="ghost"
               onClick={() => {
@@ -141,7 +154,7 @@ export const OutstandingCustomersReminderPage = () => {
                   channel: "SMS" as ReminderChannel
                 };
                 setFilters(resetFilters);
-                void loadCustomers(resetFilters);
+                void loadCustomers(resetFilters, 0);
               }}
             >
               Reset
@@ -154,7 +167,7 @@ export const OutstandingCustomersReminderPage = () => {
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-400">Outstanding customers</p>
-              <p className="mt-3 text-3xl font-extrabold text-white">{customers.length}</p>
+              <p className="mt-3 text-3xl font-extrabold text-white">{customerPage.totalRecords}</p>
             </div>
             <div className="rounded-[26px] border border-white/10 bg-white/5 p-5">
               <p className="text-sm text-slate-400">Total due amount</p>
@@ -183,7 +196,7 @@ export const OutstandingCustomersReminderPage = () => {
           </div>
         ) : (
           <Table
-            data={customers}
+            data={customerPage.records}
             emptyText="No overdue customers match the current filters."
             columns={[
               {
@@ -224,22 +237,36 @@ export const OutstandingCustomersReminderPage = () => {
               {
                 key: "actions",
                 header: "Actions",
+                className: "text-right",
                 render: (item) => (
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => void sendCustomerReminder(item.customerId)}>Send reminder</Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setHistoryTarget({ id: item.customerId, name: item.customerName })}
-                    >
-                      <History size={14} />
-                      History
-                    </Button>
-                  </div>
+                  <ActionDropdown
+                    actions={[
+                      {
+                        label: "Send reminder",
+                        icon: <BellRing size={15} />,
+                        hidden: !can("OUTSTANDING", "ADD"),
+                        onClick: () => void sendCustomerReminder(item.customerId)
+                      },
+                      {
+                        label: "History",
+                        icon: <History size={15} />,
+                        onClick: () => setHistoryTarget({ id: item.customerId, name: item.customerName })
+                      }
+                    ]}
+                  />
                 )
               }
             ]}
           />
         )}
+        <Pagination
+          page={customerPage.page}
+          size={customerPage.size}
+          totalRecords={customerPage.totalRecords}
+          totalPages={customerPage.totalPages}
+          disabled={loading}
+          onPageChange={(nextPage) => void loadCustomers(filters, nextPage)}
+        />
       </GlassCard>
 
       <ReminderHistoryModal

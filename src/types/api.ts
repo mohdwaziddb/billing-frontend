@@ -10,10 +10,37 @@ export type Role = "OWNER" | "ADMIN" | "USER";
 export type CompanySummary = {
   id: number;
   name: string;
+  legalName?: string | null;
+  code?: string | null;
+  databaseName?: string | null;
   email: string;
   phone: string;
-  address: string;
+  alternatePhone?: string | null;
+  address: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  pincode?: string | null;
   taxId: string;
+  panNumber?: string | null;
+  cinNumber?: string | null;
+  logoUrl?: string | null;
+  websiteUrl?: string | null;
+};
+
+export type CompanyTheme = {
+  themeColor: string;
+};
+
+export type CompanyOwner = {
+  userId: number;
+  fullName: string;
+  email: string;
+  mobileNumber: string;
+  role: Role;
+  active: boolean;
 };
 
 export type UserProfile = {
@@ -41,11 +68,37 @@ export type DashboardSummary = {
   totalCollection: number;
   outstandingAmount: number;
   newCustomers: number;
+  existingCustomers: number;
   totalInvoices: number;
   totalProducts: number;
   totalRevenue: number;
   outstandingBalance: number;
   topCustomers: DashboardTopCustomer[];
+};
+
+export type PageResponse<T> = {
+  records: T[];
+  page: number;
+  size: number;
+  totalRecords: number;
+  totalPages: number;
+};
+
+export type DashboardCardKey = "totalSales" | "collections" | "outstanding" | "newCustomers" | "existingCustomers" | "invoices";
+
+export type DashboardDetailRow = Record<string, string | number | null>;
+
+export type DashboardDetail = {
+  card: DashboardCardKey;
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  sortBy: string;
+  sortDirection: "asc" | "desc";
+  search: string | null;
+  rows: DashboardDetailRow[];
+  productSummary: DashboardDetailRow[];
 };
 
 export type DashboardTopCustomer = {
@@ -129,7 +182,6 @@ export type CustomerDue = {
   mobile: string;
   email: string | null;
   currentBalance: number;
-  creditLimit: number;
 };
 
 export type Customer = {
@@ -139,9 +191,7 @@ export type Customer = {
   email: string | null;
   address: string | null;
   gstNo: string | null;
-  openingBalance: number;
   currentBalance: number;
-  creditLimit: number;
   totalPurchaseAmount: number;
   totalPaidAmount: number;
   totalDiscountGiven: number;
@@ -161,8 +211,6 @@ export type CustomerRequest = {
   email?: string;
   address?: string;
   gstNo?: string;
-  openingBalance: number;
-  creditLimit: number;
   active: boolean;
 };
 
@@ -180,9 +228,12 @@ export type LedgerEntry = {
 export type CustomerLedger = {
   customerId: number;
   customerName: string;
-  openingBalance: number;
   currentBalance: number;
   entries: LedgerEntry[];
+  page: number;
+  size: number;
+  totalRecords: number;
+  totalPages: number;
 };
 
 export type CustomerSummaryMetrics = {
@@ -201,11 +252,17 @@ export type CustomerPurchaseHistory = {
   address: string | null;
   summary: CustomerSummaryMetrics;
   invoices: Invoice[];
+  page: number;
+  size: number;
+  totalRecords: number;
+  totalPages: number;
 };
 
 export type Product = {
   id: number;
   name: string;
+  categoryId: number | null;
+  categoryName: string | null;
   category: string | null;
   brand: string | null;
   sku: string;
@@ -222,9 +279,26 @@ export type Product = {
   updatedBy: string | null;
 };
 
+export type ProductCategory = {
+  id: number;
+  categoryName: string;
+  description: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+export type ProductCategoryRequest = {
+  categoryName: string;
+  description?: string;
+  active: boolean;
+};
+
 export type ProductRequest = {
   name: string;
-  category?: string;
+  categoryId: number;
   brand?: string;
   sku: string;
   hsnCode?: string;
@@ -314,4 +388,46 @@ export type CompanyUserRequest = {
   password?: string;
   role: Role;
   active: boolean;
+};
+
+export type ActionPermission = {
+  id: number;
+  actionName: string;
+  actionCode: string;
+  allowed: boolean;
+  overrideAllowed: boolean | null;
+};
+
+export type MenuPermission = {
+  id: number;
+  menuName: string;
+  menuCode: string;
+  menuIcon: string | null;
+  menuRoute: string;
+  displayOrder: number;
+  parentMenuId: number | null;
+  parentMenuCode: string | null;
+  canView: boolean;
+  actions: ActionPermission[];
+  children?: MenuPermission[];
+};
+
+export type PermissionMatrix = {
+  roleCode: Role;
+  userId: number | null;
+  menus: MenuPermission[];
+};
+
+export type PermissionMatrixRequest = {
+  roleCode?: Role;
+  userId?: number;
+  menus: Array<{
+    menuId: number;
+    canView: boolean;
+    actions: Array<{
+      actionId: number;
+      allowed: boolean;
+      overrideAllowed?: boolean | null;
+    }>;
+  }>;
 };

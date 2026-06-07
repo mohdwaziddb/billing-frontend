@@ -30,8 +30,8 @@ export const RegisterPage = () => {
     try {
       setLoading(true);
       clearFeedback();
-      await register(form);
-      navigate("/dashboard", { replace: true });
+      const firstRoute = await register(form);
+      navigate(firstRoute ?? "/no-menu", { replace: true });
     } catch (err: any) {
       applyApiError(err, "Unable to register");
     } finally {

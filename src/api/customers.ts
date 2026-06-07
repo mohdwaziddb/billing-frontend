@@ -4,14 +4,20 @@ import type {
   Customer,
   CustomerLedger,
   CustomerPurchaseHistory,
-  CustomerRequest
+  CustomerRequest,
+  PageResponse
 } from "../types/api";
 
-export const getCustomers = async (params?: { search?: string; active?: boolean }) => {
-  const response = await apiClient.get<ApiResponse<Customer[]>>("/v1/customers", {
+export const getCustomersPage = async (params?: { search?: string; active?: boolean; page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PageResponse<Customer>>>("/v1/customers", {
     params
   });
   return response.data.data;
+};
+
+export const getCustomers = async (params?: { search?: string; active?: boolean; page?: number; size?: number }) => {
+  const response = await getCustomersPage(params);
+  return response.records;
 };
 
 export const getCustomer = async (id: number) => {
@@ -40,13 +46,13 @@ export const deleteCustomer = async (id: number) => {
   await apiClient.delete(`/v1/customers/${id}`);
 };
 
-export const getCustomerLedger = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<CustomerLedger>>(`/v1/customers/${id}/ledger`);
+export const getCustomerLedger = async (id: number, params?: { page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<CustomerLedger>>(`/v1/customers/${id}/ledger`, { params });
   return response.data.data;
 };
 
-export const getCustomerPurchaseHistory = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<CustomerPurchaseHistory>>(`/v1/customers/${id}/purchase-history`);
+export const getCustomerPurchaseHistory = async (id: number, params?: { page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<CustomerPurchaseHistory>>(`/v1/customers/${id}/purchase-history`, { params });
   return response.data.data;
 };
 

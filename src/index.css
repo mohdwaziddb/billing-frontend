@@ -19,6 +19,11 @@
   --text-tertiary: #94a3b8;
   --accent: #38bdf8;
   --accent-strong: #0ea5e9;
+  --theme-color: #0ea5e9;
+  --theme-light: #7dd3fc;
+  --theme-dark: #075985;
+  --theme-hover: #38bdf8;
+  --theme-border: #bae6fd;
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #f43f5e;
@@ -93,6 +98,10 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
+input[type="number"] {
+  touch-action: manipulation;
+}
+
 input::placeholder,
 textarea::placeholder {
   color: rgba(148, 163, 184, 0.9);
@@ -123,7 +132,7 @@ select:-webkit-autofill {
 }
 
 .gradient-text {
-  background: linear-gradient(90deg, #dbeafe 0%, #7dd3fc 55%, #38bdf8 100%);
+  background: linear-gradient(90deg, #ffffff 0%, var(--theme-light) 55%, var(--theme-color) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -152,7 +161,7 @@ select:-webkit-autofill {
   pointer-events: none;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(125, 211, 252, 0.55), rgba(56, 189, 248, 0.18), rgba(148, 163, 184, 0.22));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--theme-border) 60%, transparent), color-mix(in srgb, var(--theme-color) 22%, transparent), rgba(148, 163, 184, 0.22));
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
@@ -165,6 +174,16 @@ select:-webkit-autofill {
 .neon-border:hover::after,
 .neon-border:focus-within::after {
   opacity: 1;
+}
+
+.stat-card {
+  container-type: inline-size;
+}
+
+.stat-card-value {
+  font-size: clamp(1.45rem, 12cqw, 2rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 .scrollbar-thin {

@@ -20,7 +20,7 @@ export const Modal = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 px-4 py-8 backdrop-blur-sm">
       <div className="flex min-h-full items-center justify-center">
-        <GlassCard className="w-full max-w-3xl p-6 md:p-7">
+        <GlassCard className="w-full max-w-6xl p-6 md:p-7">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Details</p>

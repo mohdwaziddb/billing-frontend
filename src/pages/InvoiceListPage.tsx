@@ -1,24 +1,41 @@
 import { useEffect, useState } from "react";
+import { Eye, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { deleteInvoice, getInvoices } from "../api/invoices";
+import { deleteInvoice, getInvoicesPage } from "../api/invoices";
+import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
-import type { Invoice } from "../types/api";
+import type { Invoice, PageResponse } from "../types/api";
+
+const emptyInvoicePage: PageResponse<Invoice> = {
+  records: [],
+  page: 0,
+  size: DEFAULT_PAGE_SIZE,
+  totalRecords: 0,
+  totalPages: 0
+};
 
 export const InvoiceListPage = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicePage, setInvoicePage] = useState<PageResponse<Invoice>>(emptyInvoicePage);
+  const [page, setPage] = useState(0);
+  const { can } = useAuth();
 
-  const loadInvoices = async () => {
-    setInvoices(await getInvoices());
+  const loadInvoices = async (nextPage = page) => {
+    const response = await getInvoicesPage({ page: nextPage, size: DEFAULT_PAGE_SIZE });
+    setInvoicePage(response);
+    setInvoices(response.records);
   };
 
   useEffect(() => {
-    void loadInvoices();
+    void loadInvoices(0);
   }, []);
 
   return (
@@ -33,9 +50,11 @@ export const InvoiceListPage = () => {
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Invoice ledger</p>
             <h2 className="mt-2 text-2xl font-bold text-white">All invoices</h2>
           </div>
-          <Link to="/invoices/new">
-            <Button>Create invoice</Button>
-          </Link>
+          {can("CREATE_INVOICE", "ADD") ? (
+            <Link to="/create-invoice">
+              <Button>Create invoice</Button>
+            </Link>
+          ) : null}
         </div>
         <Table
           data={invoices}
@@ -72,18 +91,37 @@ export const InvoiceListPage = () => {
             {
               key: "actions",
               header: "Actions",
+              className: "text-right",
               render: (item) => (
-                <div className="flex flex-wrap gap-2">
-                  <Link to={`/invoices/${item.id}`}>
-                    <Button variant="secondary">View</Button>
-                  </Link>
-                  <Button variant="danger" onClick={() => void deleteInvoice(item.id).then(loadInvoices)}>
-                    Delete
-                  </Button>
-                </div>
+                <ActionDropdown
+                  actions={[
+                    {
+                      label: "View",
+                      icon: <Eye size={15} />,
+                      to: `/invoices/${item.id}`
+                    },
+                    {
+                      label: "Delete",
+                      icon: <Trash2 size={15} />,
+                      danger: true,
+                      hidden: !can("INVOICES", "DELETE"),
+                      onClick: () => void deleteInvoice(item.id).then(() => loadInvoices(page))
+                    }
+                  ]}
+                />
               )
             }
           ]}
+        />
+        <Pagination
+          page={invoicePage.page}
+          size={invoicePage.size}
+          totalRecords={invoicePage.totalRecords}
+          totalPages={invoicePage.totalPages}
+          onPageChange={(nextPage) => {
+            setPage(nextPage);
+            void loadInvoices(nextPage);
+          }}
         />
       </GlassCard>
     </div>

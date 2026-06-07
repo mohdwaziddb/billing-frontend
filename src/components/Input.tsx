@@ -21,7 +21,9 @@ const buildPlaceholder = (label?: string, placeholder?: string, type?: string) =
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, className, requiredMark = false, placeholder, type, hint, ...props }, ref) => {
+  ({ label, error, className, requiredMark = false, placeholder, type, hint, onKeyDown, onWheel, inputMode, ...props }, ref) => {
+  const isNumberInput = type === "number";
+
   return (
     <label className="block space-y-2">
       {label ? (
@@ -39,6 +41,22 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         placeholder={buildPlaceholder(label, placeholder, type)}
         type={type}
+        inputMode={isNumberInput ? "decimal" : inputMode}
+        onKeyDown={(event) => {
+          if (isNumberInput && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            event.preventDefault();
+            return;
+          }
+          onKeyDown?.(event);
+        }}
+        onWheel={(event) => {
+          if (isNumberInput) {
+            event.currentTarget.blur();
+            event.preventDefault();
+            return;
+          }
+          onWheel?.(event);
+        }}
         {...props}
       />
       {error ? <span className="block text-xs text-rose-300">{error}</span> : hint ? <span className="block text-xs text-slate-400">{hint}</span> : null}

@@ -10,9 +10,11 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
@@ -31,6 +33,7 @@ type FormValues = {
 
 export const CreateInvoicePage = () => {
   const navigate = useNavigate();
+  const { can } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [customerMobile, setCustomerMobile] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -53,8 +56,6 @@ export const CreateInvoicePage = () => {
     email: "",
     address: "",
     gstNo: "",
-    openingBalance: "",
-    creditLimit: "",
     active: "true"
   });
 
@@ -77,7 +78,7 @@ export const CreateInvoicePage = () => {
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
   useEffect(() => {
-    void getProducts().then((productData) => {
+    void getProducts({ active: true, size: 1000 }).then((productData) => {
       setProducts(productData.filter((item) => item.active));
     });
   }, []);
@@ -118,8 +119,6 @@ export const CreateInvoicePage = () => {
         email: customer.email ?? "",
         address: customer.address ?? "",
         gstNo: customer.gstNo ?? "",
-        openingBalance: String(customer.openingBalance ?? ""),
-        creditLimit: String(customer.creditLimit ?? ""),
         active: customer.active ? "true" : "false"
       });
 
@@ -129,15 +128,13 @@ export const CreateInvoicePage = () => {
         setApiError({ message: "Customer found, but it is inactive. Activate it before invoicing." }, "Customer found, but it is inactive. Activate it before invoicing.");
       }
     } catch (err: any) {
-      setShowNewCustomerForm(true);
+      setShowNewCustomerForm(can("CUSTOMERS", "ADD"));
       setNewCustomer({
         name: "",
         mobile,
         email: "",
         address: "",
         gstNo: "",
-        openingBalance: "",
-        creditLimit: "",
         active: "true"
       });
       setApiError(err, "Unable to find customer");
@@ -150,12 +147,10 @@ export const CreateInvoicePage = () => {
 
     const payload: CustomerRequest = {
       name: newCustomer.name.trim(),
-      mobile: newCustomer.mobile.trim(),
+      mobile: customerMobile.trim() || newCustomer.mobile.trim(),
       email: newCustomer.email.trim() || undefined,
       address: newCustomer.address.trim() || undefined,
       gstNo: newCustomer.gstNo.trim() || undefined,
-      openingBalance: Number(newCustomer.openingBalance || 0),
-      creditLimit: Number(newCustomer.creditLimit || 0),
       active: newCustomer.active === "true"
     };
 
@@ -174,21 +169,25 @@ export const CreateInvoicePage = () => {
     }
   };
 
-  const openPurchaseHistory = async () => {
+  const loadPurchaseHistory = async (page = 0) => {
     if (!selectedCustomer) {
       return;
     }
 
-    setHistoryOpen(true);
     setHistoryLoading(true);
     try {
-      const history = await getCustomerPurchaseHistory(selectedCustomer.id);
+      const history = await getCustomerPurchaseHistory(selectedCustomer.id, { page, size: DEFAULT_PAGE_SIZE });
       setPurchaseHistory(history);
     } catch (err: any) {
       setApiError(err, "Unable to load purchase history");
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const openPurchaseHistory = async () => {
+    setHistoryOpen(true);
+    await loadPurchaseHistory(0);
   };
 
   const onSubmit = async (values: FormValues) => {
@@ -270,7 +269,7 @@ export const CreateInvoicePage = () => {
               </div>
             ) : null}
 
-            {showNewCustomerForm && !selectedCustomer ? (
+            {showNewCustomerForm && !selectedCustomer && can("CUSTOMERS", "ADD") ? (
               <div className="rounded-[26px] border border-white/10 bg-white/5 p-4 md:p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
@@ -284,12 +283,18 @@ export const CreateInvoicePage = () => {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input label="Customer Name" requiredMark error={customerCreateFieldErrors.name} value={newCustomer.name} onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))} />
-                  <Input label="Mobile Number" requiredMark error={customerCreateFieldErrors.mobile} value={newCustomer.mobile} onChange={(event) => setNewCustomer((current) => ({ ...current, mobile: event.target.value }))} />
+                  <Input
+                    label="Mobile Number"
+                    requiredMark
+                    readOnly
+                    aria-readonly="true"
+                    className="cursor-not-allowed bg-slate-900/70 text-slate-300"
+                    error={customerCreateFieldErrors.mobile}
+                    value={newCustomer.mobile}
+                  />
                   <Input label="Email Address" type="email" error={customerCreateFieldErrors.email} value={newCustomer.email} onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))} />
                   <Input label="GST Number" error={customerCreateFieldErrors.gstNo} value={newCustomer.gstNo} onChange={(event) => setNewCustomer((current) => ({ ...current, gstNo: event.target.value }))} />
                   <Input label="Address" className="md:col-span-2" error={customerCreateFieldErrors.address} value={newCustomer.address} onChange={(event) => setNewCustomer((current) => ({ ...current, address: event.target.value }))} />
-                  <Input label="Opening Balance" type="number" step="0.01" error={customerCreateFieldErrors.openingBalance} value={newCustomer.openingBalance} onChange={(event) => setNewCustomer((current) => ({ ...current, openingBalance: event.target.value }))} />
-                  <Input label="Credit Limit" type="number" step="0.01" error={customerCreateFieldErrors.creditLimit} value={newCustomer.creditLimit} onChange={(event) => setNewCustomer((current) => ({ ...current, creditLimit: event.target.value }))} />
                 </div>
 
                 {customerCreateError ? <div className="mt-4 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{customerCreateError}</div> : null}
@@ -424,18 +429,10 @@ export const CreateInvoicePage = () => {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Opening Balance</p>
-                <p className="mt-2 font-semibold text-white">{formatCurrency(selectedCustomer.openingBalance)}</p>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Current Balance</p>
                 <p className="mt-2 font-semibold text-white">{formatCurrency(selectedCustomer.currentBalance)}</p>
-              </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Credit Limit</p>
-                <p className="mt-2 font-semibold text-white">{formatCurrency(selectedCustomer.creditLimit)}</p>
               </div>
               <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Status</p>
@@ -510,6 +507,14 @@ export const CreateInvoicePage = () => {
                 { key: "pending", header: "Pending Amount", className: "text-right", render: (item) => <span className="block text-right text-rose-200">{formatCurrency(item.balanceAmount)}</span> },
                 { key: "status", header: "Payment Status", render: (item) => <StatusBadge label={item.paymentStatus} /> }
               ]}
+            />
+            <Pagination
+              page={purchaseHistory.page}
+              size={purchaseHistory.size}
+              totalRecords={purchaseHistory.totalRecords}
+              totalPages={purchaseHistory.totalPages}
+              disabled={historyLoading}
+              onPageChange={(nextPage) => void loadPurchaseHistory(nextPage)}
             />
           </div>
         )}

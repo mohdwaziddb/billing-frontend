@@ -1,40 +1,58 @@
 import { useEffect, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { deleteProduct, getProducts } from "../api/products";
+import { deleteProduct, getProductsPage } from "../api/products";
+import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
-import type { Product } from "../types/api";
+import type { PageResponse, Product } from "../types/api";
+
+const emptyProductPage: PageResponse<Product> = {
+  records: [],
+  page: 0,
+  size: DEFAULT_PAGE_SIZE,
+  totalRecords: 0,
+  totalPages: 0
+};
 
 export const ProductListPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [productPage, setProductPage] = useState<PageResponse<Product>>(emptyProductPage);
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
+  const { can } = useAuth();
   const { message: error, clearMessage, setApiError } = useApiMessage();
 
-  const loadProducts = async () => {
+  const loadProducts = async (nextPage = page) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    setProducts(await getProducts({ search: search.trim() || undefined, active }));
+    const response = await getProductsPage({ search: search.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
+    setProductPage(response);
+    setProducts(response.records);
   };
 
   const handleDelete = async (productId: number) => {
     try {
       clearMessage();
       await deleteProduct(productId);
-      await loadProducts();
+      await loadProducts(page);
     } catch (err: any) {
       setApiError(err, "Unable to delete product");
     }
   };
 
   useEffect(() => {
-    void loadProducts();
+    setPage(0);
+    void loadProducts(0);
   }, [statusFilter]);
 
   return (
@@ -50,9 +68,11 @@ export const ProductListPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Inventory</p>
               <h2 className="mt-2 text-2xl font-bold text-white">Products</h2>
             </div>
-            <Link to="/products/new">
-              <Button>Add product</Button>
-            </Link>
+            {can("PRODUCTS", "ADD") ? (
+              <Link to="/products/new">
+                <Button>Add product</Button>
+              </Link>
+            ) : null}
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
             <Input
@@ -63,7 +83,8 @@ export const ProductListPage = () => {
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  void loadProducts();
+                  setPage(0);
+                  void loadProducts(0);
                 }
               }}
             />
@@ -79,7 +100,7 @@ export const ProductListPage = () => {
               ]}
             />
             <div className="flex items-end">
-              <Button className="w-full" variant="secondary" onClick={() => void loadProducts()}>
+              <Button className="w-full" variant="secondary" onClick={() => { setPage(0); void loadProducts(0); }}>
                 Search
               </Button>
             </div>
@@ -104,7 +125,7 @@ export const ProductListPage = () => {
                 </div>
               )
             },
-            { key: "brand", header: "Brand / Category", render: (item) => `${item.brand ?? "--"} / ${item.category ?? "--"}` },
+            { key: "brand", header: "Brand / Category", render: (item) => `${item.brand ?? "--"} / ${item.categoryName ?? item.category ?? "--"}` },
             {
               key: "price",
               header: "Selling Price",
@@ -133,18 +154,38 @@ export const ProductListPage = () => {
             {
               key: "actions",
               header: "Actions",
+              className: "text-right",
               render: (item) => (
-                <div className="flex flex-wrap gap-2">
-                  <Link to={`/products/${item.id}/edit`}>
-                    <Button variant="secondary">Edit</Button>
-                  </Link>
-                  <Button variant="danger" onClick={() => void handleDelete(item.id)}>
-                    Delete
-                  </Button>
-                </div>
+                <ActionDropdown
+                  actions={[
+                    {
+                      label: "Edit",
+                      icon: <Pencil size={15} />,
+                      to: `/products/${item.id}/edit`,
+                      hidden: !can("PRODUCTS", "EDIT")
+                    },
+                    {
+                      label: "Delete",
+                      icon: <Trash2 size={15} />,
+                      danger: true,
+                      hidden: !can("PRODUCTS", "DELETE"),
+                      onClick: () => void handleDelete(item.id)
+                    }
+                  ]}
+                />
               )
             }
           ]}
+        />
+        <Pagination
+          page={productPage.page}
+          size={productPage.size}
+          totalRecords={productPage.totalRecords}
+          totalPages={productPage.totalPages}
+          onPageChange={(nextPage) => {
+            setPage(nextPage);
+            void loadProducts(nextPage);
+          }}
         />
       </GlassCard>
     </div>

@@ -1,11 +1,16 @@
 import { apiClient } from "./apiClient";
-import type { ApiResponse, Product, ProductRequest } from "../types/api";
+import type { ApiResponse, PageResponse, Product, ProductRequest } from "../types/api";
 
-export const getProducts = async (params?: { search?: string; active?: boolean }) => {
-  const response = await apiClient.get<ApiResponse<Product[]>>("/v1/products", {
+export const getProductsPage = async (params?: { search?: string; active?: boolean; page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PageResponse<Product>>>("/v1/products", {
     params
   });
   return response.data.data;
+};
+
+export const getProducts = async (params?: { search?: string; active?: boolean; page?: number; size?: number }) => {
+  const response = await getProductsPage(params);
+  return response.records;
 };
 
 export const getProduct = async (id: number) => {

@@ -1,18 +1,20 @@
 import { Edit3, Plus, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { createCompanyUser, deactivateCompanyUser, getCompanyUsers, updateCompanyUser } from "../api/users";
+import { createCompanyUser, deactivateCompanyUser, getCompanyUsersPage, getRoles, updateCompanyUser } from "../api/users";
+import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
-import type { CompanyUserRequest, Role, UserProfile } from "../types/api";
+import type { CompanyUserRequest, PageResponse, Role, UserProfile } from "../types/api";
 
 type FormValues = {
   fullName: string;
@@ -23,15 +25,22 @@ type FormValues = {
   active: string;
 };
 
-const roleOptions: Array<{ label: string; value: Role }> = [
-  { label: "Owner", value: "OWNER" },
-  { label: "Admin", value: "ADMIN" },
-  { label: "User", value: "USER" }
-];
+const toRoleOption = (role: Role) => ({ label: role.charAt(0) + role.slice(1).toLowerCase(), value: role });
+
+const emptyUserPage: PageResponse<UserProfile> = {
+  records: [],
+  page: 0,
+  size: DEFAULT_PAGE_SIZE,
+  totalRecords: 0,
+  totalPages: 0
+};
 
 export const UserManagementPage = () => {
-  const { user } = useAuth();
+  const { can } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [userPage, setUserPage] = useState<PageResponse<UserProfile>>(emptyUserPage);
+  const [page, setPage] = useState(0);
+  const [roles, setRoles] = useState<Role[]>(["OWNER", "ADMIN", "USER"]);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const { message: pageError, clearMessage, setApiError } = useApiMessage();
@@ -54,15 +63,17 @@ export const UserManagementPage = () => {
 
   const ownerCount = useMemo(() => users.filter((item) => item.role === "OWNER" && item.active).length, [users]);
 
-  const loadUsers = async () => {
-    setUsers(await getCompanyUsers());
+  const loadUsers = async (nextPage = page) => {
+    const response = await getCompanyUsersPage({ page: nextPage, size: DEFAULT_PAGE_SIZE });
+    setUserPage(response);
+    setUsers(response.records);
   };
 
   useEffect(() => {
-    if (user?.role === "OWNER") {
-      void loadUsers().catch((err: any) => setApiError(err, "Unable to load users"));
+    if (can("USERS", "VIEW")) {
+      void Promise.all([loadUsers(0), getRoles().then(setRoles)]).catch((err: any) => setApiError(err, "Unable to load users"));
     }
-  }, [user?.role]);
+  }, [can]);
 
   const openCreateModal = () => {
     clearFeedback();
@@ -115,7 +126,7 @@ export const UserManagementPage = () => {
       }
       setModalOpen(false);
       clearMessage();
-      await loadUsers();
+      await loadUsers(page);
     } catch (err: any) {
       applyApiError(err, editingUser ? "Unable to update user" : "Unable to create user");
     }
@@ -125,16 +136,16 @@ export const UserManagementPage = () => {
     clearMessage();
     try {
       await deactivateCompanyUser(target.id);
-      await loadUsers();
+      await loadUsers(page);
     } catch (err: any) {
       setApiError(err, "Unable to deactivate user");
     }
   };
 
-  if (user?.role !== "OWNER") {
+  if (!can("USERS", "VIEW")) {
     return (
       <div className="space-y-4 pb-6">
-        <Header title="Users" subtitle="Only owner users can manage company team access." />
+        <Header title="Users" subtitle="Manage company team access and permission assignments." />
         <GlassCard className="p-6 md:p-7">
           <p className="text-sm text-slate-300">You do not have permission to manage users.</p>
         </GlassCard>
@@ -144,7 +155,7 @@ export const UserManagementPage = () => {
 
   return (
     <div className="space-y-4 pb-6">
-      <Header title="Users" subtitle="Create, update, and deactivate company users from one owner-controlled workspace." />
+      <Header title="Users" subtitle="Create, update, and deactivate company users." />
 
       {pageError ? (
         <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
@@ -155,7 +166,7 @@ export const UserManagementPage = () => {
       <div className="grid gap-4 md:grid-cols-3">
         <GlassCard className="p-5">
           <p className="text-sm text-slate-400">Total users</p>
-          <p className="mt-3 text-3xl font-extrabold text-white">{users.length}</p>
+          <p className="mt-3 text-3xl font-extrabold text-white">{userPage.totalRecords}</p>
         </GlassCard>
         <GlassCard className="p-5">
           <p className="text-sm text-slate-400">Active owners</p>
@@ -173,10 +184,12 @@ export const UserManagementPage = () => {
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Access control</p>
             <h2 className="mt-2 text-2xl font-bold text-white">Company users</h2>
           </div>
-          <Button type="button" onClick={openCreateModal}>
-            <Plus size={16} />
-            Add user
-          </Button>
+          {can("USERS", "ADD") ? (
+            <Button type="button" onClick={openCreateModal}>
+              <Plus size={16} />
+              Add user
+            </Button>
+          ) : null}
         </div>
 
         <Table
@@ -199,20 +212,39 @@ export const UserManagementPage = () => {
             {
               key: "actions",
               header: "Actions",
+              className: "text-right",
               render: (item) => (
-                <div className="grid min-w-[190px] grid-cols-2 items-center gap-2">
-                  <Button className="w-full min-h-10 px-3" type="button" variant="secondary" onClick={() => openEditModal(item)}>
-                    <Edit3 size={15} />
-                    Edit
-                  </Button>
-                  <Button className="w-full min-h-10 px-3" type="button" variant="danger" disabled={!item.active} onClick={() => void deactivateUser(item)}>
-                    <UserX size={15} />
-                    Disable
-                  </Button>
-                </div>
+                <ActionDropdown
+                  actions={[
+                    {
+                      label: "Edit",
+                      icon: <Edit3 size={15} />,
+                      hidden: !can("USERS", "EDIT"),
+                      onClick: () => openEditModal(item)
+                    },
+                    {
+                      label: "Disable",
+                      icon: <UserX size={15} />,
+                      danger: true,
+                      disabled: !item.active,
+                      hidden: !can("USERS", "DELETE"),
+                      onClick: () => void deactivateUser(item)
+                    }
+                  ]}
+                />
               )
             }
           ]}
+        />
+        <Pagination
+          page={userPage.page}
+          size={userPage.size}
+          totalRecords={userPage.totalRecords}
+          totalPages={userPage.totalPages}
+          onPageChange={(nextPage) => {
+            setPage(nextPage);
+            void loadUsers(nextPage);
+          }}
         />
       </GlassCard>
 
@@ -254,7 +286,7 @@ export const UserManagementPage = () => {
             requiredMark
             placeholder={null}
             error={fieldErrors.role}
-            options={roleOptions}
+            options={roles.map(toRoleOption)}
             {...register("role", { required: "Role is required" })}
           />
           <Select

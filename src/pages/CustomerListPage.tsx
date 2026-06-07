@@ -1,33 +1,57 @@
 import { useEffect, useState } from "react";
+import { BookOpen, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { deleteCustomer, getCustomerLedger, getCustomers } from "../api/customers";
+import { deleteCustomer, getCustomerLedger, getCustomersPage } from "../api/customers";
+import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
-import type { Customer, CustomerLedger } from "../types/api";
+import type { Customer, CustomerLedger, PageResponse } from "../types/api";
+
+const emptyCustomerPage: PageResponse<Customer> = {
+  records: [],
+  page: 0,
+  size: DEFAULT_PAGE_SIZE,
+  totalRecords: 0,
+  totalPages: 0
+};
 
 export const CustomerListPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerPage, setCustomerPage] = useState<PageResponse<Customer>>(emptyCustomerPage);
   const [selectedLedger, setSelectedLedger] = useState<CustomerLedger | null>(null);
+  const [ledgerCustomerId, setLedgerCustomerId] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
+  const { can } = useAuth();
   const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
 
-  const loadCustomers = async () => {
+  const loadCustomers = async (nextPage = page) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    setCustomers(await getCustomers({ search: search.trim() || undefined, active }));
+    const response = await getCustomersPage({ search: search.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
+    setCustomerPage(response);
+    setCustomers(response.records);
+  };
+
+  const loadLedger = async (customerId: number, nextPage = 0) => {
+    setLedgerCustomerId(customerId);
+    setSelectedLedger(await getCustomerLedger(customerId, { page: nextPage, size: DEFAULT_PAGE_SIZE }));
   };
 
   useEffect(() => {
-    void loadCustomers();
+    setPage(0);
+    void loadCustomers(0);
   }, [statusFilter]);
 
   return (
@@ -48,9 +72,11 @@ export const CustomerListPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Customer registry</p>
               <h2 className="mt-2 text-2xl font-bold text-white">All customers</h2>
             </div>
-            <Link to="/customers/new">
-              <Button>Add customer</Button>
-            </Link>
+            {can("CUSTOMERS", "ADD") ? (
+              <Link to="/customers/new">
+                <Button>Add customer</Button>
+              </Link>
+            ) : null}
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
             <Input
@@ -61,7 +87,8 @@ export const CustomerListPage = () => {
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  void loadCustomers();
+                  setPage(0);
+                  void loadCustomers(0);
                 }
               }}
             />
@@ -77,7 +104,7 @@ export const CustomerListPage = () => {
               ]}
             />
             <div className="flex items-end">
-              <Button className="w-full" variant="secondary" onClick={() => void loadCustomers()}>
+              <Button className="w-full" variant="secondary" onClick={() => { setPage(0); void loadCustomers(0); }}>
                 Search
               </Button>
             </div>
@@ -95,7 +122,6 @@ export const CustomerListPage = () => {
                 <div className="min-w-[180px]">
                   <p className="font-semibold text-white">{item.name}</p>
                   <p className="text-xs text-slate-400">{item.mobile}</p>
-                  <p className="mt-2 text-xs text-slate-500">Credit limit: {formatCurrency(item.creditLimit)}</p>
                 </div>
               )
             },
@@ -128,34 +154,51 @@ export const CustomerListPage = () => {
             {
               key: "actions",
               header: "Actions",
+              className: "text-right",
               render: (item) => (
-                <div className="grid min-w-[230px] grid-cols-3 items-center gap-2">
-                  <Button className="w-full min-h-10 px-3" variant="ghost" onClick={() => void getCustomerLedger(item.id).then(setSelectedLedger)}>
-                    Ledger
-                  </Button>
-                  <Link className="block" to={`/customers/${item.id}/edit`}>
-                    <Button className="w-full min-h-10 px-3" variant="secondary">Edit</Button>
-                  </Link>
-                  <Button
-                    className="w-full min-h-10 px-3"
-                    variant="danger"
-                    onClick={() =>
-                      void deleteCustomer(item.id)
-                        .then(() => {
-                          clearMessage();
-                          return loadCustomers();
-                        })
-                        .catch((err: any) => {
-                          setApiError(err, "Unable to delete customer");
-                        })
+                <ActionDropdown
+                  actions={[
+                    {
+                      label: "Ledger",
+                      icon: <BookOpen size={15} />,
+                      onClick: () => void loadLedger(item.id, 0)
+                    },
+                    {
+                      label: "Edit",
+                      icon: <Pencil size={15} />,
+                      to: `/customers/${item.id}/edit`,
+                      hidden: !can("CUSTOMERS", "EDIT")
+                    },
+                    {
+                      label: "Delete",
+                      icon: <Trash2 size={15} />,
+                      danger: true,
+                      hidden: !can("CUSTOMERS", "DELETE"),
+                      onClick: () =>
+                        void deleteCustomer(item.id)
+                          .then(() => {
+                            clearMessage();
+                            return loadCustomers(page);
+                          })
+                          .catch((err: any) => {
+                            setApiError(err, "Unable to delete customer");
+                          })
                     }
-                  >
-                    Delete
-                  </Button>
-                </div>
+                  ]}
+                />
               )
             }
           ]}
+        />
+        <Pagination
+          page={customerPage.page}
+          size={customerPage.size}
+          totalRecords={customerPage.totalRecords}
+          totalPages={customerPage.totalPages}
+          onPageChange={(nextPage) => {
+            setPage(nextPage);
+            void loadCustomers(nextPage);
+          }}
         />
       </GlassCard>
 
@@ -178,6 +221,19 @@ export const CustomerListPage = () => {
               </div>
             ))}
           </div>
+          {selectedLedger ? (
+            <Pagination
+              page={selectedLedger.page}
+              size={selectedLedger.size}
+              totalRecords={selectedLedger.totalRecords}
+              totalPages={selectedLedger.totalPages}
+              onPageChange={(nextPage) => {
+                if (ledgerCustomerId) {
+                  void loadLedger(ledgerCustomerId, nextPage);
+                }
+              }}
+            />
+          ) : null}
         </div>
       </Modal>
     </div>

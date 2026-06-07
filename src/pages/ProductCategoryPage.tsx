@@ -1,0 +1,264 @@
+import { useEffect, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
+import { createProductCategory, deleteProductCategory, getProductCategoriesPage, updateProductCategory } from "../api/productCategories";
+import { ActionDropdown } from "../components/ActionDropdown";
+import { Button } from "../components/Button";
+import { GlassCard } from "../components/GlassCard";
+import { Header } from "../components/Header";
+import { Input } from "../components/Input";
+import { Modal } from "../components/Modal";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { Select } from "../components/Select";
+import { StatusBadge } from "../components/StatusBadge";
+import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
+import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
+import { formatDateTime } from "../lib/format";
+import type { PageResponse, ProductCategory, ProductCategoryRequest } from "../types/api";
+
+type FormState = {
+  categoryName: string;
+  description: string;
+  active: string;
+};
+
+const emptyForm: FormState = {
+  categoryName: "",
+  description: "",
+  active: "true"
+};
+
+const emptyCategoryPage: PageResponse<ProductCategory> = {
+  records: [],
+  page: 0,
+  size: DEFAULT_PAGE_SIZE,
+  totalRecords: 0,
+  totalPages: 0
+};
+
+export const ProductCategoryPage = () => {
+  const { can } = useAuth();
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [categoryPage, setCategoryPage] = useState<PageResponse<ProductCategory>>(emptyCategoryPage);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
+  const { message: formError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
+
+  const canAdd = can("PRODUCT_CATEGORY", "ADD");
+  const canEdit = can("PRODUCT_CATEGORY", "EDIT");
+  const canDelete = can("PRODUCT_CATEGORY", "DELETE");
+
+  const loadCategories = async (nextPage = page) => {
+    const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
+    const response = await getProductCategoriesPage({ search: search.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
+    setCategoryPage(response);
+    setCategories(response.records);
+  };
+
+  useEffect(() => {
+    setPage(0);
+    void loadCategories(0).catch((err: any) => setApiError(err, "Unable to load product categories"));
+  }, [statusFilter]);
+
+  const openCreate = () => {
+    setEditingCategory(null);
+    setForm(emptyForm);
+    clearFeedback();
+    setFormOpen(true);
+  };
+
+  const openEdit = (category: ProductCategory) => {
+    setEditingCategory(category);
+    setForm({
+      categoryName: category.categoryName,
+      description: category.description ?? "",
+      active: category.active ? "true" : "false"
+    });
+    clearFeedback();
+    setFormOpen(true);
+  };
+
+  const saveCategory = async () => {
+    clearFeedback();
+    setSaving(true);
+    const payload: ProductCategoryRequest = {
+      categoryName: form.categoryName.trim(),
+      description: form.description.trim() || undefined,
+      active: form.active === "true"
+    };
+
+    try {
+      if (editingCategory) {
+        await updateProductCategory(editingCategory.id, payload);
+      } else {
+        await createProductCategory(payload);
+      }
+      setFormOpen(false);
+      clearMessage();
+      await loadCategories(page);
+    } catch (err: any) {
+      applyApiError(err, "Unable to save product category");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeCategory = async (category: ProductCategory) => {
+    if (!window.confirm(`Delete ${category.categoryName}?`)) {
+      return;
+    }
+    try {
+      await deleteProductCategory(category.id);
+      clearMessage();
+      await loadCategories(page);
+    } catch (err: any) {
+      setApiError(err, "Unable to delete product category");
+    }
+  };
+
+  return (
+    <div className="space-y-4 pb-6">
+      <Header
+        title="Product Categories"
+        subtitle="Manage product category names, descriptions, and active status for product setup."
+      />
+      {errorMessage ? (
+        <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <GlassCard className="p-6 md:p-7">
+        <div className="mb-5 flex flex-col gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Setup</p>
+              <h2 className="mt-2 text-2xl font-bold text-white">Product Categories</h2>
+            </div>
+            {canAdd ? <Button onClick={openCreate}>Add Category</Button> : null}
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
+            <Input
+              label="Search Category"
+              placeholder="Enter Category Name"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  setPage(0);
+                  void loadCategories(0);
+                }
+              }}
+            />
+            <Select
+              label="Status Filter"
+              placeholder={null}
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              options={[
+                { label: "All Categories", value: "all" },
+                { label: "Active Only", value: "active" },
+                { label: "Inactive Only", value: "inactive" }
+              ]}
+            />
+            <div className="flex items-end">
+              <Button className="w-full" variant="secondary" onClick={() => { setPage(0); void loadCategories(0); }}>
+                Search
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <Table
+          data={categories}
+          emptyText="No product categories found."
+          columns={[
+            { key: "category", header: "Category Name", render: (item) => <span className="font-semibold text-white">{item.categoryName}</span> },
+            { key: "description", header: "Description", render: (item) => item.description ?? "--" },
+            { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
+            { key: "updated", header: "Updated At", render: (item) => formatDateTime(item.updatedAt) },
+            {
+              key: "actions",
+              header: "Actions",
+              className: "text-right",
+              render: (item) => (
+                <ActionDropdown
+                  actions={[
+                    {
+                      label: "Edit",
+                      icon: <Pencil size={15} />,
+                      hidden: !canEdit,
+                      onClick: () => openEdit(item)
+                    },
+                    {
+                      label: "Delete",
+                      icon: <Trash2 size={15} />,
+                      danger: true,
+                      hidden: !canDelete,
+                      onClick: () => void removeCategory(item)
+                    }
+                  ]}
+                />
+              )
+            }
+          ]}
+        />
+        <Pagination
+          page={categoryPage.page}
+          size={categoryPage.size}
+          totalRecords={categoryPage.totalRecords}
+          totalPages={categoryPage.totalPages}
+          onPageChange={(nextPage) => {
+            setPage(nextPage);
+            void loadCategories(nextPage);
+          }}
+        />
+      </GlassCard>
+
+      <Modal open={formOpen} title={editingCategory ? "Edit Category" : "Add Category"} onClose={() => setFormOpen(false)}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Input
+            label="Category Name"
+            requiredMark
+            error={fieldErrors.categoryName}
+            value={form.categoryName}
+            onChange={(event) => setForm((current) => ({ ...current, categoryName: event.target.value }))}
+          />
+          <Select
+            label="Status"
+            placeholder={null}
+            value={form.active}
+            onChange={(event) => setForm((current) => ({ ...current, active: event.target.value }))}
+            options={[
+              { label: "Active", value: "true" },
+              { label: "Inactive", value: "false" }
+            ]}
+          />
+          <Input
+            label="Description"
+            className="md:col-span-2"
+            error={fieldErrors.description}
+            value={form.description}
+            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+          />
+        </div>
+        {formError ? <div className="mt-4 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{formError}</div> : null}
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button disabled={saving} onClick={() => void saveCategory()}>
+            {saving ? "Saving..." : editingCategory ? "Update Category" : "Create Category"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  );
+};

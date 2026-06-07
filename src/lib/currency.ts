@@ -12,7 +12,20 @@ const formatter = new Intl.NumberFormat(currencyConfig.locale, {
   maximumFractionDigits: 2
 });
 
-export const formatCurrency = (value: number | string | null | undefined) => {
+const amountFormatter = new Intl.NumberFormat(currencyConfig.locale, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
+const normalizeAmount = (value: number | string | null | undefined) => {
   const amount = typeof value === "number" ? value : Number(value ?? 0);
-  return formatter.format(Number.isFinite(amount) ? amount : 0);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+export const formatCurrency = (value: number | string | null | undefined) => {
+  return formatter.format(normalizeAmount(value));
+};
+
+export const formatAmount = (value: number | string | null | undefined) => {
+  return amountFormatter.format(normalizeAmount(value));
 };

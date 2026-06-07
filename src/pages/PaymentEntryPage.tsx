@@ -47,7 +47,7 @@ export const PaymentEntryPage = () => {
   });
 
   useEffect(() => {
-    void Promise.all([getCustomers(), getInvoices()]).then(([customerData, invoiceData]) => {
+    void Promise.all([getCustomers({ active: true, size: 1000 }), getInvoices({ size: 1000 })]).then(([customerData, invoiceData]) => {
       setCustomers(customerData.filter((customer) => customer.active));
       setInvoices(invoiceData);
     });
@@ -56,7 +56,7 @@ export const PaymentEntryPage = () => {
   const selectedCustomerId = watch("customerId");
   const selectedInvoiceId = watch("invoiceId");
   const invoiceOptions = useMemo(() => {
-    const customerInvoices = invoices.filter((invoice) => String(invoice.customerId) === selectedCustomerId);
+    const customerInvoices = invoices.filter((invoice) => String(invoice.customerId) === selectedCustomerId && Number(invoice.balanceAmount) > 0);
     return customerInvoices.map((invoice) => ({
       label: `${invoice.invoiceNo} | ${invoice.paymentStatus} | Due ${formatCurrency(invoice.balanceAmount)}`,
       value: invoice.id
@@ -105,6 +105,11 @@ export const PaymentEntryPage = () => {
       mode: values.mode,
       remarks: values.remarks || undefined
     };
+
+    if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
+      setApiError({ message: "Payment amount must be greater than 0" }, "Payment amount must be greater than 0");
+      return;
+    }
 
     try {
       await createPayment(payload);
@@ -155,7 +160,10 @@ export const PaymentEntryPage = () => {
             type="number"
             step="0.01"
             error={errors.amount?.message}
-            {...register("amount", { required: "Amount is required" })}
+            {...register("amount", {
+              required: "Amount is required",
+              validate: (value) => Number(value) > 0 || "Payment amount must be greater than 0"
+            })}
           />
           <Input
             label="Payment date"

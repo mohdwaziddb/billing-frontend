@@ -1,9 +1,19 @@
 import { apiClient } from "./apiClient";
-import type { ApiResponse, CompanyUserRequest, UserProfile } from "../types/api";
+import type { ApiResponse, CompanyUserRequest, PageResponse, UserProfile } from "../types/api";
 
-export const getCompanyUsers = async () => {
-  const response = await apiClient.get<ApiResponse<UserProfile[]>>("/v1/users");
+export const getRoles = async () => {
+  const response = await apiClient.get<ApiResponse<Array<"OWNER" | "ADMIN" | "USER">>>("/v1/roles");
   return response.data.data;
+};
+
+export const getCompanyUsersPage = async (params?: { page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PageResponse<UserProfile>>>("/v1/users", { params });
+  return response.data.data;
+};
+
+export const getCompanyUsers = async (params?: { page?: number; size?: number }) => {
+  const response = await getCompanyUsersPage(params);
+  return response.records;
 };
 
 export const createCompanyUser = async (payload: CompanyUserRequest) => {

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../../../components/Modal";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../../../components/Pagination";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
 import { formatCurrency } from "../../../lib/currency";
 import { formatDateTime } from "../../../lib/format";
+import type { PageResponse } from "../../../types/api";
 import { getReminderHistory } from "../reminder.api";
 import type { ReminderHistoryItem } from "../reminder.types";
 
@@ -18,17 +20,31 @@ export const ReminderHistoryModal = ({
   open: boolean;
   onClose: () => void;
 }) => {
-  const [history, setHistory] = useState<ReminderHistoryItem[]>([]);
+  const [historyPage, setHistoryPage] = useState<PageResponse<ReminderHistoryItem>>({
+    records: [],
+    page: 0,
+    size: DEFAULT_PAGE_SIZE,
+    totalRecords: 0,
+    totalPages: 0
+  });
   const [loading, setLoading] = useState(false);
+
+  const loadHistory = (nextPage = 0) => {
+    if (!customerId) {
+      return;
+    }
+    setLoading(true);
+    void getReminderHistory(customerId, { page: nextPage, size: DEFAULT_PAGE_SIZE })
+      .then(setHistoryPage)
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     if (!open || !customerId) {
       return;
     }
-    setLoading(true);
-    void getReminderHistory(customerId)
-      .then(setHistory)
-      .finally(() => setLoading(false));
+    loadHistory(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, customerId]);
 
   return (
@@ -39,7 +55,7 @@ export const ReminderHistoryModal = ({
         </div>
       ) : (
         <Table
-          data={history}
+          data={historyPage.records}
           emptyText="No reminders sent yet."
           columns={[
             { key: "channel", header: "Channel", render: (item) => item.channel },
@@ -59,6 +75,14 @@ export const ReminderHistoryModal = ({
           ]}
         />
       )}
+      <Pagination
+        page={historyPage.page}
+        size={historyPage.size}
+        totalRecords={historyPage.totalRecords}
+        totalPages={historyPage.totalPages}
+        disabled={loading}
+        onPageChange={loadHistory}
+      />
     </Modal>
   );
 };

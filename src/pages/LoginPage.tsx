@@ -21,8 +21,8 @@ export const LoginPage = () => {
     try {
       setLoading(true);
       clearMessage();
-      await login(form);
-      navigate(from, { replace: true });
+      const firstRoute = await login(form);
+      navigate(firstRoute ?? "/no-menu", { replace: true });
     } catch (err: any) {
       setApiError(err, "Unable to login");
     } finally {

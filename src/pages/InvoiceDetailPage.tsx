@@ -14,7 +14,7 @@ import type { Invoice } from "../types/api";
 
 export const InvoiceDetailPage = () => {
   const { invoiceId } = useParams();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export const InvoiceDetailPage = () => {
             </div>
             <div className="flex flex-wrap gap-2">
               {invoice ? <StatusBadge label={invoice.paymentStatus} /> : null}
-              {invoice ? (
+              {invoice && can("INVOICES", "EXPORT") ? (
                 <Button type="button" variant="secondary" onClick={() => downloadInvoicePdf(invoice, user?.company ?? null)}>
                   Download invoice
                 </Button>
@@ -105,11 +105,13 @@ export const InvoiceDetailPage = () => {
               <span className="font-bold text-white">{formatCurrency(invoice?.balanceAmount)}</span>
             </div>
           </div>
-          <div className="mt-6">
-            <Link to={invoice ? `/payments/new?invoiceId=${invoice.id}` : "/payments/new"}>
-              <Button>Record payment</Button>
-            </Link>
-          </div>
+          {can("PAYMENTS", "ADD") ? (
+            <div className="mt-6">
+              <Link to={invoice ? `/payments?invoiceId=${invoice.id}` : "/payments"}>
+                <Button>Record payment</Button>
+              </Link>
+            </div>
+          ) : null}
         </GlassCard>
 
         <GlassCard className="p-6 md:p-7">

@@ -21,11 +21,12 @@ import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { StatCard } from "../components/StatCard";
 import { Table } from "../components/Table";
 import { TrendBadge } from "../components/TrendBadge";
 import { formatCurrency } from "../lib/currency";
-import type { AnalyticsSummary, CustomerDue, LowStockProduct, OwnerAnalytics, TopSellingProduct } from "../types/api";
+import type { AnalyticsSummary, CustomerDue, LowStockProduct, OwnerAnalytics, PageResponse, TopSellingProduct } from "../types/api";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 
@@ -70,9 +71,27 @@ const chartColors = ["#38bdf8", "#10b981", "#f97316", "#a78bfa", "#f43f5e"];
 export const SalesAnalyticsPage = () => {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [overview, setOverview] = useState<OwnerAnalytics | null>(null);
-  const [topProducts, setTopProducts] = useState<TopSellingProduct[]>([]);
-  const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
-  const [dueCustomers, setDueCustomers] = useState<CustomerDue[]>([]);
+  const [topProductsPage, setTopProductsPage] = useState<PageResponse<TopSellingProduct>>({
+    records: [],
+    page: 0,
+    size: DEFAULT_PAGE_SIZE,
+    totalRecords: 0,
+    totalPages: 0
+  });
+  const [lowStockPage, setLowStockPage] = useState<PageResponse<LowStockProduct>>({
+    records: [],
+    page: 0,
+    size: DEFAULT_PAGE_SIZE,
+    totalRecords: 0,
+    totalPages: 0
+  });
+  const [dueCustomersPage, setDueCustomersPage] = useState<PageResponse<CustomerDue>>({
+    records: [],
+    page: 0,
+    size: DEFAULT_PAGE_SIZE,
+    totalRecords: 0,
+    totalPages: 0
+  });
   const [preset, setPreset] = useState<DatePreset>("thisMonth");
   const [customRange, setCustomRange] = useState(() => buildRange("thisMonth"));
 
@@ -82,24 +101,36 @@ export const SalesAnalyticsPage = () => {
     void Promise.all([
       getAnalyticsSummary(activeRange),
       getOwnerAnalytics(activeRange),
-      getTopProducts(5),
-      getLowStockProducts(5),
-      getCustomerDueList(8)
+      getTopProducts({ page: 0, size: DEFAULT_PAGE_SIZE }),
+      getLowStockProducts({ page: 0, size: DEFAULT_PAGE_SIZE }),
+      getCustomerDueList({ page: 0, size: DEFAULT_PAGE_SIZE })
     ]).then(([summaryData, ownerData, topProductsData, lowStockData, dueData]) => {
       setSummary(summaryData);
       setOverview(ownerData);
-      setTopProducts(topProductsData);
-      setLowStockProducts(lowStockData);
-      setDueCustomers(dueData);
+      setTopProductsPage(topProductsData);
+      setLowStockPage(lowStockData);
+      setDueCustomersPage(dueData);
     });
   }, [activeRange]);
 
+  const loadTopProducts = async (page: number) => {
+    setTopProductsPage(await getTopProducts({ page, size: DEFAULT_PAGE_SIZE }));
+  };
+
+  const loadLowStockProducts = async (page: number) => {
+    setLowStockPage(await getLowStockProducts({ page, size: DEFAULT_PAGE_SIZE }));
+  };
+
+  const loadDueCustomers = async (page: number) => {
+    setDueCustomersPage(await getCustomerDueList({ page, size: DEFAULT_PAGE_SIZE }));
+  };
+
   const lowStockCaption = useMemo(() => {
-    if (lowStockProducts.length === 0) {
+    if (lowStockPage.totalRecords === 0) {
       return "Inventory levels are healthy.";
     }
-    return `${lowStockProducts.length} product${lowStockProducts.length > 1 ? "s" : ""} already at or below threshold.`;
-  }, [lowStockProducts]);
+    return `${lowStockPage.totalRecords} product${lowStockPage.totalRecords > 1 ? "s" : ""} already at or below threshold.`;
+  }, [lowStockPage.totalRecords]);
 
   const salesVsPayments = useMemo(() => {
     const collectionsByLabel = new Map((overview?.collectionTrend ?? []).map((point) => [point.label, point.value]));
@@ -323,7 +354,7 @@ export const SalesAnalyticsPage = () => {
             <h2 className="mt-2 text-2xl font-bold text-white">Top selling products</h2>
           </div>
           <Table
-            data={topProducts}
+            data={topProductsPage.records}
             emptyText="No sales data yet."
             columns={[
               { key: "product", header: "Product", render: (item) => <div><p className="font-semibold text-white">{item.productName}</p><p className="text-xs text-slate-400">{item.sku}</p></div> },
@@ -331,6 +362,13 @@ export const SalesAnalyticsPage = () => {
               { key: "sales", header: "Sales", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.totalSalesAmount)}</span> },
               { key: "stock", header: "Current Stock", className: "text-right", render: (item) => <span className="block text-right">{item.currentStockQty}</span> }
             ]}
+          />
+          <Pagination
+            page={topProductsPage.page}
+            size={topProductsPage.size}
+            totalRecords={topProductsPage.totalRecords}
+            totalPages={topProductsPage.totalPages}
+            onPageChange={(nextPage) => void loadTopProducts(nextPage)}
           />
         </GlassCard>
 
@@ -340,13 +378,20 @@ export const SalesAnalyticsPage = () => {
             <h2 className="mt-2 text-2xl font-bold text-white">Low stock products</h2>
           </div>
           <Table
-            data={lowStockProducts}
+            data={lowStockPage.records}
             emptyText="No low stock products."
             columns={[
               { key: "product", header: "Product", render: (item) => <div><p className="font-semibold text-white">{item.productName}</p><p className="text-xs text-slate-400">{item.sku}</p></div> },
               { key: "stock", header: "Stock", className: "text-right", render: (item) => <span className="block text-right font-semibold text-amber-200">{item.stockQty}</span> },
               { key: "min", header: "Min", className: "text-right", render: (item) => <span className="block text-right">{item.minStockQty}</span> }
             ]}
+          />
+          <Pagination
+            page={lowStockPage.page}
+            size={lowStockPage.size}
+            totalRecords={lowStockPage.totalRecords}
+            totalPages={lowStockPage.totalPages}
+            onPageChange={(nextPage) => void loadLowStockProducts(nextPage)}
           />
         </GlassCard>
       </div>
@@ -357,14 +402,20 @@ export const SalesAnalyticsPage = () => {
           <h2 className="mt-2 text-2xl font-bold text-white">Due customer list</h2>
         </div>
         <Table
-          data={dueCustomers}
+          data={dueCustomersPage.records}
           emptyText="No outstanding customer balances."
           columns={[
             { key: "customer", header: "Customer", render: (item) => <div><p className="font-semibold text-white">{item.customerName}</p><p className="text-xs text-slate-400">{item.mobile}</p></div> },
             { key: "email", header: "Email", render: (item) => item.email ?? "--" },
-            { key: "due", header: "Current Due", className: "text-right", render: (item) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.currentBalance)}</span> },
-            { key: "limit", header: "Credit Limit", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.creditLimit)}</span> }
+            { key: "due", header: "Current Due", className: "text-right", render: (item) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.currentBalance)}</span> }
           ]}
+        />
+        <Pagination
+          page={dueCustomersPage.page}
+          size={dueCustomersPage.size}
+          totalRecords={dueCustomersPage.totalRecords}
+          totalPages={dueCustomersPage.totalPages}
+          onPageChange={(nextPage) => void loadDueCustomers(nextPage)}
         />
       </GlassCard>
     </div>

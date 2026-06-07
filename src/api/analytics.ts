@@ -5,6 +5,7 @@ import type {
   CustomerDue,
   LowStockProduct,
   OwnerAnalytics,
+  PageResponse,
   SalesChartPoint,
   TopSellingProduct
 } from "../types/api";
@@ -30,23 +31,23 @@ export const getMonthWiseSales = async (year?: number) => {
   return response.data.data;
 };
 
-export const getTopProducts = async (limit = 5) => {
-  const response = await apiClient.get<ApiResponse<TopSellingProduct[]>>("/v1/analytics/top-products", {
-    params: { limit }
+export const getTopProducts = async (params?: { page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PageResponse<TopSellingProduct>>>("/v1/analytics/top-products", {
+    params
   });
   return response.data.data;
 };
 
-export const getLowStockProducts = async (limit = 5) => {
-  const response = await apiClient.get<ApiResponse<LowStockProduct[]>>("/v1/analytics/low-stock-products", {
-    params: { limit }
+export const getLowStockProducts = async (params?: { page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PageResponse<LowStockProduct>>>("/v1/analytics/low-stock-products", {
+    params
   });
   return response.data.data;
 };
 
-export const getCustomerDueList = async (limit = 10) => {
-  const response = await apiClient.get<ApiResponse<CustomerDue[]>>("/v1/analytics/customer-due-list", {
-    params: { limit }
+export const getCustomerDueList = async (params?: { page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PageResponse<CustomerDue>>>("/v1/analytics/customer-due-list", {
+    params
   });
   return response.data.data;
 };
