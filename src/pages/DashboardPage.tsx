@@ -187,6 +187,16 @@ const formatCell = (row: DashboardDetailRow, column: DetailColumn) => {
   return String(value).replace(/_/g, " ");
 };
 
+const toExcelCellValue = (value: unknown): string | number | Date | null | undefined => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+  if (value instanceof Date || typeof value === "string" || typeof value === "number") {
+    return value;
+  }
+  return String(value);
+};
+
 const isTotalColumn = (column: DetailColumn) => {
   if (column.type === "currency") {
     return true;
@@ -595,7 +605,7 @@ export const DashboardPage = () => {
       key: column.key,
       header: column.header,
       type: column.type === "currency" ? "amount" : column.type === "date" ? "date" : "text",
-      value: (row) => row[column.key]
+      value: (row) => toExcelCellValue(row[column.key])
     })));
   };
 
@@ -615,7 +625,7 @@ export const DashboardPage = () => {
       key: column.key,
       header: column.header,
       type: column.type === "currency" ? "amount" : column.type === "date" ? "date" : "text",
-      value: (row) => column.value ? column.value(row as DashboardListRow) : (row as Record<string, unknown>)[column.key]
+      value: (row) => toExcelCellValue(column.value ? column.value(row as DashboardListRow) : (row as Record<string, unknown>)[column.key])
     })));
   };
 
