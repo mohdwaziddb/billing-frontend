@@ -240,14 +240,14 @@ select:-webkit-autofill {
   opacity: 0.55;
 }
 
-.saas-card {
+.billing-card {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-panel);
 }
 
-:root.dark .saas-card {
+:root.dark .billing-card {
   color: var(--text-secondary);
 }
 
@@ -315,36 +315,36 @@ select:-webkit-autofill {
   color: var(--theme-dark-contrast);
 }
 
-.saas-card .text-white {
+.billing-card .text-white {
   color: #071330;
 }
 
-:root.dark .saas-card .text-white {
+:root.dark .billing-card .text-white {
   color: #ffffff;
 }
 
-.saas-card .text-slate-100,
-.saas-card .text-slate-200,
-.saas-card .text-slate-300 {
+.billing-card .text-slate-100,
+.billing-card .text-slate-200,
+.billing-card .text-slate-300 {
   color: #334155;
 }
 
-.saas-card .text-slate-400 {
+.billing-card .text-slate-400 {
   color: #64748b;
 }
 
-.saas-card .text-slate-500 {
+.billing-card .text-slate-500 {
   color: #718096;
 }
 
-:root.dark .saas-card .text-slate-100,
-:root.dark .saas-card .text-slate-200,
-:root.dark .saas-card .text-slate-300 {
+:root.dark .billing-card .text-slate-100,
+:root.dark .billing-card .text-slate-200,
+:root.dark .billing-card .text-slate-300 {
   color: #e2e8f0;
 }
 
-:root.dark .saas-card .text-slate-400,
-:root.dark .saas-card .text-slate-500 {
+:root.dark .billing-card .text-slate-400,
+:root.dark .billing-card .text-slate-500 {
   color: #cbd5e1;
 }
 
@@ -397,7 +397,7 @@ select:-webkit-autofill {
 }
 
 :root.dark td .text-rose-200,
-:root.dark .saas-card .text-rose-200 {
+:root.dark .billing-card .text-rose-200 {
   color: #fca5a5 !important;
 }
 
@@ -461,27 +461,27 @@ select:-webkit-autofill {
   color: #e5e7eb !important;
 }
 
-.saas-card .border-white\/10,
-.saas-card .border-white\/5 {
+.billing-card .border-white\/10,
+.billing-card .border-white\/5 {
   border-color: #e6ebf2;
 }
 
-.saas-card .bg-white\/5,
-.saas-card .bg-white\/8 {
+.billing-card .bg-white\/5,
+.billing-card .bg-white\/8 {
   background-color: #f8fafc;
 }
 
-:root.dark .saas-card .bg-white\/5,
-:root.dark .saas-card .bg-white\/8,
-:root.dark .saas-card .bg-white\/10,
-:root.dark .saas-card .bg-white\/12 {
+:root.dark .billing-card .bg-white\/5,
+:root.dark .billing-card .bg-white\/8,
+:root.dark .billing-card .bg-white\/10,
+:root.dark .billing-card .bg-white\/12 {
   background-color: #1f2937;
 }
 
-:root.dark .saas-card .border-white\/5,
-:root.dark .saas-card .border-white\/10,
-:root.dark .saas-card .border-white\/12,
-:root.dark .saas-card .border-white\/20 {
+:root.dark .billing-card .border-white\/5,
+:root.dark .billing-card .border-white\/10,
+:root.dark .billing-card .border-white\/12,
+:root.dark .billing-card .border-white\/20 {
   border-color: #334155;
 }
 
@@ -493,8 +493,8 @@ select:-webkit-autofill {
   color: #86efac;
 }
 
-.saas-card .text-sky-100,
-.saas-card .text-sky-200 {
+.billing-card .text-sky-100,
+.billing-card .text-sky-200 {
   color: var(--theme-dark);
 }
 

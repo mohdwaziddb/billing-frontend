@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { handlePermissionDenied } from "../lib/permissionHandler";
 
 export const PermissionRoute = ({
   menuCode,
@@ -30,12 +31,20 @@ export const PermissionRoute = ({
     };
   }, [location.pathname]);
 
+  const denied = Boolean(permissions && !validating && !can(menuCode, actionCode));
+
+  useEffect(() => {
+    if (denied) {
+      handlePermissionDenied();
+    }
+  }, [denied, location.pathname]);
+
   if (!permissions || validating) {
     return null;
   }
 
-  if (!can(menuCode, actionCode)) {
-    const nextRoute = firstAccessibleRoute();
+  if (denied) {
+    const nextRoute = can("DASHBOARD", "VIEW") ? "/dashboard" : firstAccessibleRoute();
     return <Navigate replace to={nextRoute && nextRoute !== location.pathname ? nextRoute : "/no-menu"} />;
   }
 

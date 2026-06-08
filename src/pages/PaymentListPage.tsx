@@ -1,9 +1,10 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { CreditCard, Download, Trash2, Wallet } from "lucide-react";
+import { AlertCircle, Banknote, CreditCard, Download, Smartphone, Trash2, Wallet } from "lucide-react";
 import { deletePayment, getPaymentsPage, type PaymentFilterParams } from "../api/payments";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
+import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -102,6 +103,7 @@ export const PaymentListPage = () => {
   const [page, setPage] = useState(0);
   const [draftFilters, setDraftFilters] = useState<PaymentFilters>(emptyFilters);
   const [appliedFilters, setAppliedFilters] = useState<PaymentFilters>(emptyFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportRows, setExportRows] = useState<Payment[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -113,6 +115,7 @@ export const PaymentListPage = () => {
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
   const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
+  const activeFilterSummary = useMemo(() => summarizePaymentFilters(appliedFilters), [appliedFilters]);
   const summary = useMemo(() => ({
     total: exportRows.length,
     collection: exportRows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
@@ -120,6 +123,7 @@ export const PaymentListPage = () => {
     upi: exportRows.filter((item) => item.mode === "UPI").reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
     outstandingCollection: exportRows.filter((item) => item.invoiceNo).reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
   }), [exportRows]);
+  const modalGrandTotal = useMemo(() => modalPayments.reduce((sum, item) => sum + Number(item.amount ?? 0), 0), [modalPayments]);
 
   const loadPayments = async (nextPage = page, params = baseParams) => {
     const response = await getPaymentsPage({ ...params, page: nextPage, size: DEFAULT_PAGE_SIZE });
@@ -150,12 +154,14 @@ export const PaymentListPage = () => {
   const applyFilters = () => {
     setPage(0);
     setAppliedFilters(draftFilters);
+    setFiltersOpen(false);
   };
 
   const resetFilters = () => {
     setPage(0);
     setDraftFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
+    setFiltersOpen(false);
   };
 
   const handleDelete = async () => {
@@ -191,17 +197,20 @@ export const PaymentListPage = () => {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total Payments" value={String(summary.total)} caption="Current filtered payments" icon={<CreditCard size={18} />} onClick={() => openSummary("total")} />
         <StatCard label="Total Collection" value={formatCurrency(summary.collection)} caption="All payment modes" icon={<Wallet size={18} />} onClick={() => openSummary("collection")} />
-        <StatCard label="Cash Collection" value={formatCurrency(summary.cash)} caption="Cash payments" icon={<Wallet size={18} />} onClick={() => openSummary("cash")} />
-        <StatCard label="UPI Collection" value={formatCurrency(summary.upi)} caption="UPI payments" icon={<Wallet size={18} />} onClick={() => openSummary("upi")} />
-        <StatCard label="Outstanding Collection" value={formatCurrency(summary.outstandingCollection)} caption="Invoice-linked payments" icon={<Wallet size={18} />} onClick={() => openSummary("outstanding")} />
+        <StatCard label="Cash Collection" value={formatCurrency(summary.cash)} caption="Cash payments" icon={<Banknote size={18} />} onClick={() => openSummary("cash")} />
+        <StatCard label="UPI Collection" value={formatCurrency(summary.upi)} caption="UPI payments" icon={<Smartphone size={18} />} onClick={() => openSummary("upi")} />
+        <StatCard label="Outstanding Collection" value={formatCurrency(summary.outstandingCollection)} caption="Invoice-linked payments" icon={<AlertCircle size={18} />} onClick={() => openSummary("outstanding")} />
       </div>
 
-      <GlassCard className="p-6 md:p-7">
-        <div className="mb-5">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Payment Filters</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">Advanced Payment Search</h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <CommonAdvancedFilterPanel
+        title="Advanced Payment Search"
+        eyebrow="Payment Filters"
+        expanded={filtersOpen}
+        activeFilters={activeFilterSummary}
+        onToggle={() => setFiltersOpen((current) => !current)}
+        onClearAll={resetFilters}
+      >
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Input label="Search Payment" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} />
           <Select label="Payment Status" value={draftFilters.paymentStatus} options={[
             { label: "All", value: "" },
@@ -210,6 +219,14 @@ export const PaymentListPage = () => {
             { label: "Failed", value: "FAILED" },
             { label: "Cancelled", value: "CANCELLED" }
           ]} onChange={(event) => setDraftFilters((current) => ({ ...current, paymentStatus: event.target.value }))} />
+          <Select label="Payment Method" value={draftFilters.mode} options={[
+            { label: "All", value: "" },
+            { label: "Cash", value: "CASH" },
+            { label: "UPI", value: "UPI" },
+            { label: "Bank Transfer", value: "BANK_TRANSFER" },
+            { label: "Card", value: "CARD" },
+            { label: "Cheque", value: "CHEQUE" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, mode: event.target.value }))} />
           <Select label="Payment Date" value={draftFilters.datePreset} options={[
             { label: "All", value: "" },
             { label: "Today", value: "today" },
@@ -219,14 +236,6 @@ export const PaymentListPage = () => {
             { label: "This Year", value: "thisYear" },
             { label: "Custom Date Range", value: "custom" }
           ]} onChange={(event) => setDraftFilters((current) => ({ ...current, datePreset: event.target.value as DatePreset }))} />
-          <Select label="Payment Method" value={draftFilters.mode} options={[
-            { label: "All", value: "" },
-            { label: "Cash", value: "CASH" },
-            { label: "UPI", value: "UPI" },
-            { label: "Bank Transfer", value: "BANK_TRANSFER" },
-            { label: "Card", value: "CARD" },
-            { label: "Cheque", value: "CHEQUE" }
-          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, mode: event.target.value }))} />
           {draftFilters.datePreset === "custom" ? (
             <>
               <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
@@ -241,12 +250,14 @@ export const PaymentListPage = () => {
             { label: "Admin", value: "ADMIN" },
             { label: "User", value: "USER" }
           ]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
+          <div className="flex items-end">
+            <Button type="button" className="w-full" onClick={applyFilters}>Apply Filters</Button>
+          </div>
+          <div className="flex items-end">
+            <Button type="button" variant="secondary" className="w-full" onClick={resetFilters}>Reset Filters</Button>
+          </div>
         </div>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button type="button" onClick={applyFilters}>Apply Filters</Button>
-          <Button type="button" variant="secondary" onClick={resetFilters}>Reset Filters</Button>
-        </div>
-      </GlassCard>
+      </CommonAdvancedFilterPanel>
 
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -281,8 +292,11 @@ export const PaymentListPage = () => {
         <div className="space-y-5">
           <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
             <span className="font-semibold text-slate-950">Active Filters:</span>
-            <span className="min-w-0 flex-1 text-slate-600">{summaryTitle(activeSummary)}</span>
+            <span className="min-w-0 flex-1 text-slate-600">
+              {[summaryTitle(activeSummary), ...activeFilterSummary].filter(Boolean).join(" | ")}
+            </span>
             <span className="font-semibold text-slate-950">Records: {modalPaymentPage.totalRecords}</span>
+            <span className="font-semibold text-slate-950">Grand Total: {formatCurrency(modalGrandTotal)}</span>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <Input label="Search Modal Payments" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={modalSearch} onChange={(event) => {
@@ -350,6 +364,50 @@ const buildParams = (filters: PaymentFilters): PaymentFilterParams => {
     mode: filters.mode || undefined,
     createdByRole: filters.createdByRole || undefined
   };
+};
+
+const summarizePaymentFilters = (filters: PaymentFilters) => {
+  const summary: string[] = [];
+  const paymentStatusLabels: Record<string, string> = {
+    SUCCESS: "Success",
+    PENDING: "Pending",
+    FAILED: "Failed",
+    CANCELLED: "Cancelled"
+  };
+  const methodLabels: Record<string, string> = {
+    CASH: "Cash",
+    UPI: "UPI",
+    BANK_TRANSFER: "Bank Transfer",
+    CARD: "Card",
+    CHEQUE: "Cheque"
+  };
+  const datePresetLabels: Record<DatePreset, string> = {
+    "": "",
+    today: "Today",
+    yesterday: "Yesterday",
+    thisWeek: "This Week",
+    thisMonth: "This Month",
+    thisYear: "This Year",
+    custom: "Custom Date"
+  };
+  const roleLabels: Record<string, string> = {
+    OWNER: "Owner",
+    ADMIN: "Admin",
+    USER: "User"
+  };
+
+  if (filters.search.trim()) summary.push(`Search: ${filters.search.trim()}`);
+  if (filters.paymentStatus) summary.push(paymentStatusLabels[filters.paymentStatus] ?? filters.paymentStatus);
+  if (filters.mode) summary.push(methodLabels[filters.mode] ?? filters.mode);
+  if (filters.datePreset === "custom" && (filters.startDate || filters.endDate)) {
+    summary.push(`${formatDate(filters.startDate)} - ${formatDate(filters.endDate)}`);
+  } else if (filters.datePreset) {
+    summary.push(datePresetLabels[filters.datePreset]);
+  }
+  if (filters.minAmount) summary.push(`Amount > ${filters.minAmount}`);
+  if (filters.maxAmount) summary.push(`Amount < ${filters.maxAmount}`);
+  if (filters.createdByRole) summary.push(`Created By: ${roleLabels[filters.createdByRole] ?? filters.createdByRole}`);
+  return summary;
 };
 
 const summaryParams = (params: PaymentFilterParams, key: SummaryKey, search: string): PaymentFilterParams => {

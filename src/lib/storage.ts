@@ -1,6 +1,6 @@
 import type { AuthPayload } from "../types/api";
 
-const AUTH_KEY = "billing_saas_auth";
+const AUTH_KEY = "billing_frontend_auth";
 
 export const authStorage = {
   get(): AuthPayload | null {

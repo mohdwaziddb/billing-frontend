@@ -8,6 +8,7 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { notificationService } from "../services/notificationService";
 import type { ActionPermission, PermissionMatrix, Role, UserProfile } from "../types/api";
 
 const ACTION_COLUMNS = ["VIEW", "ADD", "EDIT", "DELETE", "EXPORT"];
@@ -155,6 +156,7 @@ export const RolePermissionsPage = () => {
       setPermissionMatrix(nextMatrix);
       await refreshPermissions();
       clearMessage();
+      notificationService.showSuccess(permissionMode === "role" ? "Permissions Saved Successfully" : "Role Permissions Updated Successfully");
     } catch (err: any) {
       setApiError(err, "Unable to save permissions");
     } finally {

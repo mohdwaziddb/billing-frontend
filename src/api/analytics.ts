@@ -32,7 +32,7 @@ export const getMonthWiseSales = async (year?: number) => {
   return response.data.data;
 };
 
-export const getTopProducts = async (params?: { page?: number; size?: number }) => {
+export const getTopProducts = async (params?: { startDate?: string; endDate?: string; search?: string; page?: number; size?: number }) => {
   const response = await apiClient.get<ApiResponse<PageResponse<TopSellingProduct>>>("/v1/analytics/top-products", {
     params
   });
@@ -46,7 +46,7 @@ export const getLowStockProducts = async (params?: { page?: number; size?: numbe
   return response.data.data;
 };
 
-export const getCustomerDueList = async (params?: { page?: number; size?: number }) => {
+export const getCustomerDueList = async (params?: { search?: string; page?: number; size?: number }) => {
   const response = await apiClient.get<ApiResponse<PageResponse<CustomerDue>>>("/v1/analytics/customer-due-list", {
     params
   });
@@ -62,6 +62,13 @@ export const getOwnerAnalytics = async (params?: { startDate?: string; endDate?:
 
 export const getSalesByCategory = async (params?: { startDate?: string; endDate?: string; limit?: number }) => {
   const response = await apiClient.get<ApiResponse<SalesByCategory[]>>("/v1/analytics/sales-by-category", {
+    params
+  });
+  return response.data.data;
+};
+
+export const getSalesByCategoryDetails = async (params?: { startDate?: string; endDate?: string; search?: string; page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PageResponse<SalesByCategory>>>("/v1/analytics/sales-by-category/details", {
     params
   });
   return response.data.data;

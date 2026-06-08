@@ -1,6 +1,8 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { env } from "../config/env";
+import { getApiErrorMessage } from "../lib/errors";
 import { authStorage } from "../lib/storage";
+import { notificationService } from "../services/notificationService";
 import type { ApiResponse, AuthPayload } from "../types/api";
 
 declare module "axios" {
@@ -71,6 +73,12 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
     const status = error.response?.status;
+
+    if (status === 403) {
+      notificationService.showError(getApiErrorMessage(error, "You do not have permission to access this resource"), error);
+    } else if (error.message === "Network Error") {
+      notificationService.showError("Unable to connect to the server. Please check your network connection.", error);
+    }
 
     if (!originalRequest || status !== 401 || originalRequest.skipAuthRefresh || isAuthBypassRoute(originalRequest.url)) {
       if (status === 401 && (originalRequest?.skipAuthRefresh || originalRequest?.url?.includes("/v1/auth/refresh"))) {

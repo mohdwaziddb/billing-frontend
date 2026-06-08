@@ -1,7 +1,7 @@
 import { applyThemeColor, DEFAULT_THEME_COLOR, normalizeHexColor } from "../lib/theme";
 import type { CompanyTheme, UserPreference } from "../types/api";
 
-const THEME_BOOTSTRAP_KEY = "billing_saas_theme_bootstrap";
+const THEME_BOOTSTRAP_KEY = "billing_frontend_theme_bootstrap";
 
 export type ThemeBootstrapState = {
   themeColor: string;

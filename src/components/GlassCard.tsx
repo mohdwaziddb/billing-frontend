@@ -8,5 +8,5 @@ export const GlassCard = ({
   children: ReactNode;
   className?: string;
 }) => {
-  return <div className={clsx("saas-card", className)}>{children}</div>;
+  return <div className={clsx("billing-card", className)}>{children}</div>;
 };
