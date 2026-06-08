@@ -56,7 +56,7 @@ export const RegisterPage = () => {
     <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-10">
       <GlassCard className="w-full max-w-5xl p-8 md:p-10">
         <div className="mb-8">
-          <p className="text-sm uppercase tracking-[0.35em] text-[var(--theme-color)]">Create your workspace</p>
+          <p className="text-sm uppercase tracking-[0.35em] text-[var(--theme-color)]">Wazid Create your workspace</p>
           <h1 className="mt-4 text-4xl font-extrabold text-slate-950">Register your company</h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-600">
             Set up your billing workspace and administrator account with backend validation for security and access.
