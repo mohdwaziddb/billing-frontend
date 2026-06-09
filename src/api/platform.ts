@@ -2,9 +2,9 @@ import { apiClient } from "./apiClient";
 import type { ApiResponse, PlatformSettings } from "../types/api";
 
 export const defaultPlatformSettings: PlatformSettings = {
-  platformName: "BizPulse Technologies",
+  platformName: "",
   platformLogo: null,
-  platformTagline: "Business Management Platform"
+  platformTagline: null
 };
 
 export const getPlatformSettings = async () => {

@@ -1,9 +1,11 @@
-import { Download, Edit3, Plus, UserX } from "lucide-react";
+import { Download, Edit3, History, Plus, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { createCompanyUser, deactivateCompanyUser, getCompanyUsersPage, getRoles, updateCompanyUser } from "../api/users";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -76,6 +78,7 @@ export const UserManagementPage = () => {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [logTarget, setLogTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [activeUserRole, setActiveUserRole] = useState<Role | "ALL" | null>(null);
   const [modalSearch, setModalSearch] = useState("");
@@ -248,7 +251,7 @@ export const UserManagementPage = () => {
   }
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header title="Users" subtitle="Create, update, and deactivate company users." />
 
       {pageError ? (
@@ -284,11 +287,10 @@ export const UserManagementPage = () => {
         </button>
       </div>
 
-      <GlassCard className="p-6 md:p-7">
+      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Access control</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Company Users</h2>
+            <CommonBreadcrumb items={[{ label: "Users" }]} />
           </div>
           {can("USERS", "EXPORT") || can("USERS", "ADD") ? (
             <div className="flex flex-wrap gap-2">
@@ -341,10 +343,12 @@ export const UserManagementPage = () => {
           />
         </div>
 
-        <Table
-          data={users}
-          emptyText="No company users found."
-          columns={[
+        <div className="flex-1">
+          <Table
+            data={users}
+            emptyText="No company users found."
+            emptyAction={can("USERS", "ADD") ? <Button type="button" onClick={openCreateModal}><Plus size={16} />Add user</Button> : null}
+            columns={[
             {
               key: "name",
               header: "Name",
@@ -377,6 +381,12 @@ export const UserManagementPage = () => {
                       onClick: () => openEditModal(item)
                     },
                     {
+                      label: "Show Logs",
+                      icon: <History size={15} />,
+                      hidden: !can("USERS", "VIEW_LOGS"),
+                      onClick: () => setLogTarget(item)
+                    },
+                    {
                       label: "Disable",
                       icon: <UserX size={15} />,
                       danger: true,
@@ -388,9 +398,11 @@ export const UserManagementPage = () => {
                 />
               )
             }
-          ]}
-        />
-        <Pagination
+            ]}
+          />
+        </div>
+        <div className="mt-auto">
+          <Pagination
           page={userPage.page}
           size={userPage.size}
           totalRecords={userPage.totalRecords}
@@ -399,7 +411,8 @@ export const UserManagementPage = () => {
             setPage(nextPage);
             void loadUsers(nextPage);
           }}
-        />
+          />
+        </div>
       </GlassCard>
 
       <Modal open={modalOpen} title={editingUser ? "Edit User" : "Add User"} onClose={() => setModalOpen(false)}>
@@ -517,6 +530,7 @@ export const UserManagementPage = () => {
           <Pagination page={modalUserPage.page} size={modalUserPage.size} totalRecords={modalUserPage.totalRecords} totalPages={modalUserPage.totalPages} onPageChange={setModalPage} />
         </div>
       </Modal>
+      <AuditLogModal open={Boolean(logTarget)} moduleName="User" entityId={logTarget?.id ?? null} title="User Change History" onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void deactivateUser()} />
     </div>
   );

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Download, Pencil, Trash2 } from "lucide-react";
+import { Download, History, Pencil, Trash2 } from "lucide-react";
 import { createProductCategory, deleteProductCategory, getProductCategoriesPage, updateProductCategory } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -53,6 +55,7 @@ export const ProductCategoryPage = () => {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProductCategory | null>(null);
+  const [logTarget, setLogTarget] = useState<ProductCategory | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
   const { message: formError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
@@ -138,7 +141,7 @@ export const ProductCategoryPage = () => {
   };
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title="Product Categories"
         subtitle="Manage product category names, descriptions, and active status for product setup."
@@ -149,12 +152,11 @@ export const ProductCategoryPage = () => {
         </div>
       ) : null}
 
-      <GlassCard className="p-6 md:p-7">
+      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Setup</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">Product Categories</h2>
+              <CommonBreadcrumb items={[{ label: "Product Categories" }]} />
             </div>
             <div className="flex flex-wrap gap-2">
               {canExport ? <Button type="button" variant="secondary" disabled={!categories.length} onClick={() => exportToExcel("product-categories.xlsx", categories, [
@@ -205,10 +207,12 @@ export const ProductCategoryPage = () => {
           </div>
         </div>
 
-        <Table
-          data={categories}
-          emptyText="No product categories found."
-          columns={[
+        <div className="flex-1">
+          <Table
+            data={categories}
+            emptyText="No product categories found."
+            emptyAction={canAdd ? <Button onClick={openCreate}>Add Category</Button> : null}
+            columns={[
             { key: "category", header: "Category Name", render: (item) => <span className="font-semibold text-white">{item.categoryName}</span> },
             { key: "description", header: "Description", render: (item) => item.description ?? "--" },
             { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
@@ -227,6 +231,12 @@ export const ProductCategoryPage = () => {
                       onClick: () => openEdit(item)
                     },
                     {
+                      label: "Show Logs",
+                      icon: <History size={15} />,
+                      hidden: !can("PRODUCT_CATEGORY", "VIEW_LOGS"),
+                      onClick: () => setLogTarget(item)
+                    },
+                    {
                       label: "Delete",
                       icon: <Trash2 size={15} />,
                       danger: true,
@@ -237,9 +247,11 @@ export const ProductCategoryPage = () => {
                 />
               )
             }
-          ]}
-        />
-        <Pagination
+            ]}
+          />
+        </div>
+        <div className="mt-auto">
+          <Pagination
           page={categoryPage.page}
           size={categoryPage.size}
           totalRecords={categoryPage.totalRecords}
@@ -248,7 +260,8 @@ export const ProductCategoryPage = () => {
             setPage(nextPage);
             void loadCategories(nextPage);
           }}
-        />
+          />
+        </div>
       </GlassCard>
 
       <Modal open={formOpen} title={editingCategory ? "Edit Category" : "Add Category"} onClose={() => setFormOpen(false)}>
@@ -288,6 +301,7 @@ export const ProductCategoryPage = () => {
           </Button>
         </div>
       </Modal>
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Product Category" entityId={logTarget?.id ?? null} title="Product Category Change History" onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void removeCategory()} />
     </div>
   );

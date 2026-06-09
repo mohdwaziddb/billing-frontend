@@ -1,4 +1,4 @@
-import { Eye, Search, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Eye, Search, ShoppingBag } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -6,6 +6,7 @@ import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from 
 import { createInvoice } from "../api/invoices";
 import { getProducts } from "../api/products";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -19,17 +20,21 @@ import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
+import { InvoiceCalculationService } from "../services/InvoiceCalculationService";
 import { notificationService } from "../services/notificationService";
 import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, Product } from "../types/api";
 
 type FormValues = {
   customerId: string;
   invoiceDate: string;
+  invoiceDiscountType: "FIXED" | "PERCENT";
   discountAmount: string;
+  paidAmount: string;
   items: Array<{
     productId: string;
     qty: string;
-    discountPercent: string;
+    discountType: "PERCENT" | "FIXED";
+    discountValue: string;
   }>;
 };
 
@@ -72,8 +77,10 @@ export const CreateInvoicePage = () => {
     defaultValues: {
       customerId: "",
       invoiceDate: new Date().toISOString().slice(0, 10),
-      discountAmount: "",
-      items: [{ productId: "", qty: "", discountPercent: "" }]
+      invoiceDiscountType: "FIXED",
+      discountAmount: "0",
+      paidAmount: "0",
+      items: [{ productId: "", qty: "1", discountType: "FIXED", discountValue: "0" }]
     }
   });
 
@@ -86,17 +93,27 @@ export const CreateInvoicePage = () => {
   }, []);
 
   const watchItems = watch("items");
-  const previewSubtotal = useMemo(() => {
-    return watchItems.reduce((sum, item) => {
+  const invoiceDiscountType = watch("invoiceDiscountType");
+  const invoiceDiscountInput = watch("discountAmount");
+  const paidAmountInput = watch("paidAmount");
+  const invoiceSummary = useMemo(() => {
+    return InvoiceCalculationService.calculate({
+      invoiceDiscountType,
+      invoiceDiscountValue: invoiceDiscountInput,
+      paidAmount: paidAmountInput,
+      rows: watchItems.map((item) => {
       const product = products.find((entry) => String(entry.id) === item.productId);
-      if (!product) {
-        return sum;
-      }
-      return sum + product.sellingPrice * Number(item.qty || 0);
-    }, 0);
-  }, [products, watchItems]);
-  const selectedLineCount = watchItems.filter((item) => item.productId).length;
-  const selectedQuantity = watchItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+      return {
+          productId: item.productId,
+          qty: item.qty,
+          rate: product?.sellingPrice ?? 0,
+          taxPercent: product?.taxPercent ?? 0,
+          productDiscountType: item.discountType,
+          productDiscountValue: item.discountValue
+      };
+      })
+    });
+  }, [invoiceDiscountInput, invoiceDiscountType, paidAmountInput, products, watchItems]);
 
   const lookupCustomerByMobile = async () => {
     clearMessage();
@@ -198,11 +215,21 @@ export const CreateInvoicePage = () => {
     const payload: InvoiceRequest = {
       customerId: Number(values.customerId),
       invoiceDate: values.invoiceDate,
-      discountAmount: Number(values.discountAmount || 0),
+      discountAmount: Number(invoiceSummary.invoiceDiscount.toFixed(2)),
       items: values.items.map((item) => ({
         productId: Number(item.productId),
         qty: Number(item.qty),
-        discountPercent: Number(item.discountPercent || 0)
+        discountType: item.discountType,
+        discountValue: Number(item.discountValue || 0),
+        discountPercent: (() => {
+          const product = products.find((entry) => String(entry.id) === item.productId);
+          const lineBase = Number(product?.sellingPrice ?? 0) * Number(item.qty || 0);
+          const value = Number(item.discountValue || 0);
+          if (lineBase <= 0) {
+            return 0;
+          }
+          return item.discountType === "FIXED" ? Math.min(100, (Math.max(0, value) / lineBase) * 100) : Math.max(0, value);
+        })()
       }))
     };
 
@@ -216,15 +243,33 @@ export const CreateInvoicePage = () => {
   };
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title="Create Invoice"
         subtitle="Search customers by mobile, review purchase history, and submit invoice items through a focused billing workflow."
       />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <GlassCard className="p-6 md:p-7">
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+      <div className="mx-auto w-full max-w-[1400px] flex-1">
+        <div className="mb-4 flex flex-col gap-3 rounded-[22px] border border-slate-200 bg-white/92 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)] sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Create Invoice" }]} />
+            <h2 className="mt-1 text-2xl font-bold text-slate-950">Professional Billing Screen</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => navigate("/invoices")}>
+              <ArrowLeft size={16} />
+              Back
+            </Button>
+            <Button disabled={isSubmitting} type="submit" form="create-invoice-form">
+              {isSubmitting ? "Submitting..." : "Save Invoice"}
+            </Button>
+          </div>
+        </div>
+        <form id="create-invoice-form" className="grid gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]" onSubmit={handleSubmit(onSubmit)}>
+          <div className="space-y-4">
+            <GlassCard className="p-5">
+              <section className="space-y-4">
+              <h3 className="text-sm font-bold uppercase text-slate-500">Customer Information</h3>
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
               <Input
                 label="Customer Mobile Number"
                 requiredMark
@@ -272,9 +317,11 @@ export const CreateInvoicePage = () => {
                 </div>
               </div>
             ) : null}
+              </section>
+            </GlassCard>
 
             {showNewCustomerForm && !selectedCustomer && can("CUSTOMERS", "ADD") ? (
-              <div className="rounded-[26px] border border-white/10 bg-white/5 p-4 md:p-5">
+              <GlassCard className="p-5">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-400">New customer</p>
@@ -308,24 +355,29 @@ export const CreateInvoicePage = () => {
                     {creatingCustomer ? "Creating..." : "Add Customer"}
                   </Button>
                 </div>
-              </div>
+              </GlassCard>
             ) : null}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Invoice date" requiredMark type="date" error={errors.invoiceDate?.message} {...register("invoiceDate", { required: "Invoice date is required" })} />
-              <Input label="Invoice-level discount" type="number" step="0.01" error={errors.discountAmount?.message} {...register("discountAmount")} />
-            </div>
+            <GlassCard className="p-5">
+              <section className="space-y-4">
+              <h3 className="text-sm font-bold uppercase text-slate-500">Invoice Information</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input label="Invoice date" requiredMark type="date" error={errors.invoiceDate?.message} {...register("invoiceDate", { required: "Invoice date is required" })} />
+              </div>
+              </section>
+            </GlassCard>
 
-            <div className="space-y-4">
+            <GlassCard className="p-5">
+              <section className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-xl font-bold text-white">Invoice items</h2>
-                <Button type="button" variant="secondary" onClick={() => append({ productId: "", qty: "", discountPercent: "" })}>
+                <h3 className="text-sm font-bold uppercase text-slate-500">Invoice Items</h3>
+                <Button type="button" variant="secondary" onClick={() => append({ productId: "", qty: "1", discountType: "FIXED", discountValue: "0" })}>
                   Add item
                 </Button>
               </div>
               {fields.map((field, index) => (
                 <div key={field.id} className="rounded-[26px] border border-white/10 bg-white/5 p-4">
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_110px_140px_140px_110px]">
                     <Select
                       label="Product"
                       requiredMark
@@ -335,7 +387,13 @@ export const CreateInvoicePage = () => {
                       {...register(`items.${index}.productId`, { required: "Product is required" })}
                     />
                     <Input label="Qty" requiredMark type="number" error={errors.items?.[index]?.qty?.message} {...register(`items.${index}.qty`, { required: "Qty is required" })} />
-                    <Input label="Item discount %" type="number" step="0.01" error={errors.items?.[index]?.discountPercent?.message} {...register(`items.${index}.discountPercent`)} />
+                    <Select
+                      label="Discount Type"
+                      placeholder={null}
+                      options={[{ label: "Percent", value: "PERCENT" }, { label: "Fixed", value: "FIXED" }]}
+                      {...register(`items.${index}.discountType`)}
+                    />
+                    <Input label="Product Discount" type="number" step="0.01" error={errors.items?.[index]?.discountValue?.message} {...register(`items.${index}.discountValue`)} />
                     <div className="flex items-end">
                       <Button type="button" variant="danger" className="w-full" onClick={() => remove(index)} disabled={fields.length === 1}>
                         Remove
@@ -344,54 +402,39 @@ export const CreateInvoicePage = () => {
                   </div>
                 </div>
               ))}
-            </div>
+            </section>
+            </GlassCard>
 
             {serverError ? <div className="rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{serverError}</div> : null}
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button disabled={isSubmitting} type="submit">{isSubmitting ? "Submitting..." : "Create Invoice"}</Button>
-              <Button type="button" variant="ghost" onClick={() => navigate("/invoices")}>Back to invoices</Button>
-            </div>
-          </form>
-        </GlassCard>
-
-        <GlassCard className="h-fit p-6 md:p-7">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Invoice context</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">Submission summary</h2>
-          <p className="mt-3 text-sm text-slate-300/70">Review the selected customer and invoice composition before submitting to the backend.</p>
-          <div className="mt-6 space-y-4">
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-slate-400">Customer</p>
-              <p className="mt-2 text-lg font-bold text-white">{selectedCustomer?.name ?? "No customer selected"}</p>
-              <p className="mt-1 text-sm text-slate-400">{selectedCustomer?.mobile ?? "Search by mobile to continue."}</p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Selected lines</p>
-                <p className="mt-2 text-2xl font-bold text-white">{selectedLineCount}</p>
-              </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Total quantity</p>
-                <p className="mt-2 text-2xl font-bold text-white">{selectedQuantity}</p>
-              </div>
-            </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-              <p className="text-sm text-slate-400">Estimated line subtotal</p>
-              <p className="mt-2 text-2xl font-bold text-white">{formatCurrency(previewSubtotal)}</p>
-              <p className="mt-2 text-xs leading-5 text-slate-400">Final totals, tax, discounts, stock adjustments, and balances are computed after validation.</p>
-            </div>
-            {selectedCustomer ? (
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Customer summary</p>
-                <p className="mt-2 font-semibold text-white">{selectedCustomer.name}</p>
-                <p className="mt-1 text-sm text-slate-400">{selectedCustomer.mobile}</p>
-                <Button type="button" variant="ghost" className="mt-3 min-h-10 px-3" onClick={() => setCustomerDetailsOpen(true)}>
-                  <Eye size={16} />
-                  View Details
-                </Button>
-              </div>
-            ) : null}
           </div>
-        </GlassCard>
+          <aside className="xl:sticky xl:top-24 xl:self-start">
+            <GlassCard className="p-5">
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold uppercase text-slate-500">Invoice Summary</h3>
+                <div className="grid gap-3">
+                  <Select
+                    label="Invoice Discount Type"
+                    placeholder={null}
+                    options={[{ label: "Fixed", value: "FIXED" }, { label: "Percent", value: "PERCENT" }]}
+                    {...register("invoiceDiscountType")}
+                  />
+                  <Input label="Invoice Discount" type="number" step="0.01" error={errors.discountAmount?.message} {...register("discountAmount")} />
+                  <Input label="Paid Amount" type="number" step="0.01" error={errors.paidAmount?.message} {...register("paidAmount")} />
+                </div>
+                <div className="space-y-2 rounded-2xl bg-white/5 p-4 text-sm">
+                  <div className="flex justify-between gap-3"><span className="text-slate-400">Subtotal</span><span className="font-semibold text-white">{formatCurrency(invoiceSummary.subtotal)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-400">Product Discounts</span><span className="font-semibold amount-danger">-{formatCurrency(invoiceSummary.productDiscountTotal)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-400">After Product Discounts</span><span className="font-semibold text-white">{formatCurrency(invoiceSummary.afterProductDiscountSubtotal)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-400">Invoice Discount</span><span className="font-semibold amount-danger">-{formatCurrency(invoiceSummary.invoiceDiscount)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-400">Tax</span><span className="font-semibold text-white">{formatCurrency(invoiceSummary.taxAmount)}</span></div>
+                  <div className="flex justify-between gap-3 border-t border-white/10 pt-3 text-base"><span className="font-bold text-white">Grand Total</span><span className="font-extrabold text-white">{formatCurrency(invoiceSummary.grandTotal)}</span></div>
+                  <div className="flex justify-between gap-3"><span className="text-slate-400">Paid Amount</span><span className="font-semibold text-white">{formatCurrency(invoiceSummary.paidAmount)}</span></div>
+                  <div className="flex justify-between gap-3 text-base"><span className="font-bold text-white">Outstanding Amount</span><span className="font-extrabold amount-danger">{formatCurrency(invoiceSummary.outstandingAmount)}</span></div>
+                </div>
+              </div>
+            </GlassCard>
+          </aside>
+        </form>
       </div>
 
       <Modal

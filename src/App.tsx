@@ -8,6 +8,7 @@ import { CreateInvoicePage } from "./pages/CreateInvoicePage";
 import { CustomerFormPage } from "./pages/CustomerFormPage";
 import { CustomerListPage } from "./pages/CustomerListPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { EmailTemplatePage } from "./pages/EmailTemplatePage";
 import { InvoiceDetailPage } from "./pages/InvoiceDetailPage";
 import { InvoiceListPage } from "./pages/InvoiceListPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -43,6 +44,7 @@ function App() {
           <Route path="/setup/product-category" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/theme-settings" element={<PermissionRoute menuCode="THEME_SETTINGS"><ThemeSettingsPage /></PermissionRoute>} />
           <Route path="/setup/about-company" element={<PermissionRoute menuCode="ABOUT_COMPANY"><AboutCompanyPage /></PermissionRoute>} />
+          <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
           <Route path="/invoices" element={<PermissionRoute menuCode="INVOICES"><InvoiceListPage /></PermissionRoute>} />
           <Route path="/create-invoice" element={<PermissionRoute menuCode="CREATE_INVOICE" actionCode="ADD"><CreateInvoicePage /></PermissionRoute>} />
           <Route path="/invoices/new" element={<PermissionRoute menuCode="CREATE_INVOICE" actionCode="ADD"><CreateInvoicePage /></PermissionRoute>} />

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, Trash2, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, Trash2, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteInvoice, getInvoicesPage, type InvoiceFilterParams } from "../api/invoices";
 import { getProductCategories } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
@@ -121,6 +123,7 @@ export const InvoiceListPage = () => {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [exportRows, setExportRows] = useState<Invoice[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
+  const [logTarget, setLogTarget] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [activeSummary, setActiveSummary] = useState<SummaryKey | null>(null);
   const [modalPage, setModalPage] = useState(0);
@@ -215,7 +218,7 @@ export const InvoiceListPage = () => {
   };
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header title="Invoices" subtitle="Search, filter, analyze, and export invoices from one billing ledger." />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -292,11 +295,10 @@ export const InvoiceListPage = () => {
         </div>
       </CommonAdvancedFilterPanel>
 
-      <GlassCard className="p-6 md:p-7">
+      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Invoice ledger</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Invoice Details</h2>
+            <CommonBreadcrumb items={[{ label: "Invoices" }]} />
           </div>
           {can("INVOICES", "EXPORT") || can("CREATE_INVOICE", "ADD") ? (
             <div className="flex flex-wrap gap-2">
@@ -314,8 +316,11 @@ export const InvoiceListPage = () => {
             </div>
           ) : null}
         </div>
-        <InvoiceTable invoices={invoices} canDelete={can("INVOICES", "DELETE")} onDelete={setDeleteTarget} />
-        <Pagination
+        <div className="flex-1">
+          <InvoiceTable invoices={invoices} canDelete={can("INVOICES", "DELETE")} canViewLogs={can("INVOICES", "VIEW_LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+        </div>
+        <div className="mt-auto">
+          <Pagination
           page={invoicePage.page}
           size={invoicePage.size}
           totalRecords={invoicePage.totalRecords}
@@ -324,7 +329,8 @@ export const InvoiceListPage = () => {
             setPage(nextPage);
             void loadInvoices(nextPage);
           }}
-        />
+          />
+        </div>
       </GlassCard>
 
       <Modal open={Boolean(activeSummary)} title={summaryTitle(activeSummary)} onClose={() => setActiveSummary(null)}>
@@ -344,7 +350,7 @@ export const InvoiceListPage = () => {
               Export Excel
             </Button>
           </div>
-          <InvoiceTable invoices={modalInvoices} canDelete={false} onDelete={setDeleteTarget} />
+          <InvoiceTable invoices={modalInvoices} canDelete={false} canViewLogs={can("INVOICES", "VIEW_LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
           <Pagination
             page={modalInvoicePage.page}
             size={modalInvoicePage.size}
@@ -355,15 +361,17 @@ export const InvoiceListPage = () => {
         </div>
       </Modal>
 
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Invoice" entityId={logTarget?.id ?? null} title="Invoice Change History" onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );
 };
 
-const InvoiceTable = ({ invoices, canDelete, onDelete }: { invoices: Invoice[]; canDelete: boolean; onDelete: (invoice: Invoice) => void }) => (
+const InvoiceTable = ({ invoices, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { invoices: Invoice[]; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (invoice: Invoice) => void; onShowLogs?: (invoice: Invoice) => void }) => (
   <Table
     data={invoices}
     emptyText="No invoices match the selected filters."
+    emptyAction={canAdd ? <Link to="/create-invoice"><Button>Create Invoice</Button></Link> : null}
     columns={[
       { key: "invoice", header: "Invoice No", render: (item) => <span className="font-semibold text-white">{item.invoiceNo}</span> },
       { key: "date", header: "Date", render: (item) => formatDate(item.invoiceDate) },
@@ -391,6 +399,7 @@ const InvoiceTable = ({ invoices, canDelete, onDelete }: { invoices: Invoice[]; 
           <ActionDropdown
             actions={[
               { label: "View", icon: <Eye size={15} />, to: `/invoices/${item.id}` },
+              { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs, onClick: () => onShowLogs?.(item) },
               { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
             ]}
           />

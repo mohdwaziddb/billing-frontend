@@ -10,14 +10,16 @@ type Column<T> = {
 export const Table = <T,>({
   data,
   columns,
-  emptyText = "No records found."
+  emptyText = "No records found.",
+  emptyAction
 }: {
   data: T[];
   columns: Column<T>[];
   emptyText?: string;
+  emptyAction?: ReactNode;
 }) => {
   return (
-    <div className="scrollbar-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+    <div className="scrollbar-thin min-h-[360px] overflow-x-auto rounded-2xl border border-slate-200 bg-white">
       <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
         <thead className="sticky top-0 z-10 bg-slate-50">
           <tr className="border-b border-slate-200 text-slate-500">
@@ -31,8 +33,11 @@ export const Table = <T,>({
         <tbody>
           {data.length === 0 ? (
             <tr>
-              <td className="px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={columns.length}>
-                {emptyText}
+              <td className="h-[320px] px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={columns.length}>
+                <div className="flex h-full flex-col items-center justify-center gap-3">
+                  <p className="font-medium">{emptyText}</p>
+                  {emptyAction}
+                </div>
               </td>
             </tr>
           ) : (

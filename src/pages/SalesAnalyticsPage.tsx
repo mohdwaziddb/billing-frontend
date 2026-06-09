@@ -155,7 +155,7 @@ export const SalesAnalyticsPage = () => {
   return (
     <div className="space-y-4 pb-6">
       <Header
-        title="Analytics Overview"
+        title="Reports"
         subtitle="Monitor sales, collections, outstanding risk, customer growth, and revenue trends with date-based reporting."
       />
 

@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createCustomer, getCustomer, getCustomers, updateCustomer } from "../api/customers";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -17,6 +19,9 @@ type FormValues = {
   mobile: string;
   email: string;
   address: string;
+  city: string;
+  state: string;
+  pincode: string;
   gstNo: string;
   active: string;
 };
@@ -36,6 +41,9 @@ export const CustomerFormPage = () => {
       mobile: "",
       email: "",
       address: "",
+      city: "",
+      state: "",
+      pincode: "",
       gstNo: "",
       active: "true"
     }
@@ -53,6 +61,9 @@ export const CustomerFormPage = () => {
         mobile: customer.mobile,
         email: customer.email ?? "",
         address: customer.address ?? "",
+        city: "",
+        state: "",
+        pincode: "",
         gstNo: customer.gstNo ?? "",
         active: customer.active ? "true" : "false"
       });
@@ -66,7 +77,7 @@ export const CustomerFormPage = () => {
       name: values.name.trim(),
       mobile: values.mobile.trim(),
       email: values.email.trim() || undefined,
-      address: values.address.trim() || undefined,
+      address: [values.address, values.city, values.state, values.pincode].map((value) => value.trim()).filter(Boolean).join(", ") || undefined,
       gstNo: values.gstNo.trim() || undefined,
       active: values.active === "true"
     };
@@ -108,83 +119,90 @@ export const CustomerFormPage = () => {
   };
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
-        title={editing ? "Edit customer" : "Add customer"}
+        title={editing ? "Customers > Edit Customer" : "Customers > Add Customer"}
         subtitle="Create and update customer records with clear validation, balanced spacing, and consistent controls."
       />
 
-      <GlassCard className="mx-auto max-w-5xl p-6 md:p-8">
-        <div className="mb-6">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Customer form</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">
-            {editing ? "Update customer details" : "Create new customer"}
-          </h2>
+      <GlassCard className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col p-4 md:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CommonBreadcrumb items={[{ label: "Customers", to: "/customers" }, { label: editing ? "Edit Customer" : "Add Customer" }]} />
+            <h2 className="mt-1 text-xl font-bold text-white">
+              {editing ? "Edit Customer" : "Add Customer"}
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => navigate("/customers")}>
+              <ArrowLeft size={16} />
+              Back
+            </Button>
+            <Button disabled={isSubmitting} type="submit" form="customer-form">
+              {isSubmitting ? "Saving..." : "Save Customer"}
+            </Button>
+          </div>
         </div>
 
-        <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              label="Customer Name"
-              requiredMark
-              error={fieldErrors.name ?? errors.name?.message}
-              {...register("name", { required: "Name is required" })}
-            />
-            <Input
-              label="Mobile Number"
-              requiredMark
-              error={fieldErrors.mobile ?? errors.mobile?.message}
-              {...register("mobile", { required: "Mobile is required" })}
-            />
-            <Input
-              label="Email Address"
-              type="email"
-              error={fieldErrors.email ?? errors.email?.message}
-              {...register("email")}
-            />
-            <Input
-              label="GST Number"
-              error={fieldErrors.gstNo ?? errors.gstNo?.message}
-              {...register("gstNo")}
-            />
-          </div>
+        <form id="customer-form" className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
+          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <h3 className="text-sm font-bold uppercase text-slate-500">Customer Details</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input
+                label="Customer Name"
+                requiredMark
+                error={fieldErrors.name ?? errors.name?.message}
+                {...register("name", { required: "Name is required" })}
+              />
+              <Input
+                label="Mobile Number"
+                requiredMark
+                error={fieldErrors.mobile ?? errors.mobile?.message}
+                {...register("mobile", { required: "Mobile is required" })}
+              />
+              <Input
+                label="Email Address"
+                type="email"
+                error={fieldErrors.email ?? errors.email?.message}
+                {...register("email")}
+              />
+              <Input
+                label="GST Number"
+                error={fieldErrors.gstNo ?? errors.gstNo?.message}
+                {...register("gstNo")}
+              />
+              <Select
+                label="Status"
+                placeholder="Select Status"
+                error={fieldErrors.active}
+                options={[
+                  { label: "Active", value: "true" },
+                  { label: "Inactive", value: "false" }
+                ]}
+                {...register("active")}
+              />
+            </div>
+          </section>
 
-          <div className="grid gap-4">
-            <Input
-              label="Address"
-              hint="Store the billing or communication address for this customer."
-              error={fieldErrors.address ?? errors.address?.message}
-              {...register("address")}
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Select
-              label="Status"
-              placeholder="Select Status"
-              error={fieldErrors.active}
-              options={[
-                { label: "Active", value: "true" },
-                { label: "Inactive", value: "false" }
-              ]}
-              {...register("active")}
-            />
-          </div>
+          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <h3 className="text-sm font-bold uppercase text-slate-500">Address Information</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input
+                label="Address"
+                error={fieldErrors.address ?? errors.address?.message}
+                {...register("address")}
+              />
+              <Input label="City" {...register("city")} />
+              <Input label="State" {...register("state")} />
+              <Input label="Pincode" {...register("pincode")} />
+            </div>
+          </section>
 
           {serverError ? (
-            <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
+            <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200 lg:col-span-2">
               {serverError}
             </div>
           ) : null}
-
-          <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-            <Button disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Saving..." : editing ? "Update Customer" : "Create Customer"}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => navigate("/customers")}>
-              Cancel
-            </Button>
-          </div>
         </form>
       </GlassCard>
     </div>

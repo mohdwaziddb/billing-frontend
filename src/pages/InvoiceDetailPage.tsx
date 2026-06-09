@@ -27,7 +27,7 @@ export const InvoiceDetailPage = () => {
   return (
     <div className="space-y-4 pb-6">
       <Header
-        title="Invoice detail"
+        title="Invoice Details"
         subtitle="Review invoice details, line items, totals, customer information, and download a printable invoice PDF."
       />
       <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">

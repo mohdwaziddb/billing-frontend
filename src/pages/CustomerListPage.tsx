@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { BookOpen, Download, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Download, History, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteCustomer, getCustomerLedger, getCustomersPage } from "../api/customers";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -40,6 +42,7 @@ export const CustomerListPage = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [logTarget, setLogTarget] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { can } = useAuth();
   const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
@@ -80,7 +83,7 @@ export const CustomerListPage = () => {
   }, [statusFilter]);
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title="Customers"
         subtitle="Review purchase totals, payments, discounts, and outstanding balances for every customer from one view."
@@ -90,12 +93,11 @@ export const CustomerListPage = () => {
           {errorMessage}
         </div>
       ) : null}
-      <GlassCard className="p-6 md:p-7">
+      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Customer registry</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">All customers</h2>
+              <CommonBreadcrumb items={[{ label: "Customers" }]} />
             </div>
             {can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
               <div className="flex flex-wrap gap-2">
@@ -139,7 +141,7 @@ export const CustomerListPage = () => {
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
               options={[
-                { label: "All Customers", value: "all" },
+                { label: "All", value: "all" },
                 { label: "Active Only", value: "active" },
                 { label: "Inactive Only", value: "inactive" }
               ]}
@@ -152,10 +154,12 @@ export const CustomerListPage = () => {
           </div>
         </div>
 
-        <Table
-          data={customers}
-          emptyText="No customers match the current filters."
-          columns={[
+        <div className="flex-1">
+          <Table
+            data={customers}
+            emptyText="No customers match the current filters."
+            emptyAction={can("CUSTOMERS", "ADD") ? <Link to="/customers/new"><Button>Add customer</Button></Link> : null}
+            columns={[
             {
               key: "name",
               header: "Customer",
@@ -211,6 +215,12 @@ export const CustomerListPage = () => {
                       hidden: !can("CUSTOMERS", "EDIT")
                     },
                     {
+                      label: "Show Logs",
+                      icon: <History size={15} />,
+                      hidden: !can("CUSTOMERS", "VIEW_LOGS"),
+                      onClick: () => setLogTarget(item)
+                    },
+                    {
                       label: "Delete",
                       icon: <Trash2 size={15} />,
                       danger: true,
@@ -221,9 +231,11 @@ export const CustomerListPage = () => {
                 />
               )
             }
-          ]}
-        />
-        <Pagination
+            ]}
+          />
+        </div>
+        <div className="mt-auto">
+          <Pagination
           page={customerPage.page}
           size={customerPage.size}
           totalRecords={customerPage.totalRecords}
@@ -232,7 +244,8 @@ export const CustomerListPage = () => {
             setPage(nextPage);
             void loadCustomers(nextPage);
           }}
-        />
+          />
+        </div>
       </GlassCard>
 
       <Modal open={Boolean(selectedLedger)} title="Customer ledger" onClose={() => setSelectedLedger(null)}>
@@ -269,6 +282,7 @@ export const CustomerListPage = () => {
           ) : null}
         </div>
       </Modal>
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Customer" entityId={logTarget?.id ?? null} title="Customer Change History" onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );

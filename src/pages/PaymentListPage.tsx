@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Banknote, CreditCard, Download, Smartphone, Trash2, Wallet } from "lucide-react";
+import { AlertCircle, Banknote, CreditCard, Download, History, Smartphone, Trash2, Wallet } from "lucide-react";
 import { deletePayment, getPaymentsPage, type PaymentFilterParams } from "../api/payments";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
@@ -106,6 +108,7 @@ export const PaymentListPage = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportRows, setExportRows] = useState<Payment[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
+  const [logTarget, setLogTarget] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [activeSummary, setActiveSummary] = useState<SummaryKey | null>(null);
   const [modalPage, setModalPage] = useState(0);
@@ -191,7 +194,7 @@ export const PaymentListPage = () => {
   };
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header title="Payments" subtitle="Review customer collections and invoice-linked payment activity." />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -259,11 +262,10 @@ export const PaymentListPage = () => {
         </div>
       </CommonAdvancedFilterPanel>
 
-      <GlassCard className="p-6 md:p-7">
+      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Collections</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Payment Records</h2>
+            <CommonBreadcrumb items={[{ label: "Payments" }]} />
           </div>
           {can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
             <div className="flex flex-wrap gap-2">
@@ -281,11 +283,15 @@ export const PaymentListPage = () => {
             </div>
           ) : null}
         </div>
-        <PaymentTable payments={payments} canDelete={can("PAYMENTS", "DELETE")} onDelete={setDeleteTarget} />
-        <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => {
+        <div className="flex-1">
+          <PaymentTable payments={payments} canDelete={can("PAYMENTS", "DELETE")} canViewLogs={can("PAYMENTS", "VIEW_LOGS")} canAdd={can("PAYMENTS", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+        </div>
+        <div className="mt-auto">
+          <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => {
           setPage(nextPage);
           void loadPayments(nextPage);
-        }} />
+          }} />
+        </div>
       </GlassCard>
 
       <Modal open={Boolean(activeSummary)} title={summaryTitle(activeSummary)} onClose={() => setActiveSummary(null)}>
@@ -308,20 +314,22 @@ export const PaymentListPage = () => {
               Export Excel
             </Button>
           </div>
-          <PaymentTable payments={modalPayments} canDelete={false} onDelete={setDeleteTarget} />
+          <PaymentTable payments={modalPayments} canDelete={false} canViewLogs={can("PAYMENTS", "VIEW_LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
           <Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
         </div>
       </Modal>
 
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Payment" entityId={logTarget?.id ?? null} title="Payment Change History" onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );
 };
 
-const PaymentTable = ({ payments, canDelete, onDelete }: { payments: Payment[]; canDelete: boolean; onDelete: (payment: Payment) => void }) => (
+const PaymentTable = ({ payments, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { payments: Payment[]; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (payment: Payment) => void; onShowLogs?: (payment: Payment) => void }) => (
   <Table
     data={payments}
     emptyText="No payments match the selected filters."
+    emptyAction={canAdd ? <Link to="/payments/new"><Button>Add Payment</Button></Link> : null}
     columns={[
       { key: "ref", header: "Payment Ref", render: (item) => <span className="font-semibold text-white">{paymentRef(item)}</span> },
       {
@@ -345,7 +353,10 @@ const PaymentTable = ({ payments, canDelete, onDelete }: { payments: Payment[]; 
         header: "Actions",
         className: "text-right",
         render: (item) => (
-          <ActionDropdown actions={[{ label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }]} />
+          <ActionDropdown actions={[
+            { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs, onClick: () => onShowLogs?.(item) },
+            { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
+          ]} />
         )
       }
     ]}

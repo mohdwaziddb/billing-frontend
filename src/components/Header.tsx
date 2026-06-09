@@ -60,6 +60,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
   const platformLogoUrl = platform.platformLogo
     ? (platform.platformLogo.startsWith("http") ? platform.platformLogo : `${apiOrigin}${platform.platformLogo}`)
     : null;
+  const headerTitle = platform.platformName || user?.company?.name || title;
 
   const navigateToResult = (result: MenuSearchResult) => {
     setSearchValue("");
@@ -121,12 +122,12 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
         <div className="flex min-w-0 items-center gap-3">
           {platformLogoUrl ? (
             <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-              <img src={platformLogoUrl} alt={platform.platformName} className="h-full w-full object-contain p-1.5" />
+              <img src={platformLogoUrl} alt={headerTitle} className="h-full w-full object-contain p-1.5" />
             </div>
           ) : null}
           <div className="min-w-0">
             <p className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{title}</p>
-            <h1 className="page-title truncate text-xl tracking-tight text-slate-950 md:text-2xl">{platform.platformName}</h1>
+            <h1 className="page-title truncate text-xl tracking-tight text-slate-950 md:text-2xl">{headerTitle}</h1>
             <p className="mt-0.5 truncate text-sm text-slate-500">{platform.platformTagline || subtitle}</p>
           </div>
         </div>

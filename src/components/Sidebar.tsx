@@ -8,6 +8,7 @@ import {
   FilePlus2,
   FileText,
   LayoutDashboard,
+  Mail,
   ReceiptText,
   Settings,
   ShieldCheck,
@@ -30,6 +31,7 @@ const iconMap: Record<string, LucideIcon> = {
   FilePlus2,
   FileText,
   LayoutDashboard,
+  Mail,
   Palette,
   Settings,
   ShieldCheck,
@@ -58,7 +60,6 @@ export const Sidebar = () => {
 
   const company = user?.company;
   const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
-  const platformLogoUrl = platform.platformLogo ? (platform.platformLogo.startsWith("http") ? platform.platformLogo : `${apiOrigin}${platform.platformLogo}`) : null;
   const companyLogoUrl = company?.logoUrl ? (company.logoUrl.startsWith("http") ? company.logoUrl : `${apiOrigin}${company.logoUrl}`) : null;
 
   return (
@@ -69,20 +70,20 @@ export const Sidebar = () => {
             <button
               type="button"
               className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_12px_28px_rgba(2,6,23,0.16)] transition duration-200 ${collapsed ? "cursor-pointer hover:scale-105 hover:shadow-[0_14px_34px_rgba(255,255,255,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" : "cursor-default"}`}
-              aria-label={collapsed ? "Expand sidebar" : `${platform.platformName} logo`}
-              title={collapsed ? "Expand sidebar" : platform.platformName}
+              aria-label={collapsed ? "Expand sidebar" : `${company?.name ?? "Company"} logo`}
+              title={collapsed ? "Expand sidebar" : company?.name ?? "Company"}
               onClick={() => {
                 if (collapsed) {
                   setCollapsed(false);
                 }
               }}
             >
-              {platformLogoUrl ? <img src={platformLogoUrl} alt={`${platform.platformName} logo`} className="h-full w-full object-contain p-1.5" /> : <ReceiptText className="text-[var(--theme-color)]" size={28} />}
+              {companyLogoUrl ? <img src={companyLogoUrl} alt={`${company?.name ?? "Company"} logo`} className="h-full w-full object-contain p-1.5" /> : <ReceiptText className="text-[var(--theme-color)]" size={28} />}
             </button>
             {!collapsed ? (
               <div className="min-w-0 text-center">
-                <h2 className="truncate text-xl font-extrabold tracking-tight text-white">{platform.platformName}</h2>
-                <p className="mt-0.5 truncate text-sm text-white/68">{platform.platformTagline || company?.name || "Workspace"}</p>
+                <h2 className="truncate text-xl font-extrabold tracking-tight text-white">{company?.name ?? "Workspace"}</h2>
+                <p className="mt-0.5 truncate text-sm text-white/68">{user?.role ?? "User"}</p>
               </div>
             ) : null}
           </div>
@@ -192,19 +193,6 @@ export const Sidebar = () => {
           );
         })}
       </nav>
-      <div className={`mt-4 shrink-0 rounded-2xl border border-white/12 bg-white/10 shadow-[0_12px_30px_rgba(2,6,23,0.12)] backdrop-blur ${collapsed ? "flex justify-center p-2" : "p-3"}`}>
-        <div className={`flex min-w-0 items-center ${collapsed ? "justify-center" : "gap-3"}`}>
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white text-[var(--theme-color)]">
-            {companyLogoUrl ? <img src={companyLogoUrl} alt="Company logo" className="h-full w-full object-contain p-1.5" /> : <ReceiptText size={22} />}
-          </div>
-          {!collapsed ? (
-            <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold text-white">{company?.name ?? "Workspace"}</p>
-              <p className="mt-0.5 truncate text-xs font-semibold text-white/68">{user?.role ?? "User"}</p>
-            </div>
-          ) : null}
-        </div>
-      </div>
     </aside>
   );
 };

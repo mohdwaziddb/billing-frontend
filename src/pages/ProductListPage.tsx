@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Download, Pencil, Trash2 } from "lucide-react";
+import { Download, History, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteProduct, getProductsPage } from "../api/products";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -36,6 +38,7 @@ export const ProductListPage = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [logTarget, setLogTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { can } = useAuth();
   const { message: error, clearMessage, setApiError } = useApiMessage();
@@ -71,17 +74,16 @@ export const ProductListPage = () => {
   }, [statusFilter]);
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title="Products"
         subtitle="Manage pricing, stock depth, tax settings, and product availability from a structured catalog view."
       />
-      <GlassCard className="p-6 md:p-7">
+      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Inventory</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">Products</h2>
+              <CommonBreadcrumb items={[{ label: "Products" }]} />
             </div>
             {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") ? (
               <div className="flex flex-wrap gap-2">
@@ -126,7 +128,7 @@ export const ProductListPage = () => {
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
               options={[
-                { label: "All Products", value: "all" },
+                { label: "All", value: "all" },
                 { label: "Active Only", value: "active" },
                 { label: "Inactive Only", value: "inactive" }
               ]}
@@ -143,10 +145,12 @@ export const ProductListPage = () => {
             {error}
           </div>
         ) : null}
-        <Table
-          data={products}
-          emptyText="No products match the current filters."
-          columns={[
+        <div className="flex-1">
+          <Table
+            data={products}
+            emptyText="No products match the current filters."
+            emptyAction={can("PRODUCTS", "ADD") ? <Link to="/products/new"><Button>Add product</Button></Link> : null}
+            columns={[
             {
               key: "product",
               header: "Product",
@@ -172,15 +176,16 @@ export const ProductListPage = () => {
               key: "stock",
               header: "Stock",
               className: "text-right",
-              render: (item) => (
-                <span
-                  className={`block text-right font-semibold ${
-                    item.stockQty <= item.minStockQty ? "text-amber-200" : "text-white"
-                  }`}
-                >
-                  {item.stockQty}
-                </span>
-              )
+              render: (item) => {
+                const stockTone = item.stockQty <= 0 ? "amount-danger" : item.stockQty <= item.minStockQty ? "amount-warning" : "amount-success";
+                const stockLabel = item.stockQty <= 0 ? "Out Of Stock" : item.stockQty <= item.minStockQty ? "Low Stock" : "In Stock";
+                return (
+                  <div className="text-right">
+                    <span className={`block font-semibold ${stockTone}`}>{item.stockQty}</span>
+                    <span className={`mt-1 block text-xs font-semibold ${stockTone}`}>{stockLabel}</span>
+                  </div>
+                );
+              }
             },
             { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
             {
@@ -197,6 +202,12 @@ export const ProductListPage = () => {
                       hidden: !can("PRODUCTS", "EDIT")
                     },
                     {
+                      label: "Show Logs",
+                      icon: <History size={15} />,
+                      hidden: !can("PRODUCTS", "VIEW_LOGS"),
+                      onClick: () => setLogTarget(item)
+                    },
+                    {
                       label: "Delete",
                       icon: <Trash2 size={15} />,
                       danger: true,
@@ -207,9 +218,11 @@ export const ProductListPage = () => {
                 />
               )
             }
-          ]}
-        />
-        <Pagination
+            ]}
+          />
+        </div>
+        <div className="mt-auto">
+          <Pagination
           page={productPage.page}
           size={productPage.size}
           totalRecords={productPage.totalRecords}
@@ -218,8 +231,10 @@ export const ProductListPage = () => {
             setPage(nextPage);
             void loadProducts(nextPage);
           }}
-        />
+          />
+        </div>
       </GlassCard>
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Product" entityId={logTarget?.id ?? null} title="Product Change History" onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );

@@ -8,20 +8,22 @@ import { ActionDropdown } from "../../../components/ActionDropdown";
 import { GlassCard } from "../../../components/GlassCard";
 import { Header } from "../../../components/Header";
 import { Input } from "../../../components/Input";
+import { Modal } from "../../../components/Modal";
 import { Select } from "../../../components/Select";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../../../components/Pagination";
 import { useAuth } from "../../../context/AuthContext";
 import { ReminderHistoryModal } from "../components/ReminderHistoryModal";
+import { getActiveEmailTemplates, previewEmailTemplate } from "../../../api/emailTemplates";
 import { getOverdueCustomers, sendReminder } from "../reminder.api";
 import type { OverdueCustomer, ReminderChannel } from "../reminder.types";
-import type { PageResponse } from "../../../types/api";
+import type { EmailPreview, EmailTemplate, PageResponse } from "../../../types/api";
 
 const channelOptions = [
-  { label: "SMS", value: "SMS" },
-  { label: "WHATSAPP", value: "WHATSAPP" },
-  { label: "EMAIL", value: "EMAIL" }
+  { label: "Email", value: "EMAIL" },
+  { label: "WhatsApp (Future)", value: "WHATSAPP" },
+  { label: "SMS (Future)", value: "SMS" }
 ] as const;
 
 export const OutstandingCustomersReminderPage = () => {
@@ -40,9 +42,16 @@ export const OutstandingCustomersReminderPage = () => {
     search: "",
     minBalance: "",
     overdueDays: "",
-    channel: "SMS" as ReminderChannel
+    channel: "EMAIL" as ReminderChannel
   });
   const [historyTarget, setHistoryTarget] = useState<{ id: number; name: string } | null>(null);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [reminderTarget, setReminderTarget] = useState<OverdueCustomer | null>(null);
+  const [reminderForm, setReminderForm] = useState<{ channel: ReminderChannel; templateId: string }>({
+    channel: "EMAIL",
+    templateId: ""
+  });
+  const [emailPreview, setEmailPreview] = useState<EmailPreview | null>(null);
 
   const loadCustomers = async (nextFilters: typeof filters = filters, nextPage = 0) => {
     setLoading(true);
@@ -65,6 +74,10 @@ export const OutstandingCustomersReminderPage = () => {
 
   useEffect(() => {
     void loadCustomers();
+    void getActiveEmailTemplates().then((data) => {
+      setTemplates(data);
+      setReminderForm((current) => ({ ...current, templateId: data[0]?.id ? String(data[0].id) : "" }));
+    }).catch(() => setTemplates([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -73,12 +86,34 @@ export const OutstandingCustomersReminderPage = () => {
     [customerPage.records]
   );
 
-  const sendCustomerReminder = async (customerId: number) => {
+  const previewReminder = async () => {
+    if (!reminderForm.templateId || !reminderTarget) {
+      return;
+    }
+    clearMessage();
+    try {
+      const rendered = await previewEmailTemplate(Number(reminderForm.templateId), reminderVariables(reminderTarget));
+      setEmailPreview(rendered);
+    } catch (err: any) {
+      setApiError(err, "Unable to preview reminder email");
+    }
+  };
+
+  const sendCustomerReminder = async () => {
+    if (!reminderTarget) {
+      return;
+    }
     clearMessage();
     setSuccessToast("");
     try {
-      await sendReminder({ customerId, channel: filters.channel });
-      setSuccessToast("Reminder saved successfully.");
+      await sendReminder({
+        customerId: reminderTarget.customerId,
+        channel: reminderForm.channel,
+        templateId: reminderForm.templateId ? Number(reminderForm.templateId) : undefined
+      });
+      setSuccessToast("Reminder sent successfully.");
+      setReminderTarget(null);
+      setEmailPreview(null);
       await loadCustomers(filters, customerPage.page);
     } catch (err: any) {
       setApiError(err, "Unable to send reminder");
@@ -151,7 +186,7 @@ export const OutstandingCustomersReminderPage = () => {
                   search: "",
                   minBalance: "",
                   overdueDays: "",
-                  channel: "SMS" as ReminderChannel
+                  channel: "EMAIL" as ReminderChannel
                 };
                 setFilters(resetFilters);
                 void loadCustomers(resetFilters, 0);
@@ -245,7 +280,14 @@ export const OutstandingCustomersReminderPage = () => {
                         label: "Send reminder",
                         icon: <BellRing size={15} />,
                         hidden: !can("OUTSTANDING", "ADD"),
-                        onClick: () => void sendCustomerReminder(item.customerId)
+                        onClick: () => {
+                          setReminderTarget(item);
+                          setEmailPreview(null);
+                          setReminderForm({
+                            channel: "EMAIL",
+                            templateId: templates[0]?.id ? String(templates[0].id) : ""
+                          });
+                        }
                       },
                       {
                         label: "History",
@@ -275,6 +317,89 @@ export const OutstandingCustomersReminderPage = () => {
         customerName={historyTarget?.name ?? ""}
         onClose={() => setHistoryTarget(null)}
       />
+      <Modal open={Boolean(reminderTarget)} title="Send Reminder" onClose={() => setReminderTarget(null)}>
+        {reminderTarget ? (
+          <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="space-y-4">
+              <div className="rounded-[var(--radius-card)] border border-slate-200 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Customer</p>
+                <p className="mt-2 font-semibold text-slate-950">{reminderTarget.customerName}</p>
+                <p className="text-sm text-slate-500">{reminderTarget.email || reminderTarget.mobile}</p>
+                <p className="mt-3 text-sm font-semibold text-rose-700">{formatCurrency(reminderTarget.currentBalance)}</p>
+              </div>
+              <Select
+                label="Reminder Channel"
+                placeholder={null}
+                options={channelOptions.map((item) => ({ label: item.label, value: item.value }))}
+                value={reminderForm.channel}
+                onChange={(event) => {
+                  const channel = event.target.value as ReminderChannel;
+                  setReminderForm((current) => ({ ...current, channel }));
+                  setEmailPreview(null);
+                }}
+              />
+              <Select
+                label="Template"
+                placeholder="Select Template"
+                options={templates.map((template) => ({ label: template.templateName, value: String(template.id) }))}
+                value={reminderForm.templateId}
+                onChange={(event) => {
+                  setReminderForm((current) => ({ ...current, templateId: event.target.value }));
+                  setEmailPreview(null);
+                }}
+                disabled={reminderForm.channel !== "EMAIL"}
+              />
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={reminderForm.channel !== "EMAIL" || !reminderForm.templateId}
+                  onClick={() => void previewReminder()}
+                >
+                  Preview Email
+                </Button>
+                <Button
+                  type="button"
+                  disabled={reminderForm.channel === "EMAIL" && (!reminderForm.templateId || !reminderTarget.email)}
+                  onClick={() => void sendCustomerReminder()}
+                >
+                  Send
+                </Button>
+              </div>
+              {reminderForm.channel === "EMAIL" && !reminderTarget.email ? (
+                <p className="text-sm text-rose-700">Customer email missing. Add email before sending reminder.</p>
+              ) : null}
+            </div>
+            <div className="rounded-[var(--radius-card)] border border-slate-200 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Preview</p>
+              {emailPreview ? (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Subject</p>
+                    <p className="mt-1 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-950">{emailPreview.subject}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">Email Body</p>
+                    <div className="mt-1 min-h-[220px] rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-800" dangerouslySetInnerHTML={{ __html: emailPreview.emailBody }} />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
+                  Preview email before sending.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 };
+
+const reminderVariables = (customer: OverdueCustomer) => ({
+  Customer_Name: customer.customerName,
+  Customer_Email: customer.email ?? "",
+  Outstanding_Amount: customer.currentBalance.toFixed(2),
+  Due_Date: customer.oldestOutstandingInvoiceDate ?? "",
+  Current_Date: new Date().toISOString().slice(0, 10)
+});

@@ -361,6 +361,8 @@ export type InvoiceRequestItem = {
   productId: number;
   qty: number;
   discountPercent: number;
+  discountType?: "FIXED" | "PERCENT";
+  discountValue?: number;
 };
 
 export type InvoiceRequest = {
@@ -394,6 +396,64 @@ export type PaymentRequest = {
   paymentDate: string;
   mode: PaymentMode;
   remarks?: string;
+};
+
+export type AuditLog = {
+  id: number;
+  moduleName: string;
+  entityName: string;
+  entityId: number;
+  actionType: "CREATE" | "UPDATE" | "DELETE" | "STATUS_CHANGE";
+  oldData: string | null;
+  newData: string | null;
+  changedFields: string | null;
+  userId: number | null;
+  userName: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+};
+
+export type NotificationChannel = {
+  id: number;
+  channelName: string;
+  defaultChannel: boolean;
+  active: boolean;
+};
+
+export type EmailTemplate = {
+  id: number;
+  templateName: string;
+  subject: string;
+  emailBody: string;
+  active: boolean;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type EmailTemplateRequest = {
+  templateName: string;
+  subject: string;
+  emailBody: string;
+  active: boolean;
+};
+
+export type EmailPreview = {
+  subject: string;
+  emailBody: string;
+};
+
+export type EmailLog = {
+  id: number;
+  templateId: number | null;
+  recipientEmail: string;
+  subject: string;
+  emailBody: string;
+  status: "Pending" | "Sent" | "Failed";
+  errorMessage: string | null;
+  sentBy: string | null;
+  sentAt: string | null;
 };
 
 export type CompanyUserRequest = {

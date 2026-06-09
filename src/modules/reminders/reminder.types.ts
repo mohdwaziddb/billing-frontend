@@ -26,4 +26,5 @@ export type ReminderHistoryItem = {
 export type SendReminderRequest = {
   customerId: number;
   channel: ReminderChannel;
+  templateId?: number;
 };

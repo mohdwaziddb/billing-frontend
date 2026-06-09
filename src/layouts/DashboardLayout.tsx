@@ -8,7 +8,7 @@ export const DashboardLayout = () => {
         <div className="lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:flex-shrink-0">
           <Sidebar />
         </div>
-        <main className="min-w-0 flex-1 space-y-5">
+        <main className="min-w-0 flex-1 space-y-5 lg:min-h-[calc(100vh-2.5rem)]">
           <Outlet />
         </main>
       </div>
