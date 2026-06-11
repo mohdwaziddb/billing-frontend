@@ -11,7 +11,7 @@ import { useApiMessage } from "../hooks/useApiFeedback";
 import { notificationService } from "../services/notificationService";
 import type { ActionPermission, PermissionMatrix, Role, UserProfile } from "../types/api";
 
-const ACTION_COLUMNS = ["VIEW", "ADD", "EDIT", "DELETE", "EXPORT"];
+const ACTION_COLUMNS = ["VIEW", "ADD", "EDIT", "DELETE", "EXPORT", "EMAIL_SEND", "SMS_SEND"];
 const toRoleOption = (role?: Role | string | null) => {
   const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
   return {
@@ -270,7 +270,7 @@ export const RolePermissionsPage = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td className="px-4 py-10 text-center text-slate-400" colSpan={7}>No permission rows found.</td>
+                  <td className="px-4 py-10 text-center text-slate-400" colSpan={ACTION_COLUMNS.length + 2}>No permission rows found.</td>
                 </tr>
               )}
             </tbody>

@@ -369,6 +369,23 @@ select:-webkit-autofill {
   color: var(--theme-dark-contrast);
 }
 
+.preview-surface {
+  --preview-bg: #ffffff;
+  --preview-text: #111827;
+  --preview-border: #e5e7eb;
+}
+
+:root.dark .preview-surface {
+  --preview-bg: #1f2937;
+  --preview-text: #ffffff;
+  --preview-border: #374151;
+}
+
+.preview-surface,
+.preview-surface :where(p, span, div, li, strong, b, em, a, h1, h2, h3, h4, h5, h6) {
+  color: var(--preview-text) !important;
+}
+
 .billing-card .text-white {
   color: #071330;
 }

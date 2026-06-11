@@ -10,8 +10,7 @@ type Column<T> = {
 export const Table = <T,>({
   data,
   columns,
-  emptyText = "No records found.",
-  emptyAction
+  emptyText = "No records found."
 }: {
   data: T[];
   columns: Column<T>[];
@@ -36,7 +35,6 @@ export const Table = <T,>({
               <td className="h-[320px] px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={columns.length}>
                 <div className="flex h-full flex-col items-center justify-center gap-3">
                   <p className="font-medium">{emptyText}</p>
-                  {emptyAction}
                 </div>
               </td>
             </tr>

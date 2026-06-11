@@ -10,20 +10,22 @@ import { Header } from "../../../components/Header";
 import { Input } from "../../../components/Input";
 import { Modal } from "../../../components/Modal";
 import { Select } from "../../../components/Select";
+import { PreviewSurface } from "../../../components/PreviewSurface";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../../../components/Pagination";
 import { useAuth } from "../../../context/AuthContext";
 import { ReminderHistoryModal } from "../components/ReminderHistoryModal";
 import { getActiveEmailTemplates, previewEmailTemplate } from "../../../api/emailTemplates";
+import { getActiveSmsTemplates, previewSmsTemplate } from "../../../api/smsTemplates";
 import { getOverdueCustomers, sendReminder } from "../reminder.api";
 import type { OverdueCustomer, ReminderChannel } from "../reminder.types";
-import type { EmailPreview, EmailTemplate, PageResponse } from "../../../types/api";
+import type { EmailPreview, EmailTemplate, PageResponse, SmsTemplate } from "../../../types/api";
 
 const channelOptions = [
   { label: "Email", value: "EMAIL" },
-  { label: "WhatsApp (Future)", value: "WHATSAPP" },
-  { label: "SMS (Future)", value: "SMS" }
+  { label: "SMS", value: "SMS" },
+  { label: "WhatsApp (Future)", value: "WHATSAPP" }
 ] as const;
 
 export const OutstandingCustomersReminderPage = () => {
@@ -45,7 +47,7 @@ export const OutstandingCustomersReminderPage = () => {
     channel: "EMAIL" as ReminderChannel
   });
   const [historyTarget, setHistoryTarget] = useState<{ id: number; name: string } | null>(null);
-  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [templates, setTemplates] = useState<Array<EmailTemplate | SmsTemplate>>([]);
   const [reminderTarget, setReminderTarget] = useState<OverdueCustomer | null>(null);
   const [reminderForm, setReminderForm] = useState<{ channel: ReminderChannel; templateId: string }>({
     channel: "EMAIL",
@@ -92,7 +94,9 @@ export const OutstandingCustomersReminderPage = () => {
     }
     clearMessage();
     try {
-      const rendered = await previewEmailTemplate(Number(reminderForm.templateId), reminderVariables(reminderTarget));
+      const rendered = reminderForm.channel === "SMS"
+        ? await previewSmsTemplate(Number(reminderForm.templateId), reminderVariables(reminderTarget))
+        : await previewEmailTemplate(Number(reminderForm.templateId), reminderVariables(reminderTarget));
       setEmailPreview(rendered);
     } catch (err: any) {
       setApiError(err, "Unable to preview reminder email");
@@ -336,6 +340,11 @@ export const OutstandingCustomersReminderPage = () => {
                   const channel = event.target.value as ReminderChannel;
                   setReminderForm((current) => ({ ...current, channel }));
                   setEmailPreview(null);
+                  const loader = channel === "SMS" ? getActiveSmsTemplates : getActiveEmailTemplates;
+                  void loader().then((data) => {
+                    setTemplates(data);
+                    setReminderForm((current) => ({ ...current, templateId: data[0]?.id ? String(data[0].id) : "" }));
+                  }).catch(() => setTemplates([]));
                 }}
               />
               <Select
@@ -347,20 +356,20 @@ export const OutstandingCustomersReminderPage = () => {
                   setReminderForm((current) => ({ ...current, templateId: event.target.value }));
                   setEmailPreview(null);
                 }}
-                disabled={reminderForm.channel !== "EMAIL"}
+                disabled={reminderForm.channel === "WHATSAPP"}
               />
               <div className="flex flex-wrap gap-3">
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={reminderForm.channel !== "EMAIL" || !reminderForm.templateId}
+                  disabled={reminderForm.channel === "WHATSAPP" || !reminderForm.templateId}
                   onClick={() => void previewReminder()}
                 >
-                  Preview Email
+                  Preview
                 </Button>
                 <Button
                   type="button"
-                  disabled={reminderForm.channel === "EMAIL" && (!reminderForm.templateId || !reminderTarget.email)}
+                  disabled={(reminderForm.channel === "EMAIL" && (!reminderForm.templateId || !reminderTarget.email)) || (reminderForm.channel === "SMS" && !reminderForm.templateId)}
                   onClick={() => void sendCustomerReminder()}
                 >
                   Send
@@ -376,17 +385,19 @@ export const OutstandingCustomersReminderPage = () => {
                 <div className="mt-4 space-y-4">
                   <div>
                     <p className="text-sm font-semibold text-slate-700">Subject</p>
-                    <p className="mt-1 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-950">{emailPreview.subject}</p>
+                    <PreviewSurface className="mt-1 rounded-xl px-3 py-2 text-sm">{emailPreview.subject}</PreviewSurface>
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-700">Email Body</p>
-                    <div className="mt-1 min-h-[220px] rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-800" dangerouslySetInnerHTML={{ __html: emailPreview.emailBody }} />
+                    <PreviewSurface className="mt-1 min-h-[220px] rounded-xl px-3 py-2 text-sm leading-6">
+                      <div dangerouslySetInnerHTML={{ __html: emailPreview.emailBody }} />
+                    </PreviewSurface>
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
+                <PreviewSurface className="mt-4 flex min-h-[280px] items-center justify-center rounded-xl border-dashed text-sm">
                   Preview email before sending.
-                </div>
+                </PreviewSurface>
               )}
             </div>
           </div>

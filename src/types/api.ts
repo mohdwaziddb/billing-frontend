@@ -403,6 +403,7 @@ export type AuditLog = {
   moduleName: string;
   entityName: string;
   entityId: number;
+  recordName: string | null;
   actionType: "CREATE" | "UPDATE" | "DELETE" | "STATUS_CHANGE";
   oldData: string | null;
   newData: string | null;
@@ -454,6 +455,74 @@ export type EmailLog = {
   errorMessage: string | null;
   sentBy: string | null;
   sentAt: string | null;
+};
+
+export type SmsTemplate = {
+  id: number;
+  templateName: string;
+  templateBody: string;
+  active: boolean;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SmsTemplateRequest = {
+  templateName: string;
+  templateBody: string;
+  active: boolean;
+};
+
+export type ProviderSettings = {
+  id: number;
+  providerName: string;
+  senderEmail?: string | null;
+  awsAccessKey?: string | null;
+  awsRegion?: string | null;
+  apiUrl?: string | null;
+  username?: string | null;
+  senderId?: string | null;
+  channelName?: string | null;
+  active: boolean;
+};
+
+export type ProviderSettingsRequest = {
+  providerName?: string;
+  senderEmail?: string;
+  awsAccessKey?: string;
+  awsSecretKey?: string;
+  awsRegion?: string;
+  apiUrl?: string;
+  username?: string;
+  password?: string;
+  senderId?: string;
+  channelName?: string;
+  active?: boolean;
+};
+
+export type HierarchyNode = {
+  id: number;
+  name: string;
+  role: Role;
+  department: string;
+  status: "Active" | "Inactive";
+  email: string;
+  mobile: string;
+  reportingManager: string;
+  createdAt: string;
+  hasChildren: boolean;
+  metrics: {
+    totalCustomers: number;
+    totalInvoices: number;
+    totalPayments: number;
+    totalProducts: number;
+    totalUsers: number;
+    totalRevenue: number;
+    totalCollection: number;
+    outstandingAmount: number;
+    averageInvoiceValue: number;
+    lastActivityDate: string | null;
+  };
 };
 
 export type CompanyUserRequest = {

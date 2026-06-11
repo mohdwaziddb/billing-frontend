@@ -20,10 +20,13 @@ import { ProductCategoryPage } from "./pages/ProductCategoryPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
+import { EmailSettingsPage, SmsSettingsPage } from "./pages/NotificationSettingsPages";
 import { RolePermissionsPage } from "./pages/RolePermissionsPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
 import { ThemeSettingsPage } from "./pages/ThemeSettingsPage";
 import { UserManagementPage } from "./pages/UserManagementPage";
+import { SmsTemplatePage } from "./pages/SmsTemplatePage";
+import { ManagementHierarchyPage } from "./pages/ManagementHierarchyPage";
 
 function App() {
   return (
@@ -45,6 +48,9 @@ function App() {
           <Route path="/setup/theme-settings" element={<PermissionRoute menuCode="THEME_SETTINGS"><ThemeSettingsPage /></PermissionRoute>} />
           <Route path="/setup/about-company" element={<PermissionRoute menuCode="ABOUT_COMPANY"><AboutCompanyPage /></PermissionRoute>} />
           <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
+          <Route path="/setup/sms-templates" element={<PermissionRoute menuCode="SMS_TEMPLATES"><SmsTemplatePage /></PermissionRoute>} />
+          <Route path="/setup/email-settings" element={<PermissionRoute menuCode="EMAIL_SETTINGS"><EmailSettingsPage /></PermissionRoute>} />
+          <Route path="/setup/sms-settings" element={<PermissionRoute menuCode="SMS_SETTINGS"><SmsSettingsPage /></PermissionRoute>} />
           <Route path="/invoices" element={<PermissionRoute menuCode="INVOICES"><InvoiceListPage /></PermissionRoute>} />
           <Route path="/create-invoice" element={<PermissionRoute menuCode="CREATE_INVOICE" actionCode="ADD"><CreateInvoicePage /></PermissionRoute>} />
           <Route path="/invoices/new" element={<PermissionRoute menuCode="CREATE_INVOICE" actionCode="ADD"><CreateInvoicePage /></PermissionRoute>} />
@@ -55,6 +61,7 @@ function App() {
           <Route path="/outstanding-customers" element={<PermissionRoute menuCode="OUTSTANDING"><OutstandingCustomersPage /></PermissionRoute>} />
           <Route path="/analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
           <Route path="/sales-analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
+          <Route path="/reports/management-hierarchy" element={<PermissionRoute menuCode="MANAGEMENT_HIERARCHY"><ManagementHierarchyPage /></PermissionRoute>} />
           <Route path="/setup/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/setup/role-permissions" element={<PermissionRoute menuCode="ROLE_PERMISSIONS"><RolePermissionsPage /></PermissionRoute>} />

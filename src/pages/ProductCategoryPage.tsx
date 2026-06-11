@@ -301,7 +301,7 @@ export const ProductCategoryPage = () => {
           </Button>
         </div>
       </Modal>
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Product Category" entityId={logTarget?.id ?? null} title="Product Category Change History" onClose={() => setLogTarget(null)} />
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Product Category" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.categoryName} Logs` : "Category Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void removeCategory()} />
     </div>
   );

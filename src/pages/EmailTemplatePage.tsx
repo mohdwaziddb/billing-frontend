@@ -8,6 +8,7 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { PreviewSurface } from "../components/PreviewSurface";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import {
@@ -338,14 +339,14 @@ export const EmailTemplatePage = () => {
       <Modal open={Boolean(preview)} title={previewTitle} onClose={() => setPreview(null)}>
         {preview ? (
           <div className="space-y-4">
-            <div className="rounded-[var(--radius-card)] border border-slate-200 bg-white p-4">
+            <PreviewSurface>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Subject</p>
-              <p className="mt-2 font-semibold text-slate-950">{preview.subject}</p>
-            </div>
-            <div className="rounded-[var(--radius-card)] border border-slate-200 bg-white p-4">
+              <p className="mt-2 font-semibold">{preview.subject}</p>
+            </PreviewSurface>
+            <PreviewSurface>
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Email Body</p>
-              <div className="prose max-w-none text-sm text-slate-800" dangerouslySetInnerHTML={{ __html: preview.emailBody }} />
-            </div>
+              <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: preview.emailBody }} />
+            </PreviewSurface>
           </div>
         ) : null}
       </Modal>

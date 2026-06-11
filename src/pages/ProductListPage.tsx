@@ -234,7 +234,7 @@ export const ProductListPage = () => {
           />
         </div>
       </GlassCard>
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Product" entityId={logTarget?.id ?? null} title="Product Change History" onClose={() => setLogTarget(null)} />
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Product" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Product Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );

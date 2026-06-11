@@ -282,7 +282,7 @@ export const CustomerListPage = () => {
           ) : null}
         </div>
       </Modal>
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Customer" entityId={logTarget?.id ?? null} title="Customer Change History" onClose={() => setLogTarget(null)} />
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Customer" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Customer Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );

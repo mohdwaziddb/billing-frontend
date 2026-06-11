@@ -319,7 +319,7 @@ export const PaymentListPage = () => {
         </div>
       </Modal>
 
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Payment" entityId={logTarget?.id ?? null} title="Payment Change History" onClose={() => setLogTarget(null)} />
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Payment" entityId={logTarget?.id ?? null} title={logTarget ? `${paymentRef(logTarget)} Logs` : "Payment Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );

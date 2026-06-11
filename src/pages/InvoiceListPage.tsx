@@ -361,7 +361,7 @@ export const InvoiceListPage = () => {
         </div>
       </Modal>
 
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Invoice" entityId={logTarget?.id ?? null} title="Invoice Change History" onClose={() => setLogTarget(null)} />
+      <AuditLogModal open={Boolean(logTarget)} moduleName="Invoice" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.invoiceNo} Logs` : "Invoice Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
   );
