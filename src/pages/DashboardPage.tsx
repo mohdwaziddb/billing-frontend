@@ -682,7 +682,7 @@ export const DashboardPage = () => {
         ) : null}
       </GlassCard>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         {dashboardCards.map((card) => (
           <StatCard
             key={card.label}
@@ -695,6 +695,8 @@ export const DashboardPage = () => {
             onClick={card.key ? () => openDetails(card.key) : undefined}
           />
         ))}
+        <StatCard label="Total Expense" value={formatCurrency(summary?.totalExpense)} caption="Recorded business spend" icon={<Banknote size={18} />} />
+        <StatCard label="Net Revenue" value={formatCurrency(summary?.netRevenue)} caption="Revenue minus expense" icon={<TrendingUp size={18} />} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

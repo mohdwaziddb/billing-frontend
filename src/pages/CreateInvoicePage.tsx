@@ -377,7 +377,7 @@ export const CreateInvoicePage = () => {
               </div>
               {fields.map((field, index) => (
                 <div key={field.id} className="rounded-[26px] border border-white/10 bg-white/5 p-4">
-                  <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_110px_140px_140px_110px]">
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1.4fr)_110px_120px_120px_140px_140px_110px]">
                     <Select
                       label="Product"
                       requiredMark
@@ -387,6 +387,8 @@ export const CreateInvoicePage = () => {
                       {...register(`items.${index}.productId`, { required: "Product is required" })}
                     />
                     <Input label="Qty" requiredMark type="number" error={errors.items?.[index]?.qty?.message} {...register(`items.${index}.qty`, { required: "Qty is required" })} />
+                    <Input label="Rate" value={formatCurrency(invoiceSummary.rows[index]?.rate ?? 0)} readOnly className="bg-slate-100 text-slate-600" />
+                    <Input label="Tax" value={`${invoiceSummary.rows[index]?.taxPercent ?? 0}%`} readOnly className="bg-slate-100 text-slate-600" />
                     <Select
                       label="Discount Type"
                       placeholder={null}
@@ -394,6 +396,7 @@ export const CreateInvoicePage = () => {
                       {...register(`items.${index}.discountType`)}
                     />
                     <Input label="Product Discount" type="number" step="0.01" error={errors.items?.[index]?.discountValue?.message} {...register(`items.${index}.discountValue`)} />
+                    <Input label="Line Total" value={formatCurrency(invoiceSummary.rows[index]?.totalAmount ?? 0)} readOnly className="bg-slate-100 text-slate-600" />
                     <div className="flex items-end">
                       <Button type="button" variant="danger" className="w-full" onClick={() => remove(index)} disabled={fields.length === 1}>
                         Remove

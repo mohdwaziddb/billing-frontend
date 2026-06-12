@@ -15,6 +15,9 @@ import { LoginPage } from "./pages/LoginPage";
 import { OutstandingCustomersPage } from "./pages/OutstandingCustomersPage";
 import { PaymentEntryPage } from "./pages/PaymentEntryPage";
 import { PaymentListPage } from "./pages/PaymentListPage";
+import { ExpenseCategoryPage } from "./pages/ExpenseCategoryPage";
+import { ExpenseListPage } from "./pages/ExpenseListPage";
+import { ProfitLossReportPage } from "./pages/ProfitLossReportPage";
 import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductCategoryPage } from "./pages/ProductCategoryPage";
 import { ProductListPage } from "./pages/ProductListPage";
@@ -45,6 +48,7 @@ function App() {
           <Route path="/products/:productId/edit" element={<PermissionRoute menuCode="PRODUCTS" actionCode="EDIT"><ProductFormPage /></PermissionRoute>} />
           <Route path="/setup/product-categories" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/product-category" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
+          <Route path="/setup/expense-categories" element={<PermissionRoute menuCode="EXPENSE_CATEGORIES"><ExpenseCategoryPage /></PermissionRoute>} />
           <Route path="/setup/theme-settings" element={<PermissionRoute menuCode="THEME_SETTINGS"><ThemeSettingsPage /></PermissionRoute>} />
           <Route path="/setup/about-company" element={<PermissionRoute menuCode="ABOUT_COMPANY"><AboutCompanyPage /></PermissionRoute>} />
           <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
@@ -57,11 +61,13 @@ function App() {
           <Route path="/invoices/:invoiceId" element={<PermissionRoute menuCode="INVOICES"><InvoiceDetailPage /></PermissionRoute>} />
           <Route path="/payments" element={<PermissionRoute menuCode="PAYMENTS"><PaymentListPage /></PermissionRoute>} />
           <Route path="/payments/new" element={<PermissionRoute menuCode="PAYMENTS" actionCode="ADD"><PaymentEntryPage /></PermissionRoute>} />
+          <Route path="/expenses" element={<PermissionRoute menuCode="EXPENSES"><ExpenseListPage /></PermissionRoute>} />
           <Route path="/outstanding" element={<PermissionRoute menuCode="OUTSTANDING"><OutstandingCustomersPage /></PermissionRoute>} />
           <Route path="/outstanding-customers" element={<PermissionRoute menuCode="OUTSTANDING"><OutstandingCustomersPage /></PermissionRoute>} />
           <Route path="/analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
           <Route path="/sales-analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
           <Route path="/reports/management-hierarchy" element={<PermissionRoute menuCode="MANAGEMENT_HIERARCHY"><ManagementHierarchyPage /></PermissionRoute>} />
+          <Route path="/reports/profit-loss" element={<PermissionRoute menuCode="PROFIT_LOSS"><ProfitLossReportPage /></PermissionRoute>} />
           <Route path="/setup/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/setup/role-permissions" element={<PermissionRoute menuCode="ROLE_PERMISSIONS"><RolePermissionsPage /></PermissionRoute>} />

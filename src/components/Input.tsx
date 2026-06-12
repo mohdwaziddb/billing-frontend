@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { forwardRef, type InputHTMLAttributes } from "react";
+import { DatePicker } from "./DatePicker";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
@@ -23,6 +24,9 @@ const buildPlaceholder = (label?: string, placeholder?: string, type?: string) =
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, className, requiredMark = false, placeholder, type, hint, onKeyDown, onWheel, inputMode, ...props }, ref) => {
   const isNumberInput = type === "number";
+  if (type === "date") {
+    return <DatePicker ref={ref} label={label} error={error} requiredMark={requiredMark} hint={hint} className={className} {...props} />;
+  }
 
   return (
     <label className="block space-y-2">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, Trash2, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getAuditLogs } from "../api/auditLogs";
 import { deleteInvoice, getInvoicesPage, type InvoiceFilterParams } from "../api/invoices";
 import { getProductCategories } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
@@ -130,6 +131,7 @@ export const InvoiceListPage = () => {
   const [modalSearch, setModalSearch] = useState("");
   const [modalInvoices, setModalInvoices] = useState<Invoice[]>([]);
   const [modalInvoicePage, setModalInvoicePage] = useState<PageResponse<Invoice>>(emptyInvoicePage);
+  const [logCounts, setLogCounts] = useState<Record<number, number>>({});
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
 
@@ -161,6 +163,15 @@ export const InvoiceListPage = () => {
       getProductCategories({ active: true, size: 1000 }).then(setCategories)
     ]).catch((err: any) => setApiError(err, "Unable to load invoices"));
   }, [baseParams]);
+
+  useEffect(() => {
+    const ids = [...new Set([...invoices, ...modalInvoices].map((invoice) => invoice.id))];
+    if (!can("INVOICES", "LOGS") || !ids.length) {
+      setLogCounts({});
+      return;
+    }
+    void loadLogCounts("Invoice", ids).then(setLogCounts).catch(() => setLogCounts({}));
+  }, [can, invoices, modalInvoices]);
 
   useEffect(() => {
     if (!activeSummary) {
@@ -317,7 +328,7 @@ export const InvoiceListPage = () => {
           ) : null}
         </div>
         <div className="flex-1">
-          <InvoiceTable invoices={invoices} canDelete={can("INVOICES", "DELETE")} canViewLogs={can("INVOICES", "VIEW_LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <InvoiceTable invoices={invoices} logCounts={logCounts} canDelete={can("INVOICES", "DELETE")} canViewLogs={can("INVOICES", "LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
         </div>
         <div className="mt-auto">
           <Pagination
@@ -350,7 +361,7 @@ export const InvoiceListPage = () => {
               Export Excel
             </Button>
           </div>
-          <InvoiceTable invoices={modalInvoices} canDelete={false} canViewLogs={can("INVOICES", "VIEW_LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <InvoiceTable invoices={modalInvoices} logCounts={logCounts} canDelete={false} canViewLogs={can("INVOICES", "LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
           <Pagination
             page={modalInvoicePage.page}
             size={modalInvoicePage.size}
@@ -367,7 +378,7 @@ export const InvoiceListPage = () => {
   );
 };
 
-const InvoiceTable = ({ invoices, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { invoices: Invoice[]; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (invoice: Invoice) => void; onShowLogs?: (invoice: Invoice) => void }) => (
+const InvoiceTable = ({ invoices, logCounts, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { invoices: Invoice[]; logCounts: Record<number, number>; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (invoice: Invoice) => void; onShowLogs?: (invoice: Invoice) => void }) => (
   <Table
     data={invoices}
     emptyText="No invoices match the selected filters."
@@ -399,7 +410,7 @@ const InvoiceTable = ({ invoices, canDelete, canViewLogs = false, canAdd = false
           <ActionDropdown
             actions={[
               { label: "View", icon: <Eye size={15} />, to: `/invoices/${item.id}` },
-              { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs, onClick: () => onShowLogs?.(item) },
+              { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
               { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
             ]}
           />
@@ -408,6 +419,14 @@ const InvoiceTable = ({ invoices, canDelete, canViewLogs = false, canAdd = false
     ]}
   />
 );
+
+const loadLogCounts = async (moduleName: string, ids: number[]) => {
+  const entries = await Promise.all(ids.map(async (entityId) => {
+    const response = await getAuditLogs({ moduleName, entityId, page: 0, size: 1 });
+    return [entityId, response.totalRecords] as const;
+  }));
+  return Object.fromEntries(entries);
+};
 
 const buildParams = (filters: InvoiceFilters): InvoiceFilterParams => {
   const presetRange = filters.datePreset === "custom" ? { startDate: filters.startDate, endDate: filters.endDate } : dateRangeForPreset(filters.datePreset);

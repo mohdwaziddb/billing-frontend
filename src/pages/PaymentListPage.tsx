@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Banknote, CreditCard, Download, History, Smartphone, Trash2, Wallet } from "lucide-react";
+import { getAuditLogs } from "../api/auditLogs";
 import { deletePayment, getPaymentsPage, type PaymentFilterParams } from "../api/payments";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -115,6 +116,7 @@ export const PaymentListPage = () => {
   const [modalSearch, setModalSearch] = useState("");
   const [modalPayments, setModalPayments] = useState<Payment[]>([]);
   const [modalPaymentPage, setModalPaymentPage] = useState<PageResponse<Payment>>(emptyPaymentPage);
+  const [logCounts, setLogCounts] = useState<Record<number, number>>({});
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
   const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
@@ -142,6 +144,15 @@ export const PaymentListPage = () => {
   useEffect(() => {
     void Promise.all([loadPayments(0), loadExportRows()]).catch((err: any) => setApiError(err, "Unable to load payments"));
   }, [baseParams]);
+
+  useEffect(() => {
+    const ids = [...new Set([...payments, ...modalPayments].map((payment) => payment.id))];
+    if (!can("PAYMENTS", "LOGS") || !ids.length) {
+      setLogCounts({});
+      return;
+    }
+    void loadLogCounts("Payment", ids).then(setLogCounts).catch(() => setLogCounts({}));
+  }, [can, payments, modalPayments]);
 
   useEffect(() => {
     if (!activeSummary) return;
@@ -284,7 +295,7 @@ export const PaymentListPage = () => {
           ) : null}
         </div>
         <div className="flex-1">
-          <PaymentTable payments={payments} canDelete={can("PAYMENTS", "DELETE")} canViewLogs={can("PAYMENTS", "VIEW_LOGS")} canAdd={can("PAYMENTS", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <PaymentTable payments={payments} logCounts={logCounts} canDelete={can("PAYMENTS", "DELETE")} canViewLogs={can("PAYMENTS", "LOGS")} canAdd={can("PAYMENTS", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
         </div>
         <div className="mt-auto">
           <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => {
@@ -314,7 +325,7 @@ export const PaymentListPage = () => {
               Export Excel
             </Button>
           </div>
-          <PaymentTable payments={modalPayments} canDelete={false} canViewLogs={can("PAYMENTS", "VIEW_LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <PaymentTable payments={modalPayments} logCounts={logCounts} canDelete={false} canViewLogs={can("PAYMENTS", "LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
           <Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
         </div>
       </Modal>
@@ -325,7 +336,7 @@ export const PaymentListPage = () => {
   );
 };
 
-const PaymentTable = ({ payments, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { payments: Payment[]; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (payment: Payment) => void; onShowLogs?: (payment: Payment) => void }) => (
+const PaymentTable = ({ payments, logCounts, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { payments: Payment[]; logCounts: Record<number, number>; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (payment: Payment) => void; onShowLogs?: (payment: Payment) => void }) => (
   <Table
     data={payments}
     emptyText="No payments match the selected filters."
@@ -354,7 +365,7 @@ const PaymentTable = ({ payments, canDelete, canViewLogs = false, canAdd = false
         className: "text-right",
         render: (item) => (
           <ActionDropdown actions={[
-            { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs, onClick: () => onShowLogs?.(item) },
+            { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
             { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
           ]} />
         )
@@ -362,6 +373,14 @@ const PaymentTable = ({ payments, canDelete, canViewLogs = false, canAdd = false
     ]}
   />
 );
+
+const loadLogCounts = async (moduleName: string, ids: number[]) => {
+  const entries = await Promise.all(ids.map(async (entityId) => {
+    const response = await getAuditLogs({ moduleName, entityId, page: 0, size: 1 });
+    return [entityId, response.totalRecords] as const;
+  }));
+  return Object.fromEntries(entries);
+};
 
 const buildParams = (filters: PaymentFilters): PaymentFilterParams => {
   const presetRange = filters.datePreset === "custom" ? { startDate: filters.startDate, endDate: filters.endDate } : dateRangeForPreset(filters.datePreset);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, History, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteProduct, getProductsPage } from "../api/products";
@@ -6,6 +6,7 @@ import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
+import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -40,6 +41,7 @@ export const ProductListPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [logTarget, setLogTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { can } = useAuth();
   const { message: error, clearMessage, setApiError } = useApiMessage();
 
@@ -73,6 +75,66 @@ export const ProductListPage = () => {
     void loadProducts(0);
   }, [statusFilter]);
 
+  const productColumns = useMemo(() => [
+    {
+      key: "product",
+      header: "Product",
+      render: (item: Product) => (
+        <div className="min-w-[180px]">
+          <p className="font-semibold text-white">{item.name}</p>
+          <p className="text-xs text-slate-400">{item.sku}</p>
+        </div>
+      )
+    },
+    { key: "brand", header: "Brand / Category", render: (item: Product) => `${item.brand ?? "--"} / ${item.categoryName ?? item.category ?? "--"}` },
+    { key: "price", header: "Selling Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.sellingPrice)}</span> },
+    {
+      key: "stock",
+      header: "Stock",
+      className: "text-right",
+      render: (item: Product) => {
+        const stockTone = item.stockQty <= 0 ? "amount-danger" : item.stockQty <= item.minStockQty ? "amount-warning" : "amount-success";
+        const stockLabel = item.stockQty <= 0 ? "Out Of Stock" : item.stockQty <= item.minStockQty ? "Low Stock" : "In Stock";
+        return (
+          <div className="text-right">
+            <span className={`block font-semibold ${stockTone}`}>{item.stockQty}</span>
+            <span className={`mt-1 block text-xs font-semibold ${stockTone}`}>{stockLabel}</span>
+          </div>
+        );
+      }
+    },
+    { key: "status", header: "Status", render: (item: Product) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
+  ], []);
+
+  const productActionColumn = useMemo(() => ({
+    key: "actions",
+    header: "Actions",
+    className: "text-right",
+    render: (item: Product) => (
+      <ActionDropdown
+        actions={[
+          { label: "Edit", icon: <Pencil size={15} />, to: `/products/${item.id}/edit`, hidden: !can("PRODUCTS", "EDIT") },
+          { label: "Show Logs", icon: <History size={15} />, hidden: !can("PRODUCTS", "LOGS"), onClick: () => setLogTarget(item) },
+          { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !can("PRODUCTS", "DELETE"), onClick: () => setDeleteTarget(item) }
+        ]}
+      />
+    )
+  }), [can]);
+
+  const visibleProductColumns = useMemo(() => applyVisibleColumns(productColumns, visibleColumns), [productColumns, visibleColumns]);
+  const productExportColumns = useMemo(() => applyVisibleColumns([
+    { key: "product", header: "Product Name", value: (row: Product) => row.name },
+    { key: "sku", header: "SKU" },
+    { key: "brand", header: "Brand", value: (row: Product) => row.brand },
+    { key: "category", header: "Category", value: (row: Product) => row.categoryName ?? row.category },
+    { key: "purchasePrice", header: "Purchase Price", type: "amount" as const },
+    { key: "price", header: "Selling Price", value: (row: Product) => row.sellingPrice, type: "amount" as const },
+    { key: "stock", header: "Stock Qty", value: (row: Product) => row.stockQty, type: "number" as const },
+    { key: "minStockQty", header: "Minimum Stock Qty", type: "number" as const },
+    { key: "taxPercent", header: "Tax Percent", type: "number" as const },
+    { key: "status", header: "Status", value: (row: Product) => row.active ? "Active" : "Inactive" }
+  ], visibleColumns), [visibleColumns]);
+
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
@@ -87,18 +149,8 @@ export const ProductListPage = () => {
             </div>
             {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") ? (
               <div className="flex flex-wrap gap-2">
-                {can("PRODUCTS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!products.length} onClick={() => exportToExcel("products.xlsx", products, [
-                  { key: "name", header: "Product Name" },
-                  { key: "sku", header: "SKU" },
-                  { key: "brand", header: "Brand" },
-                  { key: "categoryName", header: "Category" },
-                  { key: "purchasePrice", header: "Purchase Price", type: "amount" },
-                  { key: "sellingPrice", header: "Selling Price", type: "amount" },
-                  { key: "stockQty", header: "Stock Qty", type: "number" },
-                  { key: "minStockQty", header: "Minimum Stock Qty", type: "number" },
-                  { key: "taxPercent", header: "Tax Percent", type: "number" },
-                  { key: "active", header: "Status", value: (row) => row.active ? "Active" : "Inactive" }
-                ])}>
+                <CommonColumnSelector tableName="PRODUCTS" availableColumns={productColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
+                {can("PRODUCTS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!products.length} onClick={() => exportToExcel("products.xlsx", products, productExportColumns)}>
                   <Download size={16} />
                   Export Excel
                 </Button> : null}
@@ -150,75 +202,7 @@ export const ProductListPage = () => {
             data={products}
             emptyText="No products match the current filters."
             emptyAction={can("PRODUCTS", "ADD") ? <Link to="/products/new"><Button>Add product</Button></Link> : null}
-            columns={[
-            {
-              key: "product",
-              header: "Product",
-              render: (item) => (
-                <div className="min-w-[180px]">
-                  <p className="font-semibold text-white">{item.name}</p>
-                  <p className="text-xs text-slate-400">{item.sku}</p>
-                </div>
-              )
-            },
-            { key: "brand", header: "Brand / Category", render: (item) => `${item.brand ?? "--"} / ${item.categoryName ?? item.category ?? "--"}` },
-            {
-              key: "price",
-              header: "Selling Price",
-              className: "text-right",
-              render: (item) => (
-                <span className="block text-right font-semibold text-white">
-                  {formatCurrency(item.sellingPrice)}
-                </span>
-              )
-            },
-            {
-              key: "stock",
-              header: "Stock",
-              className: "text-right",
-              render: (item) => {
-                const stockTone = item.stockQty <= 0 ? "amount-danger" : item.stockQty <= item.minStockQty ? "amount-warning" : "amount-success";
-                const stockLabel = item.stockQty <= 0 ? "Out Of Stock" : item.stockQty <= item.minStockQty ? "Low Stock" : "In Stock";
-                return (
-                  <div className="text-right">
-                    <span className={`block font-semibold ${stockTone}`}>{item.stockQty}</span>
-                    <span className={`mt-1 block text-xs font-semibold ${stockTone}`}>{stockLabel}</span>
-                  </div>
-                );
-              }
-            },
-            { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
-            {
-              key: "actions",
-              header: "Actions",
-              className: "text-right",
-              render: (item) => (
-                <ActionDropdown
-                  actions={[
-                    {
-                      label: "Edit",
-                      icon: <Pencil size={15} />,
-                      to: `/products/${item.id}/edit`,
-                      hidden: !can("PRODUCTS", "EDIT")
-                    },
-                    {
-                      label: "Show Logs",
-                      icon: <History size={15} />,
-                      hidden: !can("PRODUCTS", "VIEW_LOGS"),
-                      onClick: () => setLogTarget(item)
-                    },
-                    {
-                      label: "Delete",
-                      icon: <Trash2 size={15} />,
-                      danger: true,
-                      hidden: !can("PRODUCTS", "DELETE"),
-                      onClick: () => setDeleteTarget(item)
-                    }
-                  ]}
-                />
-              )
-            }
-            ]}
+            columns={[...visibleProductColumns, productActionColumn]}
           />
         </div>
         <div className="mt-auto">

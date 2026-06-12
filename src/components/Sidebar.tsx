@@ -9,12 +9,14 @@ import {
   FileText,
   LayoutDashboard,
   Mail,
+  ReceiptIndianRupee,
   ReceiptText,
   Settings,
   ShieldCheck,
   Palette,
   Users,
   Tags,
+  TrendingUp,
   Wallet,
   type LucideIcon
 } from "lucide-react";
@@ -33,9 +35,11 @@ const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
   Mail,
   Palette,
+  ReceiptIndianRupee,
   Settings,
   ShieldCheck,
   Tags,
+  TrendingUp,
   Users,
   Wallet
 };

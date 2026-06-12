@@ -44,6 +44,16 @@ export type UserPreference = {
   darkModeEnabled: boolean;
 };
 
+export type TablePreference = {
+  id: number | null;
+  companyId: number;
+  userId: number;
+  tableName: string;
+  visibleColumns: string[];
+  createdOn: string | null;
+  updatedOn: string | null;
+};
+
 export type UserProfile = {
   id: number;
   fullName: string;
@@ -68,6 +78,8 @@ export type DashboardSummary = {
   endDate: string | null;
   totalSales: number;
   totalCollection: number;
+  totalExpense: number;
+  netRevenue: number;
   outstandingAmount: number;
   totalCustomers: number;
   newCustomers: number;
@@ -75,6 +87,8 @@ export type DashboardSummary = {
   totalInvoices: number;
   totalProducts: number;
   totalRevenue: number;
+  totalExpense: number;
+  netRevenue: number;
   outstandingBalance: number;
   totalSalesTrendPercentage: number;
   collectionTrendPercentage: number;
@@ -154,9 +168,12 @@ export type OwnerAnalytics = {
   totalInvoices: number;
   salesTrend: MetricPoint[];
   collectionTrend: MetricPoint[];
+  expenseTrend: MetricPoint[];
+  netProfitTrend: MetricPoint[];
   outstandingTrend: MetricPoint[];
   customerGrowthTrend: MetricPoint[];
   monthlyRevenue: MetricPoint[];
+  expenseByCategory: MetricPoint[];
 };
 
 export type SalesChartPoint = {
@@ -398,13 +415,88 @@ export type PaymentRequest = {
   remarks?: string;
 };
 
+export type ExpenseType = "GENERAL" | "CUSTOMER_RELATED" | "INVOICE_RELATED";
+
+export type ExpenseCategory = {
+  id: number;
+  categoryName: string;
+  description: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+export type ExpenseCategoryRequest = {
+  categoryName: string;
+  description?: string;
+  active: boolean;
+};
+
+export type Expense = {
+  id: number;
+  expenseType: ExpenseType;
+  categoryId: number;
+  categoryName: string;
+  customerId: number | null;
+  customerName: string | null;
+  invoiceId: number | null;
+  invoiceNo: string | null;
+  amount: number;
+  expenseDate: string;
+  description: string | null;
+  attachmentUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+export type ExpenseRequest = {
+  expenseType: ExpenseType;
+  categoryId: number;
+  customerId?: number;
+  invoiceId?: number;
+  amount: number;
+  expenseDate: string;
+  description?: string;
+  attachmentUrl?: string;
+};
+
+export type Profitability = {
+  referenceId: number;
+  referenceName: string;
+  revenue: number;
+  expense: number;
+  netRevenue: number;
+};
+
+export type ProfitLossPoint = {
+  label: string;
+  revenue?: number;
+  expense?: number;
+  netRevenue?: number;
+  value?: number;
+};
+
+export type ProfitLossReport = {
+  startDate: string | null;
+  endDate: string | null;
+  revenue: number;
+  expense: number;
+  netProfit: number;
+  expenseByCategory: ProfitLossPoint[];
+  revenueVsExpense: ProfitLossPoint[];
+};
+
 export type AuditLog = {
   id: number;
   moduleName: string;
   entityName: string;
   entityId: number;
   recordName: string | null;
-  actionType: "CREATE" | "UPDATE" | "DELETE" | "STATUS_CHANGE";
+  actionType: "CREATE" | "UPDATE" | "DELETE" | "STATUS_CHANGE" | "PAYMENT_ADDED" | "PAYMENT_UPDATED" | "PAYMENT_DELETED" | string;
   oldData: string | null;
   newData: string | null;
   changedFields: string | null;

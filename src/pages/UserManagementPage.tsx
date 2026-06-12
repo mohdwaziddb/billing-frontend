@@ -383,7 +383,7 @@ export const UserManagementPage = () => {
                     {
                       label: "Show Logs",
                       icon: <History size={15} />,
-                      hidden: !can("USERS", "VIEW_LOGS"),
+                      hidden: !can("USERS", "LOGS"),
                       onClick: () => setLogTarget(item)
                     },
                     {

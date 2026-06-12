@@ -145,6 +145,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (actionCode === "VIEW") {
           return true;
         }
+        if (actionCode === "LOGS") {
+          return Boolean(menu.actions.find((action) => (action.actionCode === "LOGS" || action.actionCode === "VIEW_LOGS") && action.allowed));
+        }
         return Boolean(menu.actions.find((action) => action.actionCode === actionCode)?.allowed);
       },
       firstAccessibleRoute() {

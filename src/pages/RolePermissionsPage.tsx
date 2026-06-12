@@ -11,7 +11,17 @@ import { useApiMessage } from "../hooks/useApiFeedback";
 import { notificationService } from "../services/notificationService";
 import type { ActionPermission, PermissionMatrix, Role, UserProfile } from "../types/api";
 
-const ACTION_COLUMNS = ["VIEW", "ADD", "EDIT", "DELETE", "EXPORT", "EMAIL_SEND", "SMS_SEND"];
+const ACTION_COLUMNS = ["VIEW", "ADD", "EDIT", "DELETE", "EXPORT", "LOGS", "EMAIL_SEND", "SMS_SEND"];
+const ACTION_LABELS: Record<string, string> = {
+  VIEW: "View",
+  ADD: "Add",
+  EDIT: "Edit",
+  DELETE: "Delete",
+  EXPORT: "Export",
+  LOGS: "Show Logs",
+  EMAIL_SEND: "Send Email",
+  SMS_SEND: "Send SMS"
+};
 const toRoleOption = (role?: Role | string | null) => {
   const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
   return {
@@ -238,7 +248,7 @@ export const RolePermissionsPage = () => {
                   <th key={action} className="whitespace-nowrap border-b border-white/10 px-4 pb-3 pt-1 text-center font-medium text-slate-400">
                     <label className="inline-flex items-center gap-2">
                       <input type="checkbox" className="h-4 w-4 accent-sky-400" checked={isColumnAllSelected(action)} disabled={!permissionMatrix || selectedRole === "OWNER"} onChange={(event) => toggleColumn(action, event.target.checked)} />
-                      {action}
+                      {ACTION_LABELS[action] ?? action}
                     </label>
                   </th>
                 ))}

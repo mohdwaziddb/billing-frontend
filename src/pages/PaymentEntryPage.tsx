@@ -12,7 +12,6 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
-import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { notificationService } from "../services/notificationService";
 import type { Customer, Invoice, PaymentMode, PaymentRequest } from "../types/api";
@@ -31,7 +30,6 @@ export const PaymentEntryPage = () => {
   const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [successMessage, setSuccessMessage] = useState("");
   const { message: serverError, clearMessage, setApiError } = useApiMessage();
   const {
     register,
@@ -46,7 +44,7 @@ export const PaymentEntryPage = () => {
       invoiceId: "",
       amount: "",
       paymentDate: new Date().toISOString().slice(0, 10),
-      mode: "UPI",
+      mode: "CASH",
       remarks: ""
     }
   });
@@ -100,7 +98,6 @@ export const PaymentEntryPage = () => {
 
   const onSubmit = async (values: FormValues) => {
     clearMessage();
-    setSuccessMessage("");
 
     const payload: PaymentRequest = {
       customerId: Number(values.customerId),
@@ -118,15 +115,13 @@ export const PaymentEntryPage = () => {
 
     try {
       await createPayment(payload);
-      const message = CommonSuccessMessageUtil.created("Payment");
-      setSuccessMessage(message);
       notificationService.showSuccess("Payment Recorded Successfully");
       reset({
         customerId: "",
         invoiceId: "",
         amount: "",
         paymentDate: new Date().toISOString().slice(0, 10),
-        mode: "UPI",
+        mode: "CASH",
         remarks: ""
       });
     } catch (err: any) {
@@ -219,7 +214,6 @@ export const PaymentEntryPage = () => {
             </div>
           </section>
           {serverError ? <div className="rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200 lg:col-span-3">{serverError}</div> : null}
-          {successMessage ? <div className="rounded-[24px] border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200 lg:col-span-3">{successMessage}</div> : null}
         </form>
       </GlassCard>
     </div>

@@ -233,7 +233,7 @@ export const ProductCategoryPage = () => {
                     {
                       label: "Show Logs",
                       icon: <History size={15} />,
-                      hidden: !can("PRODUCT_CATEGORY", "VIEW_LOGS"),
+                      hidden: !can("PRODUCT_CATEGORY", "LOGS"),
                       onClick: () => setLogTarget(item)
                     },
                     {

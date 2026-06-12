@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Download, History, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteCustomer, getCustomerLedger, getCustomersPage } from "../api/customers";
+import { getCustomerProfitability } from "../api/expenses";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
+import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -23,7 +25,7 @@ import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import { notificationService } from "../services/notificationService";
-import type { Customer, CustomerLedger, PageResponse } from "../types/api";
+import type { Customer, CustomerLedger, PageResponse, Profitability } from "../types/api";
 
 const emptyCustomerPage: PageResponse<Customer> = {
   records: [],
@@ -37,6 +39,7 @@ export const CustomerListPage = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerPage, setCustomerPage] = useState<PageResponse<Customer>>(emptyCustomerPage);
   const [selectedLedger, setSelectedLedger] = useState<CustomerLedger | null>(null);
+  const [selectedProfitability, setSelectedProfitability] = useState<Profitability | null>(null);
   const [ledgerCustomerId, setLedgerCustomerId] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -44,6 +47,7 @@ export const CustomerListPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [logTarget, setLogTarget] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { can } = useAuth();
   const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
 
@@ -56,7 +60,12 @@ export const CustomerListPage = () => {
 
   const loadLedger = async (customerId: number, nextPage = 0) => {
     setLedgerCustomerId(customerId);
-    setSelectedLedger(await getCustomerLedger(customerId, { page: nextPage, size: DEFAULT_PAGE_SIZE }));
+    const [ledger, profitability] = await Promise.all([
+      getCustomerLedger(customerId, { page: nextPage, size: DEFAULT_PAGE_SIZE }),
+      can("EXPENSES", "VIEW") ? getCustomerProfitability(customerId) : Promise.resolve(null)
+    ]);
+    setSelectedLedger(ledger);
+    setSelectedProfitability(profitability);
   };
 
   const handleDelete = async () => {
@@ -82,6 +91,74 @@ export const CustomerListPage = () => {
     void loadCustomers(0);
   }, [statusFilter]);
 
+  const customerColumns = useMemo(() => [
+    {
+      key: "name",
+      header: "Customer",
+      render: (item: Customer) => (
+        <div className="min-w-[180px]">
+          <p className="font-semibold text-white">{item.name}</p>
+          <p className="text-xs text-slate-400">{item.mobile}</p>
+        </div>
+      )
+    },
+    {
+      key: "purchase",
+      header: "Total Purchase",
+      className: "text-right",
+      render: (item: Customer) => <span className="block text-right font-semibold text-white">{formatCurrency(item.totalPurchaseAmount)}</span>
+    },
+    {
+      key: "paid",
+      header: "Total Paid",
+      className: "text-right",
+      render: (item: Customer) => <span className="block text-right">{formatCurrency(item.totalPaidAmount)}</span>
+    },
+    {
+      key: "discount",
+      header: "Discount Given",
+      className: "text-right",
+      render: (item: Customer) => <span className="block text-right">{formatCurrency(item.totalDiscountGiven)}</span>
+    },
+    {
+      key: "outstanding",
+      header: "Outstanding Balance",
+      className: "text-right",
+      render: (item: Customer) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.outstandingBalance)}</span>
+    },
+    { key: "lastPurchase", header: "Last Purchase", render: (item: Customer) => formatDate(item.lastPurchaseDate) },
+    { key: "status", header: "Status", render: (item: Customer) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
+  ], []);
+
+  const customerActionColumn = useMemo(() => ({
+    key: "actions",
+    header: "Actions",
+    className: "text-right",
+    render: (item: Customer) => (
+      <ActionDropdown
+        actions={[
+          { label: "Ledger", icon: <BookOpen size={15} />, onClick: () => void loadLedger(item.id, 0) },
+          { label: "Edit", icon: <Pencil size={15} />, to: `/customers/${item.id}/edit`, hidden: !can("CUSTOMERS", "EDIT") },
+          { label: "Show Logs", icon: <History size={15} />, hidden: !can("CUSTOMERS", "LOGS"), onClick: () => setLogTarget(item) },
+          { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !can("CUSTOMERS", "DELETE"), onClick: () => setDeleteTarget(item) }
+        ]}
+      />
+    )
+  }), [can]);
+
+  const visibleCustomerColumns = useMemo(() => applyVisibleColumns(customerColumns, visibleColumns), [customerColumns, visibleColumns]);
+  const customerExportColumns = useMemo(() => applyVisibleColumns([
+    { key: "name", header: "Customer Name" },
+    { key: "mobile", header: "Mobile" },
+    { key: "email", header: "Email" },
+    { key: "purchase", header: "Total Purchase", value: (row: Customer) => row.totalPurchaseAmount, type: "amount" as const },
+    { key: "paid", header: "Total Paid", value: (row: Customer) => row.totalPaidAmount, type: "amount" as const },
+    { key: "discount", header: "Discount Given", value: (row: Customer) => row.totalDiscountGiven, type: "amount" as const },
+    { key: "outstanding", header: "Outstanding Balance", value: (row: Customer) => row.outstandingBalance, type: "amount" as const },
+    { key: "lastPurchase", header: "Last Purchase", value: (row: Customer) => row.lastPurchaseDate, type: "date" as const },
+    { key: "status", header: "Status", value: (row: Customer) => row.active ? "Active" : "Inactive" }
+  ], visibleColumns), [visibleColumns]);
+
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
@@ -101,17 +178,8 @@ export const CustomerListPage = () => {
             </div>
             {can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
               <div className="flex flex-wrap gap-2">
-                {can("CUSTOMERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!customers.length} onClick={() => exportToExcel("customers.xlsx", customers, [
-                  { key: "name", header: "Customer Name" },
-                  { key: "mobile", header: "Mobile" },
-                  { key: "email", header: "Email" },
-                  { key: "totalPurchaseAmount", header: "Total Purchase", type: "amount" },
-                  { key: "totalPaidAmount", header: "Total Paid", type: "amount" },
-                  { key: "totalDiscountGiven", header: "Discount Given", type: "amount" },
-                  { key: "outstandingBalance", header: "Outstanding Balance", type: "amount" },
-                  { key: "lastPurchaseDate", header: "Last Purchase", type: "date" },
-                  { key: "active", header: "Status", value: (row) => row.active ? "Active" : "Inactive" }
-                ])}>
+                <CommonColumnSelector tableName="CUSTOMERS" availableColumns={customerColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
+                {can("CUSTOMERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!customers.length} onClick={() => exportToExcel("customers.xlsx", customers, customerExportColumns)}>
                   <Download size={16} />
                   Export Excel
                 </Button> : null}
@@ -159,79 +227,7 @@ export const CustomerListPage = () => {
             data={customers}
             emptyText="No customers match the current filters."
             emptyAction={can("CUSTOMERS", "ADD") ? <Link to="/customers/new"><Button>Add customer</Button></Link> : null}
-            columns={[
-            {
-              key: "name",
-              header: "Customer",
-              render: (item) => (
-                <div className="min-w-[180px]">
-                  <p className="font-semibold text-white">{item.name}</p>
-                  <p className="text-xs text-slate-400">{item.mobile}</p>
-                </div>
-              )
-            },
-            {
-              key: "purchase",
-              header: "Total Purchase",
-              className: "text-right",
-              render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.totalPurchaseAmount)}</span>
-            },
-            {
-              key: "paid",
-              header: "Total Paid",
-              className: "text-right",
-              render: (item) => <span className="block text-right">{formatCurrency(item.totalPaidAmount)}</span>
-            },
-            {
-              key: "discount",
-              header: "Discount Given",
-              className: "text-right",
-              render: (item) => <span className="block text-right">{formatCurrency(item.totalDiscountGiven)}</span>
-            },
-            {
-              key: "outstanding",
-              header: "Outstanding Balance",
-              className: "text-right",
-              render: (item) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.outstandingBalance)}</span>
-            },
-            { key: "lastPurchase", header: "Last Purchase", render: (item) => formatDate(item.lastPurchaseDate) },
-            { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
-            {
-              key: "actions",
-              header: "Actions",
-              className: "text-right",
-              render: (item) => (
-                <ActionDropdown
-                  actions={[
-                    {
-                      label: "Ledger",
-                      icon: <BookOpen size={15} />,
-                      onClick: () => void loadLedger(item.id, 0)
-                    },
-                    {
-                      label: "Edit",
-                      icon: <Pencil size={15} />,
-                      to: `/customers/${item.id}/edit`,
-                      hidden: !can("CUSTOMERS", "EDIT")
-                    },
-                    {
-                      label: "Show Logs",
-                      icon: <History size={15} />,
-                      hidden: !can("CUSTOMERS", "VIEW_LOGS"),
-                      onClick: () => setLogTarget(item)
-                    },
-                    {
-                      label: "Delete",
-                      icon: <Trash2 size={15} />,
-                      danger: true,
-                      hidden: !can("CUSTOMERS", "DELETE"),
-                      onClick: () => setDeleteTarget(item)
-                    }
-                  ]}
-                />
-              )
-            }
-            ]}
+            columns={[...visibleCustomerColumns, customerActionColumn]}
           />
         </div>
         <div className="mt-auto">
@@ -248,12 +244,28 @@ export const CustomerListPage = () => {
         </div>
       </GlassCard>
 
-      <Modal open={Boolean(selectedLedger)} title="Customer ledger" onClose={() => setSelectedLedger(null)}>
+      <Modal open={Boolean(selectedLedger)} title="Customer ledger" onClose={() => { setSelectedLedger(null); setSelectedProfitability(null); }}>
         <div className="space-y-3">
           <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
             <p className="font-semibold text-white">{selectedLedger?.customerName}</p>
             <p className="text-sm text-slate-300/70">Current balance: {formatCurrency(selectedLedger?.currentBalance)}</p>
           </div>
+          {selectedProfitability ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Total Purchase</p>
+                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedProfitability.revenue)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Customer Expense</p>
+                <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(selectedProfitability.expense)}</p>
+              </div>
+              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                <p className="text-sm text-slate-400">Net Revenue</p>
+                <p className="mt-2 text-xl font-bold text-emerald-200">{formatCurrency(selectedProfitability.netRevenue)}</p>
+              </div>
+            </div>
+          ) : null}
           <div className="max-h-[420px] space-y-2 overflow-auto scrollbar-thin">
             {selectedLedger?.entries.map((entry, index) => (
               <div key={`${entry.referenceNo}-${index}`} className="rounded-[24px] border border-white/10 bg-white/5 p-4">
