@@ -356,6 +356,36 @@ const buildListTotalRow = (rows: DashboardListRow[], config: { columns: Dashboar
   return totalRow;
 };
 
+const CustomerSummaryCompactCard = ({
+  total,
+  newCustomers,
+  existingCustomers,
+  onClick
+}: {
+  total: number;
+  newCustomers: number;
+  existingCustomers: number;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    className="group flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--theme-color)_28%,white)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)]"
+    onClick={onClick}
+  >
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--theme-color)_10%,white)] text-[var(--theme-color)]">
+      <Users size={17} />
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className="block truncate text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Customers</span>
+      <span className="mt-1 block text-2xl font-extrabold text-slate-950">{total}</span>
+      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-slate-500">
+        <span>New: {newCustomers}</span>
+        <span>Existing: {existingCustomers}</span>
+      </span>
+    </span>
+  </button>
+);
+
 export const DashboardPage = () => {
   const { preferences } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -394,6 +424,7 @@ export const DashboardPage = () => {
   const activeRange = useMemo(() => (preset === "custom" ? customRange : buildRange(preset)), [customRange, preset]);
   const salesTrendRange = useMemo(() => buildRange(salesTrendPreset), [salesTrendPreset]);
   const selectedConfig = activeCard ? detailConfig[activeCard] : null;
+  const customerDetailOpen = activeCard === "customers" || activeCard === "newCustomers" || activeCard === "existingCustomers";
   const categoryTotal = useMemo(() => salesByCategory.reduce((sum, item) => sum + Number(item.totalAmount ?? 0), 0), [salesByCategory]);
   const collectedAmount = Number(summary?.totalCollection ?? 0);
   const remainingAmount = Number(summary?.outstandingAmount ?? 0);
@@ -441,34 +472,11 @@ export const DashboardPage = () => {
           growth: formatTrend(summary?.outstandingTrendPercentage),
           analyticsColor: CHART_COLORS.outstanding
         },
-        {
-          key: "customers" as const,
-          label: "Total Customers",
-          value: String(summary?.totalCustomers ?? 0),
-          caption: "Purchased in range",
-          icon: <Users size={18} />,
-          growth: formatTrend(summary?.totalCustomersTrendPercentage),
-          analyticsColor: CHART_COLORS.customers
-        }
       ],
     [summary]
   );
   const compactMetrics = useMemo(
     () => [
-      {
-        key: "newCustomers" as const,
-        label: "New Customers",
-        value: String(summary?.newCustomers ?? 0),
-        caption: "First purchase in range",
-        icon: <Users size={17} />
-      },
-      {
-        key: "existingCustomers" as const,
-        label: "Existing Customers",
-        value: String(summary?.existingCustomers ?? 0),
-        caption: "Repeat buyers",
-        icon: <Users size={17} />
-      },
       {
         key: "products" as const,
         label: "Products",
@@ -571,6 +579,14 @@ export const DashboardPage = () => {
   }, [activeList, activeRange, listPage, listSearch]);
 
   const openDetails = (card: DashboardCardKey) => {
+    setActiveCard(card);
+    setDetails(null);
+    setDetailPage(0);
+    setDetailSearch("");
+    setDetailSort({ sortBy: detailConfig[card].defaultSort, sortDirection: "desc" });
+  };
+
+  const switchCustomerDetailTab = (card: Extract<DashboardCardKey, "customers" | "newCustomers" | "existingCustomers">) => {
     setActiveCard(card);
     setDetails(null);
     setDetailPage(0);
@@ -682,7 +698,7 @@ export const DashboardPage = () => {
         ) : null}
       </GlassCard>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {dashboardCards.map((card) => (
           <StatCard
             key={card.label}
@@ -700,6 +716,12 @@ export const DashboardPage = () => {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <CustomerSummaryCompactCard
+          total={summary?.totalCustomers ?? 0}
+          newCustomers={summary?.newCustomers ?? 0}
+          existingCustomers={summary?.existingCustomers ?? 0}
+          onClick={() => openDetails("customers")}
+        />
         {compactMetrics.map((metric) => (
           <button
             key={metric.label}
@@ -1050,8 +1072,27 @@ export const DashboardPage = () => {
         onExport={exportListDetails}
       />
 
-      <Modal open={Boolean(activeCard)} title={selectedConfig?.title ?? "Dashboard Details"} onClose={() => setActiveCard(null)}>
+      <Modal open={Boolean(activeCard)} title={customerDetailOpen ? "Customer Details" : selectedConfig?.title ?? "Dashboard Details"} onClose={() => setActiveCard(null)}>
         <div className="space-y-5">
+          {customerDetailOpen ? (
+            <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-3">
+              {([
+                { key: "customers", label: "All Customers", count: summary?.totalCustomers ?? 0 },
+                { key: "newCustomers", label: "New Customers", count: summary?.newCustomers ?? 0 },
+                { key: "existingCustomers", label: "Existing Customers", count: summary?.existingCustomers ?? 0 }
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={`rounded-xl px-4 py-3 text-left transition ${activeCard === tab.key ? "bg-white shadow-sm ring-1 ring-slate-200" : "hover:bg-white/70"}`}
+                  onClick={() => switchCustomerDetailTab(tab.key)}
+                >
+                  <span className="block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{tab.label}</span>
+                  <span className="mt-1 block text-2xl font-extrabold text-slate-950">{tab.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
             <span className="font-semibold text-slate-950">Active Filters:</span>
             <span className="min-w-0 flex-1 text-slate-600">{modalFilters.join(" | ") || "No filters applied"}</span>

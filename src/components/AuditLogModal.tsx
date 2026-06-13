@@ -68,6 +68,23 @@ export const AuditLogModal = ({
     }
   }, [open, moduleName, entityId]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
   const changes = useMemo(() => getChanges(selected), [selected]);
   const themePalette = useMemo(() => readThemePalette(), [open]);
 

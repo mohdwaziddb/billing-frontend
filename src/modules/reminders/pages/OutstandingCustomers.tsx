@@ -5,6 +5,7 @@ import { formatCurrency } from "../../../lib/currency";
 import { formatDate, formatDateTime } from "../../../lib/format";
 import { Button } from "../../../components/Button";
 import { ActionDropdown } from "../../../components/ActionDropdown";
+import { CommonColumnSelector, applyVisibleColumns } from "../../../components/CommonColumnSelector";
 import { GlassCard } from "../../../components/GlassCard";
 import { Header } from "../../../components/Header";
 import { Input } from "../../../components/Input";
@@ -54,6 +55,7 @@ export const OutstandingCustomersReminderPage = () => {
     templateId: ""
   });
   const [emailPreview, setEmailPreview] = useState<EmailPreview | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
 
   const loadCustomers = async (nextFilters: typeof filters = filters, nextPage = 0) => {
     setLoading(true);
@@ -87,6 +89,77 @@ export const OutstandingCustomersReminderPage = () => {
     () => customerPage.records.reduce((sum, customer) => sum + customer.currentBalance, 0),
     [customerPage.records]
   );
+
+  const overdueCustomerColumns = useMemo(() => [
+    {
+      key: "customer",
+      header: "Customer",
+      render: (item: OverdueCustomer) => (
+        <div className="min-w-[180px]">
+          <p className="font-semibold text-white">{item.customerName}</p>
+          <p className="text-xs text-slate-400">{item.mobile}</p>
+        </div>
+      )
+    },
+    {
+      key: "balance",
+      header: "Balance",
+      className: "text-right",
+      render: (item: OverdueCustomer) => (
+        <span className="block text-right font-semibold text-rose-200">
+          {formatCurrency(item.currentBalance)}
+        </span>
+      )
+    },
+    { key: "overdue", header: "Overdue Days", render: (item: OverdueCustomer) => item.overdueDays },
+    { key: "oldest", header: "Oldest Due", render: (item: OverdueCustomer) => formatDate(item.oldestOutstandingInvoiceDate) },
+    {
+      key: "lastStatus",
+      header: "Last Reminder",
+      render: (item: OverdueCustomer) =>
+        item.lastReminderStatus ? (
+          <div className="space-y-1">
+            <StatusBadge label={item.lastReminderStatus} />
+            <p className="text-xs text-slate-400">{formatDateTime(item.lastReminderAt)}</p>
+          </div>
+        ) : (
+          <span className="text-slate-400">No history</span>
+        )
+    }
+  ], []);
+  const visibleOverdueCustomerColumns = useMemo(
+    () => applyVisibleColumns(overdueCustomerColumns, visibleColumns),
+    [overdueCustomerColumns, visibleColumns]
+  );
+  const overdueCustomerActionColumn = useMemo(() => ({
+    key: "actions",
+    header: "Actions",
+    className: "text-right",
+    render: (item: OverdueCustomer) => (
+      <ActionDropdown
+        actions={[
+          {
+            label: "Send reminder",
+            icon: <BellRing size={15} />,
+            hidden: !can("OUTSTANDING", "ADD"),
+            onClick: () => {
+              setReminderTarget(item);
+              setEmailPreview(null);
+              setReminderForm({
+                channel: "EMAIL",
+                templateId: templates[0]?.id ? String(templates[0].id) : ""
+              });
+            }
+          },
+          {
+            label: "History",
+            icon: <History size={15} />,
+            onClick: () => setHistoryTarget({ id: item.customerId, name: item.customerName })
+          }
+        ]}
+      />
+    )
+  }), [can, templates]);
 
   const previewReminder = async () => {
     if (!reminderForm.templateId || !reminderTarget) {
@@ -219,9 +292,17 @@ export const OutstandingCustomersReminderPage = () => {
       </div>
 
       <GlassCard className="p-6 md:p-7">
-        <div className="mb-5">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder candidates</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">Overdue Customer List</h2>
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder candidates</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">Overdue Customer List</h2>
+          </div>
+          <CommonColumnSelector
+            tableName="OUTSTANDING_CUSTOMERS"
+            availableColumns={overdueCustomerColumns.map(({ key, header }) => ({ key, header }))}
+            visibleColumns={visibleColumns}
+            onApply={setVisibleColumns}
+          />
         </div>
 
         {loading ? (
@@ -232,72 +313,7 @@ export const OutstandingCustomersReminderPage = () => {
           <Table
             data={customerPage.records}
             emptyText="No overdue customers match the current filters."
-            columns={[
-              {
-                key: "customer",
-                header: "Customer",
-                render: (item) => (
-                  <div className="min-w-[180px]">
-                    <p className="font-semibold text-white">{item.customerName}</p>
-                    <p className="text-xs text-slate-400">{item.mobile}</p>
-                  </div>
-                )
-              },
-              {
-                key: "balance",
-                header: "Balance",
-                className: "text-right",
-                render: (item) => (
-                  <span className="block text-right font-semibold text-rose-200">
-                    {formatCurrency(item.currentBalance)}
-                  </span>
-                )
-              },
-              { key: "overdue", header: "Overdue Days", render: (item) => item.overdueDays },
-              { key: "oldest", header: "Oldest Due", render: (item) => formatDate(item.oldestOutstandingInvoiceDate) },
-              {
-                key: "lastStatus",
-                header: "Last Reminder",
-                render: (item) =>
-                  item.lastReminderStatus ? (
-                    <div className="space-y-1">
-                      <StatusBadge label={item.lastReminderStatus} />
-                      <p className="text-xs text-slate-400">{formatDateTime(item.lastReminderAt)}</p>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400">No history</span>
-                  )
-              },
-              {
-                key: "actions",
-                header: "Actions",
-                className: "text-right",
-                render: (item) => (
-                  <ActionDropdown
-                    actions={[
-                      {
-                        label: "Send reminder",
-                        icon: <BellRing size={15} />,
-                        hidden: !can("OUTSTANDING", "ADD"),
-                        onClick: () => {
-                          setReminderTarget(item);
-                          setEmailPreview(null);
-                          setReminderForm({
-                            channel: "EMAIL",
-                            templateId: templates[0]?.id ? String(templates[0].id) : ""
-                          });
-                        }
-                      },
-                      {
-                        label: "History",
-                        icon: <History size={15} />,
-                        onClick: () => setHistoryTarget({ id: item.customerId, name: item.customerName })
-                      }
-                    ]}
-                  />
-                )
-              }
-            ]}
+            columns={[...visibleOverdueCustomerColumns, overdueCustomerActionColumn]}
           />
         )}
         <Pagination

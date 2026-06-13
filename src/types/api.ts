@@ -571,6 +571,10 @@ export type ProviderSettings = {
   id: number;
   providerName: string;
   senderEmail?: string | null;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUsername?: string | null;
+  smtpTlsEnabled?: boolean;
   awsAccessKey?: string | null;
   awsRegion?: string | null;
   apiUrl?: string | null;
@@ -583,6 +587,11 @@ export type ProviderSettings = {
 export type ProviderSettingsRequest = {
   providerName?: string;
   senderEmail?: string;
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUsername?: string;
+  smtpPassword?: string;
+  smtpTlsEnabled?: boolean;
   awsAccessKey?: string;
   awsSecretKey?: string;
   awsRegion?: string;

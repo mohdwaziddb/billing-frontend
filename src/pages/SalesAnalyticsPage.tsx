@@ -16,7 +16,12 @@ import {
   YAxis
 } from "recharts";
 import { getAnalyticsSummary, getCustomerDueList, getLowStockProducts, getOwnerAnalytics } from "../api/analytics";
+import { getCustomersPage } from "../api/customers";
+import { getExpensesPage } from "../api/expenses";
+import { getInvoicesPage } from "../api/invoices";
+import { getPaymentsPage } from "../api/payments";
 import { Button } from "../components/Button";
+import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -25,9 +30,20 @@ import { StatCard } from "../components/StatCard";
 import { Table } from "../components/Table";
 import { TrendBadge } from "../components/TrendBadge";
 import { formatCurrency } from "../lib/currency";
-import type { AnalyticsSummary, CustomerDue, LowStockProduct, OwnerAnalytics, PageResponse } from "../types/api";
+import { exportToExcel } from "../lib/excelExport";
+import type { AnalyticsSummary, Customer, CustomerDue, Expense, Invoice, LowStockProduct, OwnerAnalytics, PageResponse, Payment } from "../types/api";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
+type AnalyticsDrilldownKey = "revenue" | "collections" | "outstanding" | "expenses" | "customers";
+type AnalyticsDrilldownRow = Invoice | Payment | Expense | Customer;
+
+const emptyDetailPage: PageResponse<AnalyticsDrilldownRow> = {
+  records: [],
+  page: 0,
+  size: DEFAULT_PAGE_SIZE,
+  totalRecords: 0,
+  totalPages: 0
+};
 
 const buildRange = (preset: DatePreset) => {
   const now = new Date();
@@ -86,6 +102,11 @@ export const SalesAnalyticsPage = () => {
   });
   const [preset, setPreset] = useState<DatePreset>("thisMonth");
   const [customRange, setCustomRange] = useState(() => buildRange("thisMonth"));
+  const [activeDrilldown, setActiveDrilldown] = useState<AnalyticsDrilldownKey | null>(null);
+  const [drilldownPage, setDrilldownPage] = useState<PageResponse<AnalyticsDrilldownRow>>(emptyDetailPage);
+  const [drilldownPageNumber, setDrilldownPageNumber] = useState(0);
+  const [drilldownSearch, setDrilldownSearch] = useState("");
+  const [drilldownLoading, setDrilldownLoading] = useState(false);
 
   const activeRange = useMemo(() => (preset === "custom" ? customRange : buildRange(preset)), [customRange, preset]);
 
@@ -109,6 +130,12 @@ export const SalesAnalyticsPage = () => {
 
   const loadDueCustomers = async (page: number) => {
     setDueCustomersPage(await getCustomerDueList({ page, size: DEFAULT_PAGE_SIZE }));
+  };
+
+  const openDrilldown = (key: AnalyticsDrilldownKey) => {
+    setActiveDrilldown(key);
+    setDrilldownPageNumber(0);
+    setDrilldownSearch("");
   };
 
   const salesVsPayments = useMemo(() => {
@@ -153,6 +180,103 @@ export const SalesAnalyticsPage = () => {
     };
   }, [overview]);
 
+  const drilldownColumns = useMemo<DashboardDetailModalColumn<AnalyticsDrilldownRow>[]>(() => {
+    if (activeDrilldown === "collections") {
+      return [
+        { key: "id", header: "Payment Ref", value: (row) => `PAY-${String((row as Payment).id).padStart(6, "0")}` },
+        { key: "customerName", header: "Customer" },
+        { key: "invoiceNo", header: "Invoice" },
+        { key: "amount", header: "Amount", type: "currency", className: "text-right" },
+        { key: "paymentDate", header: "Payment Date", type: "date" },
+        { key: "mode", header: "Mode" },
+        { key: "createdBy", header: "Created By" }
+      ];
+    }
+    if (activeDrilldown === "expenses") {
+      return [
+        { key: "expenseType", header: "Expense Type" },
+        { key: "categoryName", header: "Category" },
+        { key: "customerName", header: "Customer" },
+        { key: "invoiceNo", header: "Invoice" },
+        { key: "amount", header: "Amount", type: "currency", className: "text-right" },
+        { key: "expenseDate", header: "Date", type: "date" },
+        { key: "description", header: "Description" }
+      ];
+    }
+    if (activeDrilldown === "customers") {
+      return [
+        { key: "name", header: "Customer" },
+        { key: "mobile", header: "Mobile" },
+        { key: "email", header: "Email" },
+        { key: "totalPurchaseAmount", header: "Purchase", type: "currency", className: "text-right" },
+        { key: "totalPaidAmount", header: "Paid", type: "currency", className: "text-right" },
+        { key: "outstandingBalance", header: "Outstanding", type: "currency", className: "text-right" },
+        { key: "active", header: "Status", value: (row) => ((row as Customer).active ? "Active" : "Inactive") }
+      ];
+    }
+    return [
+      { key: "invoiceNo", header: "Invoice" },
+      { key: "customerName", header: "Customer" },
+      { key: "invoiceDate", header: "Date", type: "date" },
+      { key: "totalAmount", header: "Total", type: "currency", className: "text-right" },
+      { key: "paidAmount", header: "Paid", type: "currency", className: "text-right" },
+      { key: "balanceAmount", header: "Outstanding", type: "currency", className: "text-right" },
+      { key: "paymentStatus", header: "Status", type: "status" }
+    ];
+  }, [activeDrilldown]);
+
+  const drilldownTitle = activeDrilldown === "collections"
+    ? "Collection Details"
+    : activeDrilldown === "outstanding"
+      ? "Outstanding Invoice Details"
+      : activeDrilldown === "expenses"
+        ? "Expense Details"
+        : activeDrilldown === "customers"
+          ? "Customer Details"
+          : "Revenue Invoice Details";
+  const drilldownFilters = useMemo(() => {
+    const rangeLabel = `${activeRange.startDate} - ${activeRange.endDate}`;
+    if (activeDrilldown === "customers") {
+      return ["Customer records"];
+    }
+    if (activeDrilldown === "outstanding") {
+      return [`Outstanding invoices`, `Date: ${rangeLabel}`];
+    }
+    return [`Date: ${rangeLabel}`];
+  }, [activeDrilldown, activeRange]);
+  const drilldownGrandTotal = useMemo(() => {
+    const total = drilldownPage.records.reduce((sum, row) => {
+      if (activeDrilldown === "collections") return sum + Number((row as Payment).amount ?? 0);
+      if (activeDrilldown === "expenses") return sum + Number((row as Expense).amount ?? 0);
+      if (activeDrilldown === "customers") return sum + Number((row as Customer).outstandingBalance ?? 0);
+      return sum + Number((row as Invoice).totalAmount ?? 0);
+    }, 0);
+    return formatCurrency(total);
+  }, [activeDrilldown, drilldownPage.records]);
+
+  useEffect(() => {
+    if (!activeDrilldown) {
+      return;
+    }
+    setDrilldownLoading(true);
+    const commonParams = { search: drilldownSearch || undefined, page: drilldownPageNumber, size: DEFAULT_PAGE_SIZE };
+    const request = activeDrilldown === "collections"
+      ? getPaymentsPage({ ...commonParams, startDate: activeRange.startDate, endDate: activeRange.endDate })
+      : activeDrilldown === "expenses"
+        ? getExpensesPage({ ...commonParams, startDate: activeRange.startDate, endDate: activeRange.endDate })
+        : activeDrilldown === "customers"
+          ? getCustomersPage({ search: drilldownSearch || undefined, page: drilldownPageNumber, size: DEFAULT_PAGE_SIZE })
+          : getInvoicesPage({
+            ...commonParams,
+            startDate: activeRange.startDate,
+            endDate: activeRange.endDate,
+            outstandingFilter: activeDrilldown === "outstanding" ? "OUTSTANDING" : undefined
+          });
+    void request
+      .then((response) => setDrilldownPage(response as PageResponse<AnalyticsDrilldownRow>))
+      .finally(() => setDrilldownLoading(false));
+  }, [activeDrilldown, activeRange, drilldownPageNumber, drilldownSearch]);
+
   return (
     <div className="space-y-4 pb-6">
       <Header
@@ -190,11 +314,11 @@ export const SalesAnalyticsPage = () => {
       </GlassCard>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Collection Efficiency" value={executiveKpis.collectionEfficiency} caption="Collections against billed revenue." icon={<Gauge size={18} />} />
-        <StatCard label="Avg Invoice Value" value={executiveKpis.averageInvoiceValue} caption="Revenue per invoice." icon={<ReceiptText size={18} />} />
-        <StatCard label="Avg Collection Days" value={executiveKpis.averageCollectionDays} caption="Receivable pressure estimate." icon={<Activity size={18} />} />
-        <StatCard label="Customer Growth" value={executiveKpis.customerGrowth} caption="New customers in range." icon={<UsersRound size={18} />} />
-        <StatCard label="Recovery Rate" value={executiveKpis.recoveryRate} caption="Cash recovered from receivables." icon={<HeartPulse size={18} />} />
+        <StatCard label="Collection Efficiency" value={executiveKpis.collectionEfficiency} caption="Collections against billed revenue." icon={<Gauge size={18} />} onClick={() => openDrilldown("collections")} />
+        <StatCard label="Avg Invoice Value" value={executiveKpis.averageInvoiceValue} caption="Revenue per invoice." icon={<ReceiptText size={18} />} onClick={() => openDrilldown("revenue")} />
+        <StatCard label="Avg Collection Days" value={executiveKpis.averageCollectionDays} caption="Receivable pressure estimate." icon={<Activity size={18} />} onClick={() => openDrilldown("outstanding")} />
+        <StatCard label="Customer Growth" value={executiveKpis.customerGrowth} caption="New customers in range." icon={<UsersRound size={18} />} onClick={() => openDrilldown("customers")} />
+        <StatCard label="Recovery Rate" value={executiveKpis.recoveryRate} caption="Cash recovered from receivables." icon={<HeartPulse size={18} />} onClick={() => openDrilldown("collections")} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
@@ -307,23 +431,23 @@ export const SalesAnalyticsPage = () => {
             <h2 className="mt-2 text-2xl font-bold text-white">Cost and profitability signals</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("revenue")}>
               <p className="text-sm text-slate-400"><TrendingUp className="mr-2 inline" size={16} />Net Revenue</p>
               <p className="mt-3 text-3xl font-extrabold text-white">{formatCurrency(overview?.netRevenue)}</p>
-            </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+            </button>
+            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
               <p className="text-sm text-slate-400"><Banknote className="mr-2 inline" size={16} />Total Expense</p>
               <p className="mt-3 text-3xl font-extrabold text-white">{formatCurrency(overview?.totalExpense)}</p>
-            </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+            </button>
+            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
               <p className="text-sm text-slate-400">Expense Categories</p>
               <p className="mt-3 text-3xl font-extrabold text-white">{overview?.expenseByCategory?.length ?? 0}</p>
-            </div>
-            <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+            </button>
+            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("customers")}>
               <p className="text-sm text-slate-400">Due Customers</p>
               <p className="mt-3 text-3xl font-extrabold text-white">{summary?.dueCustomers ?? 0}</p>
               <p className="mt-2 text-xs text-slate-400">Recovery focus count.</p>
-            </div>
+            </button>
           </div>
         </GlassCard>
       </div>
@@ -390,6 +514,32 @@ export const SalesAnalyticsPage = () => {
           onPageChange={(nextPage) => void loadDueCustomers(nextPage)}
         />
       </GlassCard>
+      <CommonDashboardDetailModal
+        open={Boolean(activeDrilldown)}
+        title={drilldownTitle}
+        rows={drilldownPage.records}
+        columns={drilldownColumns}
+        loading={drilldownLoading}
+        search={drilldownSearch}
+        page={drilldownPage.page}
+        totalRecords={drilldownPage.totalRecords}
+        totalPages={drilldownPage.totalPages}
+        activeFilters={drilldownFilters}
+        grandTotal={drilldownGrandTotal}
+        emptyText="No detail records found for this card."
+        onClose={() => setActiveDrilldown(null)}
+        onSearchChange={(value) => {
+          setDrilldownPageNumber(0);
+          setDrilldownSearch(value);
+        }}
+        onPageChange={setDrilldownPageNumber}
+        onExport={() => exportToExcel(`${activeDrilldown ?? "analytics"}-details.xlsx`, drilldownPage.records, drilldownColumns.map((column) => ({
+          key: column.key,
+          header: column.header,
+          value: column.value,
+          type: column.type === "currency" ? "amount" : column.type === "date" ? "date" : undefined
+        })))}
+      />
     </div>
   );
 };

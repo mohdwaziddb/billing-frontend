@@ -23,7 +23,7 @@ export const CommonToastContainer = () => {
   }
 
   return (
-    <div className="pointer-events-none fixed right-4 top-4 z-[80] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3">
+    <div className="pointer-events-none fixed right-4 top-4 z-[2147483647] flex w-[calc(100vw-2rem)] max-w-sm flex-col gap-3">
       {notifications.map((notification) => {
         if (notification.type === "success") {
           return <CommonToastSuccess key={notification.id} notification={notification} onClose={() => close(notification.id)} />;

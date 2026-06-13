@@ -8,6 +8,7 @@ import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
+import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -51,17 +52,12 @@ const emptyPaymentPage: PageResponse<Payment> = {
   totalPages: 0
 };
 
-const todayIso = () => {
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-};
-
 const emptyFilters: PaymentFilters = {
   search: "",
   paymentStatus: "",
-  datePreset: "today",
-  startDate: todayIso(),
-  endDate: todayIso(),
+  datePreset: "",
+  startDate: "",
+  endDate: "",
   minAmount: "",
   maxAmount: "",
   mode: "",
@@ -122,6 +118,7 @@ export const PaymentListPage = () => {
   const [modalPayments, setModalPayments] = useState<Payment[]>([]);
   const [modalPaymentPage, setModalPaymentPage] = useState<PageResponse<Payment>>(emptyPaymentPage);
   const [logCounts, setLogCounts] = useState<Record<number, number>>({});
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
   const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
@@ -134,6 +131,9 @@ export const PaymentListPage = () => {
     outstandingCollection: exportRows.filter((item) => item.invoiceNo).reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
   }), [exportRows]);
   const modalGrandTotal = useMemo(() => modalPayments.reduce((sum, item) => sum + Number(item.amount ?? 0), 0), [modalPayments]);
+  const paymentColumns = useMemo(() => basePaymentColumns(), []);
+  const visiblePaymentColumns = useMemo(() => applyVisibleColumns(paymentColumns, visibleColumns), [paymentColumns, visibleColumns]);
+  const visiblePaymentExportColumns = useMemo(() => applyVisibleColumns(paymentExportColumns, visibleColumns), [visibleColumns]);
 
   const loadPayments = async (nextPage = page, params = baseParams) => {
     const response = await getPaymentsPage({ ...params, page: nextPage, size: DEFAULT_PAGE_SIZE });
@@ -208,7 +208,7 @@ export const PaymentListPage = () => {
   };
 
   const exportPayments = (fileName: string, rows: Payment[]) => {
-    exportToExcel(fileName, rows.length ? [...rows, buildGrandTotal(rows)] : [], paymentExportColumns);
+    exportToExcel(fileName, rows.length ? [...rows, buildGrandTotal(rows)] : [], visiblePaymentExportColumns);
   };
 
   const openSummary = (key: SummaryKey) => {
@@ -293,6 +293,7 @@ export const PaymentListPage = () => {
           </div>
           {can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
             <div className="flex flex-wrap gap-2">
+              <CommonColumnSelector tableName="PAYMENTS" availableColumns={paymentColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
               {can("PAYMENTS", "EXPORT") ? (
                 <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportPayments("payments.xlsx", exportRows)}>
                   <Download size={16} />
@@ -308,7 +309,7 @@ export const PaymentListPage = () => {
           ) : null}
         </div>
         <div className="flex-1">
-          <PaymentTable payments={payments} logCounts={logCounts} canDelete={can("PAYMENTS", "DELETE")} canViewLogs={can("PAYMENTS", "LOGS")} canAdd={can("PAYMENTS", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <PaymentTable payments={payments} columns={visiblePaymentColumns} logCounts={logCounts} canDelete={can("PAYMENTS", "DELETE")} canViewLogs={can("PAYMENTS", "LOGS")} canAdd={can("PAYMENTS", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
         </div>
         <div className="mt-auto">
           <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => {
@@ -338,7 +339,7 @@ export const PaymentListPage = () => {
               Export Excel
             </Button>
           </div>
-          <PaymentTable payments={modalPayments} logCounts={logCounts} canDelete={false} canViewLogs={can("PAYMENTS", "LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <PaymentTable payments={modalPayments} columns={visiblePaymentColumns} logCounts={logCounts} canDelete={false} canViewLogs={can("PAYMENTS", "LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
           <Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
         </div>
       </Modal>
@@ -349,29 +350,13 @@ export const PaymentListPage = () => {
   );
 };
 
-const PaymentTable = ({ payments, logCounts, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { payments: Payment[]; logCounts: Record<number, number>; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (payment: Payment) => void; onShowLogs?: (payment: Payment) => void }) => (
+const PaymentTable = ({ payments, columns, logCounts, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { payments: Payment[]; columns: ReturnType<typeof basePaymentColumns>; logCounts: Record<number, number>; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (payment: Payment) => void; onShowLogs?: (payment: Payment) => void }) => (
   <Table
     data={payments}
     emptyText="No payments match the selected filters."
     emptyAction={canAdd ? <Link to="/payments/new"><Button>Add Payment</Button></Link> : null}
     columns={[
-      { key: "ref", header: "Payment Ref", render: (item) => <span className="font-semibold text-white">{paymentRef(item)}</span> },
-      {
-        key: "customer",
-        header: "Customer",
-        render: (item) => (
-          <div>
-            <p className="font-semibold text-white">{item.customerName}</p>
-            <p className="text-xs text-slate-400">{item.customerMobile ?? "--"}</p>
-          </div>
-        )
-      },
-      { key: "invoice", header: "Invoice Number", render: (item) => item.invoiceNo ?? "Unapplied" },
-      { key: "date", header: "Payment Date", render: (item) => formatDate(item.paymentDate) },
-      { key: "mode", header: "Method", render: (item) => item.mode.replace(/_/g, " ") },
-      { key: "status", header: "Status", render: () => <StatusBadge label="SUCCESS" /> },
-      { key: "createdBy", header: "Created By", render: (item) => item.createdBy ?? "--" },
-      { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.amount)}</span> },
+      ...columns,
       {
         key: "actions",
         header: "Actions",
@@ -386,6 +371,26 @@ const PaymentTable = ({ payments, logCounts, canDelete, canViewLogs = false, can
     ]}
   />
 );
+
+const basePaymentColumns = () => [
+  { key: "ref", header: "Payment Ref", render: (item: Payment) => <span className="font-semibold text-white">{paymentRef(item)}</span> },
+  {
+    key: "customer",
+    header: "Customer",
+    render: (item: Payment) => (
+      <div>
+        <p className="font-semibold text-white">{item.customerName}</p>
+        <p className="text-xs text-slate-400">{item.customerMobile ?? "--"}</p>
+      </div>
+    )
+  },
+  { key: "invoice", header: "Invoice Number", render: (item: Payment) => item.invoiceNo ?? "Unapplied" },
+  { key: "date", header: "Payment Date", render: (item: Payment) => formatDate(item.paymentDate) },
+  { key: "mode", header: "Method", render: (item: Payment) => item.mode.replace(/_/g, " ") },
+  { key: "status", header: "Status", render: () => <StatusBadge label="SUCCESS" /> },
+  { key: "createdBy", header: "Created By", render: (item: Payment) => item.createdBy ?? "--" },
+  { key: "amount", header: "Amount", className: "text-right", render: (item: Payment) => <span className="block text-right font-semibold text-white">{formatCurrency(item.amount)}</span> }
+];
 
 const loadLogCounts = async (moduleName: string, ids: number[]) => {
   const entries = await Promise.all(ids.map(async (entityId) => {

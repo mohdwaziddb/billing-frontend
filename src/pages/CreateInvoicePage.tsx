@@ -1,11 +1,12 @@
 import { ArrowLeft, Eye, History, Plus, Search, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from "../api/customers";
 import { createInvoice } from "../api/invoices";
 import { getProducts } from "../api/products";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -28,7 +29,6 @@ type InvoiceItemForm = {
   qty: string;
   rate: string;
   taxPercent: string;
-  discountType: "PERCENT" | "FIXED";
   discountValue: string;
 };
 
@@ -50,7 +50,6 @@ const createEmptyItem = (): InvoiceItemForm => ({
   qty: "1",
   rate: "0",
   taxPercent: "0",
-  discountType: "FIXED",
   discountValue: "0"
 });
 
@@ -95,7 +94,6 @@ export const CreateInvoicePage = () => {
     control,
     register,
     handleSubmit,
-    watch,
     setValue,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
@@ -119,10 +117,11 @@ export const CreateInvoicePage = () => {
       .catch((err: any) => setApiError(err, "Unable to load products"));
   }, [setApiError]);
 
-  const watchedItems = watch("items");
-  const invoiceDiscountType = watch("invoiceDiscountType");
-  const invoiceDiscountInput = watch("discountAmount");
-  const paidAmountInput = watch("paidAmount");
+  const watchedItems = useWatch({ control, name: "items" }) ?? [];
+  const invoiceDiscountType = useWatch({ control, name: "invoiceDiscountType" }) ?? "FIXED";
+  const invoiceDiscountInput = useWatch({ control, name: "discountAmount" }) ?? "0";
+  const paidAmountInput = useWatch({ control, name: "paidAmount" }) ?? "0";
+  const previousInvoiceDiscountTypeRef = useRef<typeof invoiceDiscountType | null>(null);
 
   const productMap = useMemo(
     () => new Map(products.map((product) => [String(product.id), product])),
@@ -138,10 +137,22 @@ export const CreateInvoicePage = () => {
       qty: item.qty,
       rate: item.rate,
       taxPercent: item.taxPercent,
-      productDiscountType: item.discountType,
+      productDiscountType: "FIXED",
       productDiscountValue: item.discountValue
     }))
   }), [invoiceDiscountInput, invoiceDiscountType, paidAmountInput, watchedItems]);
+
+  useEffect(() => {
+    if (previousInvoiceDiscountTypeRef.current === null) {
+      previousInvoiceDiscountTypeRef.current = invoiceDiscountType;
+      return;
+    }
+
+    if (previousInvoiceDiscountTypeRef.current !== invoiceDiscountType) {
+      previousInvoiceDiscountTypeRef.current = invoiceDiscountType;
+      setValue("discountAmount", "0", { shouldDirty: true, shouldValidate: true });
+    }
+  }, [invoiceDiscountType, setValue]);
 
   const rowIssues = useMemo(() => watchedItems.map((item, index) => {
     const product = productMap.get(item.productId);
@@ -168,10 +179,7 @@ export const CreateInvoicePage = () => {
     if (taxPercent < 0) {
       issues.push({ message: "Tax cannot be negative." });
     }
-    if (item.discountType === "PERCENT" && discountValue > 100) {
-      issues.push({ message: "Product discount percent cannot exceed 100%." });
-    }
-    if (item.discountType === "FIXED" && discountValue > lineBase) {
+    if (discountValue > lineBase) {
       issues.push({ message: "Product discount cannot exceed line amount." });
     }
     if ((invoiceSummary.rows[index]?.totalAmount ?? 0) < 0) {
@@ -197,6 +205,7 @@ export const CreateInvoicePage = () => {
   }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.afterProductDiscountSubtotal, paidAmountInput]);
 
   const hasClientValidationErrors = rowIssues.some((issues) => issues.length > 0) || summaryIssues.length > 0;
+  const totalWithoutDiscount = invoiceSummary.grandTotal + invoiceSummary.productDiscountTotal + invoiceSummary.invoiceDiscount;
 
   const lookupCustomerByMobile = async () => {
     clearMessage();
@@ -303,18 +312,25 @@ export const CreateInvoicePage = () => {
   };
 
   const syncProductDefaults = (index: number, productId: string) => {
+    const current = watchedItems[index] ?? createEmptyItem();
     const product = productMap.get(productId);
     if (!product) {
-      setValue(`items.${index}.rate`, "0", { shouldDirty: true, shouldValidate: true });
-      setValue(`items.${index}.taxPercent`, "0", { shouldDirty: true, shouldValidate: true });
+      update(index, {
+        ...current,
+        productId: "",
+        rate: "0",
+        taxPercent: "0"
+      });
       return;
     }
-    setValue(`items.${index}.rate`, String(product.sellingPrice), { shouldDirty: true, shouldValidate: true });
-    setValue(`items.${index}.taxPercent`, String(product.taxPercent), { shouldDirty: true, shouldValidate: true });
     const currentQty = numberValue(watchedItems[index]?.qty);
-    if (currentQty <= 0) {
-      setValue(`items.${index}.qty`, "1", { shouldDirty: true, shouldValidate: true });
-    }
+    update(index, {
+      ...current,
+      productId,
+      qty: currentQty > 0 ? current.qty : "1",
+      rate: String(product.sellingPrice ?? 0),
+      taxPercent: String(product.taxPercent ?? 0)
+    });
   };
 
   const clearProductLine = (index: number) => {
@@ -346,7 +362,7 @@ export const CreateInvoicePage = () => {
         qty: Number(item.qty),
         price: Number(item.rate),
         taxPercent: Number(item.taxPercent),
-        discountType: item.discountType,
+        discountType: "FIXED",
         discountValue: Number(item.discountValue || 0),
         discountPercent: (() => {
           const lineBase = Number(item.rate || 0) * Number(item.qty || 0);
@@ -354,7 +370,7 @@ export const CreateInvoicePage = () => {
           if (lineBase <= 0) {
             return 0;
           }
-          return item.discountType === "FIXED" ? Math.min(100, (Math.max(0, value) / lineBase) * 100) : Math.max(0, value);
+          return Math.min(100, (Math.max(0, value) / lineBase) * 100);
         })()
       }))
     };
@@ -374,17 +390,23 @@ export const CreateInvoicePage = () => {
 
       <form id="create-invoice-form" className="mx-auto grid w-full max-w-[1660px] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-4">
-          <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => navigate("/invoices")}>
-                <ArrowLeft size={16} />
-                Back
-              </Button>
-              <Button disabled={isSubmitting || hasClientValidationErrors} type="submit">
-                {isSubmitting ? "Saving..." : "Save Invoice"}
-              </Button>
-          </div>
-
           <GlassCard className="p-4 md:p-5">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Create Invoice" }]} />
+                <h2 className="mt-1 text-xl font-bold text-slate-950">Create Invoice</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={() => navigate("/invoices")}>
+                  <ArrowLeft size={16} />
+                  Back
+                </Button>
+                <Button disabled={isSubmitting || hasClientValidationErrors} type="submit">
+                  {isSubmitting ? "Saving..." : "Save Invoice"}
+                </Button>
+              </div>
+            </div>
+
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-lg font-bold text-slate-950">Customer Details</h3>
             </div>
@@ -482,12 +504,12 @@ export const CreateInvoicePage = () => {
               </Button>
             </div>
 
-            <div className="hidden grid-cols-[minmax(220px,1fr)_78px_120px_112px_112px_46px] gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 md:grid">
+            <div className="hidden grid-cols-[minmax(220px,1fr)_78px_116px_96px_112px_46px] gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 md:grid">
               <div>Product</div>
               <div>Qty</div>
               <div>Rate</div>
               <div>Discount</div>
-              <div className="text-right">Total</div>
+              <div>Total</div>
               <div></div>
             </div>
 
@@ -501,19 +523,15 @@ export const CreateInvoicePage = () => {
                     required: "Rate is required",
                     validate: (value) => Number(value) >= 0 || "Rate cannot be negative"
                   });
-                  const taxRegister = register(`items.${index}.taxPercent`, {
-                    required: "Tax is required",
-                    validate: (value) => Number(value) >= 0 || "Tax cannot be negative"
-                  });
 
                   return (
                     <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm shadow-slate-200/30">
-                      <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_78px_120px_112px_112px_46px] md:items-center">
+                      <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_78px_116px_96px_112px_46px] md:items-center">
                         <div className="md:min-w-0">
                           <label className="sr-only">Product</label>
                           <select
                             {...productRegister}
-                            className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white py-0 pl-3 pr-9 text-sm font-medium text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.productId?.message ? "border-rose-400/70" : "border-slate-200"}`}
+                            className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white py-0 pl-3 pr-12 text-sm font-medium text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.productId?.message ? "border-rose-400/70" : "border-slate-200"}`}
                             onChange={(event) => {
                               productRegister.onChange(event);
                               syncProductDefaults(index, event.target.value);
@@ -549,23 +567,20 @@ export const CreateInvoicePage = () => {
                             step="0.01"
                             min={0}
                             aria-label="Rate"
-                            readOnly
-                            aria-readonly="true"
                             placeholder="Rate"
                             {...rateRegister}
-                            className={`h-[46px] w-full cursor-not-allowed rounded-[var(--radius-control)] border bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none transition ${errors.items?.[index]?.rate?.message ? "border-rose-400/70" : "border-slate-200"}`}
+                            className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.rate?.message ? "border-rose-400/70" : "border-slate-200"}`}
                           />
                         </div>
 
                         <div>
                           <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500 md:sr-only">Discount</label>
-                          <input type="hidden" value="FIXED" {...register(`items.${index}.discountType`)} />
                           <input
                             type="number"
                             step="0.01"
                             min={0}
                             aria-label="Discount"
-                            placeholder="Disc."
+                            placeholder="Discount"
                             {...register(`items.${index}.discountValue`, {
                               validate: (value) => Number(value || 0) >= 0 || "Discount cannot be negative"
                             })}
@@ -573,7 +588,7 @@ export const CreateInvoicePage = () => {
                           />
                         </div>
 
-                        <div className="flex h-[46px] items-center justify-end rounded-[var(--radius-control)] border border-slate-200 bg-slate-50 px-3">
+                        <div className="flex h-[46px] items-center justify-start rounded-[var(--radius-control)] border border-slate-200 bg-slate-50 px-3">
                           <span className="truncate text-sm font-extrabold text-slate-950">{hasProduct ? formatCurrency(lineSummary?.totalAmount ?? 0) : "--"}</span>
                         </div>
 
@@ -583,7 +598,6 @@ export const CreateInvoicePage = () => {
                           </Button>
                         </div>
                       </div>
-                      <input type="hidden" {...taxRegister} />
                     </div>
                   );
               })}
@@ -624,6 +638,7 @@ export const CreateInvoicePage = () => {
                 <div className="space-y-2 text-sm">
                   <SummaryRow label="Items" value={String(fields.length)} />
                   <SummaryRow label="Subtotal" value={formatCurrency(invoiceSummary.subtotal)} />
+                  <SummaryRow label="Total Without Discount" value={formatCurrency(totalWithoutDiscount)} />
                   <SummaryRow label="Product Discount" value={`-${formatCurrency(invoiceSummary.productDiscountTotal)}`} tone="danger" />
                   <SummaryRow label="Invoice Discount" value={`-${formatCurrency(invoiceSummary.invoiceDiscount)}`} tone="danger" />
                   <SummaryRow label="Tax" value={formatCurrency(invoiceSummary.taxAmount)} />

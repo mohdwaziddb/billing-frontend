@@ -16,6 +16,11 @@ export const updateEmailSettings = async (id: number, payload: ProviderSettingsR
   return response.data.data;
 };
 
+export const sendTestEmail = async (recipientEmail: string) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>("/v1/notifications/email-settings/test", { recipientEmail });
+  return response.data.data;
+};
+
 export const getSmsSettings = async () => {
   const response = await apiClient.get<ApiResponse<ProviderSettings[]>>("/v1/notifications/sms-settings");
   return response.data.data;

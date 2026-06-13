@@ -28,7 +28,7 @@ export const ExpenseCategoryPage = () => {
   const { setApiError } = useApiMessage();
   const [pageData, setPageData] = useState<PageResponse<ExpenseCategory>>(emptyPage);
   const [search, setSearch] = useState("");
-  const [active, setActive] = useState("");
+  const [active, setActive] = useState("true");
   const [editing, setEditing] = useState<ExpenseCategory | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ExpenseCategory | null>(null);
