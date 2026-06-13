@@ -164,6 +164,8 @@ export type OwnerAnalytics = {
   outstandingAmount: number;
   newCustomers: number;
   totalInvoices: number;
+  totalExpense: number;
+  netRevenue: number;
   salesTrend: MetricPoint[];
   collectionTrend: MetricPoint[];
   expenseTrend: MetricPoint[];
