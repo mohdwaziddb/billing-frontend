@@ -43,11 +43,11 @@ export const ProductListPage = () => {
   const [deleting, setDeleting] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { can } = useAuth();
-  const { message: error, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
 
-  const loadProducts = async (nextPage = page) => {
+  const loadProducts = async (nextPage = page, searchOverride = search) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    const response = await getProductsPage({ search: search.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
+    const response = await getProductsPage({ search: searchOverride.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
     setProductPage(response);
     setProducts(response.records);
   };
@@ -78,19 +78,21 @@ export const ProductListPage = () => {
   const productColumns = useMemo(() => [
     {
       key: "product",
-      header: "Product",
+      header: "Product Name",
       render: (item: Product) => (
         <div className="min-w-[180px]">
           <p className="font-semibold text-white">{item.name}</p>
-          <p className="text-xs text-slate-400">{item.sku}</p>
         </div>
       )
     },
-    { key: "brand", header: "Brand / Category", render: (item: Product) => `${item.brand ?? "--"} / ${item.categoryName ?? item.category ?? "--"}` },
+    { key: "sku", header: "SKU", render: (item: Product) => item.sku || "--" },
+    { key: "brand", header: "Brand", render: (item: Product) => item.brand ?? "--" },
+    { key: "category", header: "Category", render: (item: Product) => item.categoryName ?? item.category ?? "--" },
+    { key: "purchasePrice", header: "Purchase Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.purchasePrice)}</span> },
     { key: "price", header: "Selling Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.sellingPrice)}</span> },
     {
       key: "stock",
-      header: "Stock",
+      header: "Stock Qty",
       className: "text-right",
       render: (item: Product) => {
         const stockTone = item.stockQty <= 0 ? "amount-danger" : item.stockQty <= item.minStockQty ? "amount-warning" : "amount-success";
@@ -103,6 +105,8 @@ export const ProductListPage = () => {
         );
       }
     },
+    { key: "minStockQty", header: "Minimum Stock Qty", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{item.minStockQty}</span> },
+    { key: "taxPercent", header: "Tax Percent", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{item.taxPercent}%</span> },
     { key: "status", header: "Status", render: (item: Product) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
   ], []);
 
@@ -166,6 +170,11 @@ export const ProductListPage = () => {
               placeholder="Enter Product Name or SKU"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onClear={() => {
+                setPage(0);
+                setSearch("");
+                void loadProducts(0, "");
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -192,11 +201,6 @@ export const ProductListPage = () => {
             </div>
           </div>
         </div>
-        {error ? (
-          <div className="mb-4 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
-            {error}
-          </div>
-        ) : null}
         <div className="flex-1">
           <Table
             data={products}

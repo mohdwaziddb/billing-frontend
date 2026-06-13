@@ -30,6 +30,10 @@ export const logoutRequest = async (refreshToken: string) => {
   await apiClient.post("/v1/auth/logout", { refreshToken });
 };
 
+export const forgotPasswordRequest = async (payload: { username: string; newPassword: string }) => {
+  await apiClient.post("/v1/auth/forgot-password", payload);
+};
+
 export const refreshTokenRequest = async (refreshToken: string) => {
   const response = await apiClient.post<ApiResponse<AuthPayload>>(
     "/v1/auth/refresh",

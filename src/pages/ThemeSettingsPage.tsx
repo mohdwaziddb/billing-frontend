@@ -27,7 +27,7 @@ export const ThemeSettingsPage = () => {
   const [color, setColor] = useState(theme.themeColor || DEFAULT_THEME_COLOR);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
-  const { message: error, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
   const preview = useMemo(() => applyThemeColor(color), [color]);
 
   useEffect(() => {
@@ -80,7 +80,6 @@ export const ThemeSettingsPage = () => {
     <div className="space-y-4 pb-6">
       <Header title="Theme Settings" subtitle="Set one company theme color and let the interface derive matching shades automatically." />
 
-      {error ? <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{error}</div> : null}
       {success ? <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">{success}</div> : null}
 
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">

@@ -51,12 +51,17 @@ const emptyPaymentPage: PageResponse<Payment> = {
   totalPages: 0
 };
 
+const todayIso = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+};
+
 const emptyFilters: PaymentFilters = {
   search: "",
   paymentStatus: "",
-  datePreset: "",
-  startDate: "",
-  endDate: "",
+  datePreset: "today",
+  startDate: todayIso(),
+  endDate: todayIso(),
   minAmount: "",
   maxAmount: "",
   mode: "",
@@ -171,6 +176,14 @@ export const PaymentListPage = () => {
     setFiltersOpen(false);
   };
 
+  const clearSearchFilter = () => {
+    const nextFilters = { ...draftFilters, search: "" };
+    setPage(0);
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+    setFiltersOpen(false);
+  };
+
   const resetFilters = () => {
     setPage(0);
     setDraftFilters(emptyFilters);
@@ -225,7 +238,7 @@ export const PaymentListPage = () => {
         onClearAll={resetFilters}
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="Search Payment" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} />
+          <Input label="Search Payment" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} onClear={clearSearchFilter} />
           <Select label="Payment Status" value={draftFilters.paymentStatus} options={[
             { label: "All", value: "" },
             { label: "Success", value: "SUCCESS" },

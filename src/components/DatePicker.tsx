@@ -13,6 +13,7 @@ type DatePickerProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onC
 };
 
 const toIso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const todayIso = () => toIso(new Date());
 const fromIso = (value?: string | number | readonly string[]) => {
   if (typeof value !== "string") {
     return null;
@@ -24,8 +25,8 @@ const fromIso = (value?: string | number | readonly string[]) => {
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 };
 
-export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label, error, requiredMark, hint, value, defaultValue, onChange, className, disabled, name, onBlur, ...props }, ref) => {
-  const [internalValue, setInternalValue] = useState(typeof defaultValue === "string" ? defaultValue : "");
+export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label, error, requiredMark, hint, value, defaultValue, onChange, className, disabled, name, onBlur, id }, ref) => {
+  const [internalValue, setInternalValue] = useState(typeof defaultValue === "string" && defaultValue ? defaultValue : todayIso());
   const currentValue = typeof value === "string" ? value : internalValue;
   const initialDate = fromIso(currentValue || defaultValue) ?? new Date();
   const [open, setOpen] = useState(false);
@@ -135,6 +136,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label
     <label className="block space-y-2">
       {label ? <span className="block text-sm font-semibold text-slate-700">{label}{requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}</span> : null}
       <button
+        id={id}
         ref={buttonRef}
         type="button"
         disabled={disabled}
@@ -150,14 +152,13 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label
             setOpen(false);
           }
         }}
-        {...props}
       >
         <span className={clsx("min-w-0 flex-1", currentValue ? "text-slate-900" : "text-slate-400")}>{currentValue ? formatDateInputDisplay(String(currentValue)) : "Select date"}</span>
         <CalendarDays size={18} className="shrink-0 text-slate-400" />
       </button>
       <input ref={ref} type="hidden" name={name} value={currentValue} readOnly />
       {panel}
-      {error ? <span className="block text-xs text-rose-600">{error}</span> : hint ? <span className="block text-xs text-slate-500">{hint}</span> : null}
+      {hint ? <span className="block text-xs text-slate-500">{hint}</span> : null}
     </label>
   );
 });

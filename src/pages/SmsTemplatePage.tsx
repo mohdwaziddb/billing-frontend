@@ -31,9 +31,9 @@ export const SmsTemplatePage = () => {
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
 
-  const loadTemplates = async (nextPage = 0) => {
+  const loadTemplates = async (nextPage = 0, searchOverride = search) => {
     try {
-      setTemplatePage(await getSmsTemplatesPage({ search: search.trim() || undefined, page: nextPage, size: DEFAULT_PAGE_SIZE }));
+      setTemplatePage(await getSmsTemplatesPage({ search: searchOverride.trim() || undefined, page: nextPage, size: DEFAULT_PAGE_SIZE }));
     } catch (err: any) {
       setApiError(err, "Unable to load SMS templates");
     }
@@ -85,7 +85,17 @@ export const SmsTemplatePage = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <CommonBreadcrumb items={[{ label: "SMS Templates" }]} />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Input aria-label="Search SMS templates" placeholder="Search templates" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void loadTemplates(0)} />
+            <Input
+              aria-label="Search SMS templates"
+              placeholder="Search templates"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onClear={() => {
+                setSearch("");
+                void loadTemplates(0, "");
+              }}
+              onKeyDown={(event) => event.key === "Enter" && void loadTemplates(0)}
+            />
             <Button variant="secondary" onClick={() => void loadTemplates(0)}>Search</Button>
             {can("SMS_TEMPLATES", "ADD") ? <Button onClick={openCreate}><FilePlus2 size={16} /> New Template</Button> : null}
           </div>

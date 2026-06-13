@@ -55,12 +55,18 @@ const isAuthBypassRoute = (url?: string) => {
   return [
     "/v1/auth/login",
     "/v1/auth/register-company",
+    "/v1/auth/forgot-password",
     "/v1/auth/logout",
     "/v1/auth/refresh"
   ].some((route) => url.includes(route));
 };
 
 apiClient.interceptors.request.use((config) => {
+  if (isAuthBypassRoute(config.url)) {
+    delete config.headers.Authorization;
+    return config;
+  }
+
   const auth = authStorage.get();
   if (auth?.accessToken) {
     config.headers.Authorization = `Bearer ${auth.accessToken}`;

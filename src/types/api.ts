@@ -377,6 +377,8 @@ export type Invoice = {
 export type InvoiceRequestItem = {
   productId: number;
   qty: number;
+  price?: number;
+  taxPercent?: number;
   discountPercent: number;
   discountType?: "FIXED" | "PERCENT";
   discountValue?: number;

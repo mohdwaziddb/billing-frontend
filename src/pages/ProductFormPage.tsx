@@ -12,8 +12,8 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
-import type { ProductCategory, ProductRequest } from "../types/api";
 import { notificationService } from "../services/notificationService";
+import type { ProductCategory, ProductRequest } from "../types/api";
 
 type FormValues = {
   name: string;
@@ -26,8 +26,21 @@ type FormValues = {
   stockQty: string;
   minStockQty: string;
   taxPercent: string;
-  description: string;
   active: string;
+};
+
+const defaultValues: FormValues = {
+  name: "",
+  categoryId: "",
+  brand: "",
+  sku: "",
+  hsnCode: "",
+  purchasePrice: "",
+  sellingPrice: "",
+  stockQty: "0",
+  minStockQty: "0",
+  taxPercent: "0",
+  active: "true"
 };
 
 export const ProductFormPage = () => {
@@ -39,52 +52,45 @@ export const ProductFormPage = () => {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
-    defaultValues: {
-      name: "",
-      categoryId: "",
-      brand: "",
-      sku: "",
-      hsnCode: "",
-      purchasePrice: "",
-      sellingPrice: "",
-      stockQty: "",
-      minStockQty: "",
-      taxPercent: "0",
-      description: "",
-      active: "true"
-    }
+    defaultValues
   });
-  const { message: serverError, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
 
   useEffect(() => {
-    void getProductCategories({ active: true, size: 1000 }).then((categoryData) => {
-      setCategories(categoryData.filter((category) => category.active));
-    });
-  }, []);
+    void getProductCategories({ active: true, size: 1000 })
+      .then((categoryData) => {
+        setCategories(categoryData.filter((category) => category.active));
+      })
+      .catch((err: any) => setApiError(err, "Unable to load product categories"));
+  }, [setApiError]);
 
   useEffect(() => {
     if (!productId) {
       return;
     }
-    void getProduct(Number(productId)).then((product) => {
-      reset({
-        name: product.name,
-        categoryId: product.categoryId ? String(product.categoryId) : "",
-        brand: product.brand ?? "",
-        sku: product.sku,
-        hsnCode: product.hsnCode ?? "",
-        purchasePrice: String(product.purchasePrice),
-        sellingPrice: String(product.sellingPrice),
-        stockQty: String(product.stockQty),
-        minStockQty: String(product.minStockQty),
-        taxPercent: String(product.taxPercent),
-        description: product.hsnCode ?? "",
-        active: product.active ? "true" : "false"
-      });
-    });
-  }, [productId, reset]);
+    void getProduct(Number(productId))
+      .then((product) => {
+        reset({
+          name: product.name,
+          categoryId: product.categoryId ? String(product.categoryId) : "",
+          brand: product.brand ?? "",
+          sku: product.sku,
+          hsnCode: product.hsnCode ?? "",
+          purchasePrice: String(product.purchasePrice),
+          sellingPrice: String(product.sellingPrice),
+          stockQty: String(product.stockQty),
+          minStockQty: String(product.minStockQty),
+          taxPercent: String(product.taxPercent),
+          active: product.active ? "true" : "false"
+        });
+      })
+      .catch((err: any) => setApiError(err, "Unable to load product details"));
+  }, [productId, reset, setApiError]);
+
+  const watchedPurchasePrice = watch("purchasePrice");
 
   const categoryOptions = useMemo(
     () => categories.map((category) => ({ label: category.categoryName, value: String(category.id) })),
@@ -94,12 +100,12 @@ export const ProductFormPage = () => {
   const onSubmit = async (values: FormValues) => {
     clearMessage();
     const payload: ProductRequest = {
-      name: values.name,
+      name: values.name.trim(),
       categoryId: Number(values.categoryId),
-      brand: values.brand || undefined,
-      sku: values.sku || `${values.name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "SKU"}-${Date.now()}`,
-      hsnCode: values.description || values.hsnCode || undefined,
-      purchasePrice: Number(values.purchasePrice || values.sellingPrice),
+      brand: values.brand.trim() || undefined,
+      sku: values.sku.trim(),
+      hsnCode: values.hsnCode.trim() || undefined,
+      purchasePrice: Number(values.purchasePrice),
       sellingPrice: Number(values.sellingPrice),
       stockQty: Number(values.stockQty || 0),
       minStockQty: Number(values.minStockQty || 0),
@@ -125,7 +131,7 @@ export const ProductFormPage = () => {
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title={editing ? "Products > Edit Product" : "Products > Add Product"}
-        subtitle="Maintain product pricing, tax, and stock configuration in a clean structured form."
+        subtitle="Maintain product identity, pricing, stock thresholds, and tax setup in a complete structured form."
       />
       <GlassCard className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col p-4 md:p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -140,37 +146,126 @@ export const ProductFormPage = () => {
               <ArrowLeft size={16} />
               Back
             </Button>
-            <Button disabled={isSubmitting} type="submit" form="product-form">{isSubmitting ? "Saving..." : "Save Product"}</Button>
+            <Button disabled={isSubmitting} type="submit" form="product-form">
+              {isSubmitting ? "Saving..." : "Save Product"}
+            </Button>
           </div>
         </div>
-        <form id="product-form" className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+
+        <form id="product-form" className="grid flex-1 auto-rows-fr gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
+          <section className="h-full space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="text-sm font-bold uppercase text-slate-500">Product Details</h3>
             <div className="grid gap-3 md:grid-cols-2">
-              <Input label="Product Name" requiredMark error={errors.name?.message} {...register("name", { required: "Product name is required" })} />
+              <Input
+                label="Product Name"
+                requiredMark
+                error={errors.name?.message}
+                {...register("name", { required: "Product name is required" })}
+              />
               <Select
                 label="Product Category"
                 requiredMark
-                placeholder={categoryOptions.length ? "Select Product Category" : "No product categories found"}
+                placeholder={categoryOptions.length ? "Select Product Category" : "No active categories found"}
                 error={errors.categoryId?.message}
                 hint="Only active product categories are available."
                 disabled={!categoryOptions.length}
                 options={categoryOptions}
                 {...register("categoryId", { required: "Product category is required" })}
               />
-              <Input label="Price" requiredMark type="number" step="0.01" error={errors.sellingPrice?.message} {...register("sellingPrice", { required: "Price is required" })} />
-              <Input label="Stock Quantity" type="number" error={errors.stockQty?.message} {...register("stockQty")} />
-              <Input label="Description" className="md:col-span-2" {...register("description")} />
+              <Input
+                label="SKU"
+                requiredMark
+                error={errors.sku?.message}
+                hint="Keep this unique for each product."
+                {...register("sku", { required: "SKU is required" })}
+              />
+              <Input
+                label="Brand"
+                error={errors.brand?.message}
+                {...register("brand")}
+              />
+              <Input
+                label="HSN Code"
+                error={errors.hsnCode?.message}
+                {...register("hsnCode")}
+              />
+              <Select
+                label="Status"
+                placeholder={null}
+                error={errors.active?.message}
+                options={[
+                  { label: "Active", value: "true" },
+                  { label: "Inactive", value: "false" }
+                ]}
+                {...register("active")}
+              />
             </div>
-            <input type="hidden" {...register("sku")} />
-            <input type="hidden" {...register("brand")} />
-            <input type="hidden" {...register("hsnCode")} />
-            <input type="hidden" {...register("purchasePrice")} />
-            <input type="hidden" {...register("minStockQty")} />
-            <input type="hidden" {...register("taxPercent")} />
-            <input type="hidden" {...register("active")} />
           </section>
-          {serverError ? <div className="md:col-span-2 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{serverError}</div> : null}
+
+          <section className="h-full space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <h3 className="text-sm font-bold uppercase text-slate-500">Pricing And Inventory</h3>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input
+                label="Purchase Price"
+                requiredMark
+                type="number"
+                step="0.01"
+                error={errors.purchasePrice?.message}
+                {...register("purchasePrice", {
+                  required: "Purchase price is required",
+                  validate: (value) => Number(value) >= 0 || "Purchase price must be 0 or more"
+                })}
+              />
+              <Input
+                label="Selling Price"
+                requiredMark
+                type="number"
+                step="0.01"
+                error={errors.sellingPrice?.message}
+                {...register("sellingPrice", {
+                  required: "Selling price is required",
+                  validate: (value) => {
+                    if (Number(value) < 0) {
+                      return "Selling price must be 0 or more";
+                    }
+                    if (watchedPurchasePrice !== "" && Number(value) < Number(watchedPurchasePrice)) {
+                      return "Selling price cannot be less than purchase price";
+                    }
+                    return true;
+                  }
+                })}
+              />
+              <Input
+                label="Opening Stock Qty"
+                type="number"
+                error={errors.stockQty?.message}
+                {...register("stockQty", {
+                  validate: (value) => value === "" || Number(value) >= 0 || "Stock quantity must be 0 or more"
+                })}
+              />
+              <Input
+                label="Minimum Stock Qty"
+                type="number"
+                error={errors.minStockQty?.message}
+                {...register("minStockQty", {
+                  validate: (value) => value === "" || Number(value) >= 0 || "Minimum stock must be 0 or more"
+                })}
+              />
+              <Input
+                label="Tax Percent"
+                requiredMark
+                type="number"
+                step="0.01"
+                error={errors.taxPercent?.message}
+                hint="Use 0 for non-taxable items."
+                {...register("taxPercent", {
+                  required: "Tax percent is required",
+                  validate: (value) => Number(value) >= 0 || "Tax percent must be 0 or more"
+                })}
+              />
+            </div>
+          </section>
+
         </form>
       </GlassCard>
     </div>

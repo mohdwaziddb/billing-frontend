@@ -85,8 +85,8 @@ export const UserManagementPage = () => {
   const [modalPage, setModalPage] = useState(0);
   const [modalUsers, setModalUsers] = useState<UserProfile[]>([]);
   const [modalUserPage, setModalUserPage] = useState<PageResponse<UserProfile>>(emptyUserPage);
-  const { message: pageError, clearMessage, setApiError } = useApiMessage();
-  const { message: formError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
+  const { clearMessage, setApiError } = useApiMessage();
+  const { fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
   const {
     register,
     handleSubmit,
@@ -253,12 +253,6 @@ export const UserManagementPage = () => {
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header title="Users" subtitle="Create, update, and deactivate company users." />
-
-      {pageError ? (
-        <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
-          {pageError}
-        </div>
-      ) : null}
 
       <div className="grid gap-4 md:grid-cols-4">
         <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("ALL")}>
@@ -465,12 +459,6 @@ export const UserManagementPage = () => {
             ]}
             {...register("active")}
           />
-
-          {formError ? (
-            <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200 md:col-span-2">
-              {formError}
-            </div>
-          ) : null}
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row md:col-span-2">
             <Button disabled={isSubmitting} type="submit">

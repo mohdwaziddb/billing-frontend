@@ -38,7 +38,7 @@ export const OutstandingCustomersReminderPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [successToast, setSuccessToast] = useState("");
-  const { message: errorToast, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
   const { can } = useAuth();
   const [filters, setFilters] = useState({
     search: "",
@@ -131,11 +131,6 @@ export const OutstandingCustomersReminderPage = () => {
         subtitle="Search overdue customers, review due balances, and trigger reminder workflows that are logged by the backend."
       />
 
-      {errorToast ? (
-        <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
-          {errorToast}
-        </div>
-      ) : null}
       {successToast ? (
         <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">
           {successToast}

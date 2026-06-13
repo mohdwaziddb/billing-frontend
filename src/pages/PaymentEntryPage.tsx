@@ -25,12 +25,17 @@ type FormValues = {
   remarks: string;
 };
 
+const todayIso = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+};
+
 export const PaymentEntryPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const { message: serverError, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
   const {
     register,
     watch,
@@ -43,7 +48,7 @@ export const PaymentEntryPage = () => {
       customerId: "",
       invoiceId: "",
       amount: "",
-      paymentDate: new Date().toISOString().slice(0, 10),
+      paymentDate: todayIso(),
       mode: "CASH",
       remarks: ""
     }
@@ -120,7 +125,7 @@ export const PaymentEntryPage = () => {
         customerId: "",
         invoiceId: "",
         amount: "",
-        paymentDate: new Date().toISOString().slice(0, 10),
+        paymentDate: todayIso(),
         mode: "CASH",
         remarks: ""
       });
@@ -213,7 +218,6 @@ export const PaymentEntryPage = () => {
               <Input label="Remarks" {...register("remarks")} />
             </div>
           </section>
-          {serverError ? <div className="rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200 lg:col-span-3">{serverError}</div> : null}
         </form>
       </GlassCard>
     </div>

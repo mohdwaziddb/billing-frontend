@@ -3,6 +3,7 @@ import { getCompanyTheme } from "../api/company";
 import { getMyMenus } from "../api/permissions";
 import { loginRequest, logoutRequest, meRequest, registerRequest } from "../api/auth";
 import { defaultPlatformSettings, getPlatformSettings } from "../api/platform";
+import { sessionCache } from "../lib/sessionCache";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
 import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
 import { authStorage } from "../lib/storage";
@@ -38,6 +39,19 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AUTH_BOOTSTRAP_CACHE_KEY = "billing_frontend_auth_bootstrap";
+
+type AuthBootstrapCache = {
+  accessToken: string;
+  user: UserProfile;
+  permissions: PermissionMatrix;
+  theme: CompanyTheme;
+  platform: PlatformSettings;
+  preferences: UserPreference;
+};
+
+let bootstrapPromise: Promise<AuthBootstrapCache> | null = null;
+let bootstrapPromiseToken: string | null = null;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const cachedThemeState = ThemeBootstrapService.getCachedState();
@@ -61,32 +75,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setPermissions(null);
       setPlatform(defaultPlatformSettings);
+      sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
       return;
     }
-    Promise.all([
-      meRequest(),
-      getMyMenus(),
-      getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
-      getPlatformSettings().catch(() => defaultPlatformSettings),
-      getMyPreferences().catch(() => ({ darkModeEnabled: false }))
-    ])
-      .then(([profile, permissionData, themeData, platformData, preferenceData]) => {
-        setUser(profile);
-        setPermissions(permissionData);
-        setTheme(themeData);
-        setPlatform(platformData);
-        setPreferences(preferenceData);
-        ThemeBootstrapService.save(themeData, preferenceData);
+
+    const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
+    if (cached?.accessToken === auth.accessToken) {
+      setUser(cached.user);
+      setPermissions(cached.permissions);
+      setTheme(cached.theme);
+      setPlatform(cached.platform);
+      setPreferences(cached.preferences);
+      ThemeBootstrapService.save(cached.theme, cached.preferences);
+      return;
+    }
+
+    if (!bootstrapPromise || bootstrapPromiseToken !== auth.accessToken) {
+      bootstrapPromiseToken = auth.accessToken;
+      bootstrapPromise = Promise.all([
+        meRequest(),
+        getMyMenus(),
+        getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
+        getPlatformSettings().catch(() => defaultPlatformSettings),
+        getMyPreferences().catch(() => ({ darkModeEnabled: false }))
+      ]).then(([profile, permissionData, themeData, platformData, preferenceData]) => ({
+        accessToken: auth.accessToken,
+        user: profile,
+        permissions: permissionData,
+        theme: themeData,
+        platform: platformData,
+        preferences: preferenceData
+      }));
+    }
+
+    bootstrapPromise
+      .then((bootstrap) => {
+        if (bootstrap.accessToken !== auth.accessToken) {
+          return;
+        }
+        setUser(bootstrap.user);
+        setPermissions(bootstrap.permissions);
+        setTheme(bootstrap.theme);
+        setPlatform(bootstrap.platform);
+        setPreferences(bootstrap.preferences);
+        sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, bootstrap);
+        ThemeBootstrapService.save(bootstrap.theme, bootstrap.preferences);
       })
       .catch(() => {
         authStorage.clear();
         setAuth(null);
         setUser(null);
         setPermissions(null);
+        sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
         ThemeBootstrapService.clear();
         setTheme({ themeColor: DEFAULT_THEME_COLOR });
         setPlatform(defaultPlatformSettings);
         setPreferences({ darkModeEnabled: false });
+      })
+      .finally(() => {
+        bootstrapPromise = null;
+        bootstrapPromiseToken = null;
       });
   }, [auth?.accessToken]);
 
@@ -105,6 +153,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         const profile = await meRequest();
         setUser(profile);
+        const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
+        if (cached && cached.accessToken === auth.accessToken) {
+          sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, user: profile });
+        }
         if (auth) {
           const nextAuth = { ...auth, user: profile };
           authStorage.set(nextAuth);
@@ -116,7 +168,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setPermissions(null);
           return;
         }
-        setPermissions(await getMyMenus());
+        const nextPermissions = await getMyMenus();
+        setPermissions(nextPermissions);
+        const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
+        if (cached && cached.accessToken === auth.accessToken) {
+          sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, permissions: nextPermissions });
+        }
       },
       async refreshTheme() {
         if (!auth?.accessToken) {
@@ -126,6 +183,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         const nextTheme = await getCompanyTheme();
         setTheme(nextTheme);
+        const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
+        if (cached && cached.accessToken === auth.accessToken) {
+          sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, theme: nextTheme });
+        }
         ThemeBootstrapService.save(nextTheme, preferences);
       },
       async setDarkMode(enabled) {
@@ -134,6 +195,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (auth?.accessToken) {
           const nextPreferences = await updateMyPreferences({ darkModeEnabled: enabled });
           setPreferences(nextPreferences);
+          const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
+          if (cached && cached.accessToken === auth.accessToken) {
+            sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, preferences: nextPreferences });
+          }
           ThemeBootstrapService.save(theme, nextPreferences);
         }
       },
@@ -156,8 +221,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async login(payload) {
         const nextAuth = await loginRequest(payload);
         authStorage.set(nextAuth);
-        setAuth(nextAuth);
-        setUser(nextAuth.user);
         const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
           getMyMenus(),
           getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
@@ -168,14 +231,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setTheme(nextTheme);
         setPlatform(nextPlatform);
         setPreferences(nextPreferences);
+        sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, {
+          accessToken: nextAuth.accessToken,
+          user: nextAuth.user,
+          permissions: nextPermissions,
+          theme: nextTheme,
+          platform: nextPlatform,
+          preferences: nextPreferences
+        });
+        setAuth(nextAuth);
+        setUser(nextAuth.user);
         ThemeBootstrapService.save(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
       async register(payload) {
         const nextAuth = await registerRequest(payload);
         authStorage.set(nextAuth);
-        setAuth(nextAuth);
-        setUser(nextAuth.user);
         const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
           getMyMenus(),
           getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
@@ -186,6 +257,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setTheme(nextTheme);
         setPlatform(nextPlatform);
         setPreferences(nextPreferences);
+        sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, {
+          accessToken: nextAuth.accessToken,
+          user: nextAuth.user,
+          permissions: nextPermissions,
+          theme: nextTheme,
+          platform: nextPlatform,
+          preferences: nextPreferences
+        });
+        setAuth(nextAuth);
+        setUser(nextAuth.user);
         ThemeBootstrapService.save(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
@@ -198,6 +279,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         authStorage.clear();
+        sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
         ThemeBootstrapService.clear();
         setAuth(null);
         setUser(null);

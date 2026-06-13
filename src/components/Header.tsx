@@ -7,6 +7,7 @@ import {
   CreditCard,
   FilePlus2,
   FileText,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -25,6 +26,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { env } from "../config/env";
 import { useAuth } from "../context/AuthContext";
 import { MenuSearchService, type MenuSearchResult } from "../services/MenuSearchService";
+import { ForgotPasswordModal } from "./ForgotPasswordModal";
 
 const iconMap: Record<string, LucideIcon> = {
   BarChart3,
@@ -46,6 +48,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
   const { user, can, logout, permissions, platform, preferences, setDarkMode } = useAuth();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -239,6 +242,18 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
                 <button
                   type="button"
                   role="menuitem"
+                  className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    setForgotPasswordOpen(true);
+                  }}
+                >
+                  <KeyRound size={17} />
+                  Forgot Password
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
                   className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
                   onClick={() => {
                     setProfileOpen(false);
@@ -253,6 +268,11 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
           </div>
         </div>
       </div>
+      <ForgotPasswordModal
+        open={forgotPasswordOpen}
+        initialUsername={user?.email ?? user?.mobileNumber ?? ""}
+        onClose={() => setForgotPasswordOpen(false)}
+      />
     </header>
   );
 };

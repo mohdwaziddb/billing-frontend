@@ -28,7 +28,10 @@ import { notificationService } from "../services/notificationService";
 import type { Customer, Expense, ExpenseCategory, ExpenseType, Invoice, PageResponse } from "../types/api";
 
 const emptyPage: PageResponse<Expense> = { records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 };
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+};
 
 export const ExpenseListPage = () => {
   const { can } = useAuth();
@@ -38,7 +41,7 @@ export const ExpenseListPage = () => {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [filters, setFilters] = useState({ search: "", expenseType: "", categoryId: "", startDate: "", endDate: "", customerId: "", invoiceId: "", createdByRole: "" });
+  const [filters, setFilters] = useState({ search: "", expenseType: "", categoryId: "", startDate: todayIso(), endDate: todayIso(), customerId: "", invoiceId: "", createdByRole: "" });
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);

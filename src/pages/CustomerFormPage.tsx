@@ -48,7 +48,7 @@ export const CustomerFormPage = () => {
       active: "true"
     }
   });
-  const { message: serverError, fieldErrors, setFieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
+  const { fieldErrors, setFieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
 
   useEffect(() => {
     if (!customerId) {
@@ -198,11 +198,6 @@ export const CustomerFormPage = () => {
             </div>
           </section>
 
-          {serverError ? (
-            <div className="rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200 lg:col-span-2">
-              {serverError}
-            </div>
-          ) : null}
         </form>
       </GlassCard>
     </div>

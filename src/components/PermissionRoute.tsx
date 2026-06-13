@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { handlePermissionDenied } from "../lib/permissionHandler";
@@ -12,26 +12,10 @@ export const PermissionRoute = ({
   actionCode?: string;
   children: JSX.Element;
 }) => {
-  const { permissions, can, firstAccessibleRoute, refreshPermissions } = useAuth();
+  const { permissions, can, firstAccessibleRoute } = useAuth();
   const location = useLocation();
-  const [validating, setValidating] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    setValidating(true);
-    refreshPermissions()
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) {
-          setValidating(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [location.pathname]);
-
-  const denied = Boolean(permissions && !validating && !can(menuCode, actionCode));
+  const denied = Boolean(permissions && !can(menuCode, actionCode));
 
   useEffect(() => {
     if (denied) {
@@ -39,7 +23,7 @@ export const PermissionRoute = ({
     }
   }, [denied, location.pathname]);
 
-  if (!permissions || validating) {
+  if (!permissions) {
     return null;
   }
 

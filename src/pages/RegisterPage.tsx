@@ -24,7 +24,7 @@ export const RegisterPage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
-  const { message: error, fieldErrors, clearFeedback, clearFieldError, applyApiError } = useApiFormFeedback();
+  const { fieldErrors, clearFeedback, clearFieldError, applyApiError } = useApiFormFeedback();
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -95,7 +95,6 @@ export const RegisterPage = () => {
               />
             );
           })}
-          {error ? <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
           <div className="md:col-span-2 flex flex-col gap-4 pt-2 md:flex-row md:items-center md:justify-between">
             <Button disabled={loading} type="submit">
               {loading ? "Creating workspace..." : "Register company"}

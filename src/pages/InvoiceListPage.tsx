@@ -54,13 +54,21 @@ const emptyInvoicePage: PageResponse<Invoice> = {
   totalPages: 0
 };
 
+const todayIso = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const emptyFilters: InvoiceFilters = {
   search: "",
   invoiceStatus: "",
   paymentStatus: "",
-  datePreset: "",
-  startDate: "",
-  endDate: "",
+  datePreset: "today",
+  startDate: todayIso(),
+  endDate: todayIso(),
   outstandingFilter: "",
   minAmount: "",
   maxAmount: "",
@@ -192,6 +200,14 @@ export const InvoiceListPage = () => {
     setFiltersOpen(false);
   };
 
+  const clearSearchFilter = () => {
+    const nextFilters = { ...draftFilters, search: "" };
+    setPage(0);
+    setDraftFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+    setFiltersOpen(false);
+  };
+
   const resetFilters = () => {
     setPage(0);
     setDraftFilters(emptyFilters);
@@ -249,7 +265,7 @@ export const InvoiceListPage = () => {
         onClearAll={resetFilters}
       >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="Search Invoice" placeholder="Search by invoice no, customer name or mobile number" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} />
+          <Input label="Search Invoice" placeholder="Search by invoice no, customer name or mobile number" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} onClear={clearSearchFilter} />
           <Select label="Invoice Status" value={draftFilters.invoiceStatus} options={[
             { label: "All", value: "" },
             { label: "Draft", value: "DRAFT" },

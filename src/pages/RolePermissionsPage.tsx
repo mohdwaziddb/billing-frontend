@@ -40,7 +40,7 @@ export const RolePermissionsPage = () => {
   const [permissionSearch, setPermissionSearch] = useState("");
   const [permissionMatrix, setPermissionMatrix] = useState<PermissionMatrix | null>(null);
   const [permissionsSaving, setPermissionsSaving] = useState(false);
-  const { message: pageError, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
 
   useEffect(() => {
     if (can("ROLE_PERMISSIONS", "VIEW")) {
@@ -188,12 +188,6 @@ export const RolePermissionsPage = () => {
   return (
     <div className="space-y-4 pb-6">
       <Header title="Role Permissions" subtitle="Owner-managed company role and user permission assignment." />
-
-      {pageError ? (
-        <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
-          {pageError}
-        </div>
-      ) : null}
 
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">

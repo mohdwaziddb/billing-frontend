@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
+import { ForgotPasswordModal } from "../components/ForgotPasswordModal";
 import { GlassCard } from "../components/GlassCard";
 import { Input } from "../components/Input";
 import { PasswordInput } from "../components/PasswordInput";
@@ -13,7 +14,8 @@ export const LoginPage = () => {
   const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const { message: error, clearMessage, setApiError } = useApiMessage();
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const { clearMessage, setApiError } = useApiMessage();
 
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/dashboard";
 
@@ -62,7 +64,15 @@ export const LoginPage = () => {
               value={form.password}
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
             />
-            {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="text-sm font-semibold text-[var(--theme-color)] transition hover:text-[var(--theme-hover)]"
+                onClick={() => setForgotPasswordOpen(true)}
+              >
+                Forgot password?
+              </button>
+            </div>
             <Button className="w-full" disabled={loading} type="submit">
               {loading ? "Signing in..." : "Sign in"}
             </Button>
@@ -75,6 +85,7 @@ export const LoginPage = () => {
           </p>
         </GlassCard>
       </div>
+      <ForgotPasswordModal open={forgotPasswordOpen} initialUsername={form.username} onClose={() => setForgotPasswordOpen(false)} />
     </div>
   );
 };

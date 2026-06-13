@@ -48,7 +48,7 @@ export const AboutCompanyPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
-  const { message: error, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
 
   const setField = (key: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -135,7 +135,6 @@ export const AboutCompanyPage = () => {
     <div className="space-y-4 pb-6">
       <Header title="About Company" subtitle="Manage company identity, contact details, branding, and invoice communication settings." />
 
-      {error ? <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{error}</div> : null}
       {success ? <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">{success}</div> : null}
 
       <GlassCard className="p-6 md:p-7">

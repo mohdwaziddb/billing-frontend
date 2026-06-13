@@ -49,7 +49,7 @@ export const ProductCategoryPage = () => {
   const [categoryPage, setCategoryPage] = useState<PageResponse<ProductCategory>>(emptyCategoryPage);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -57,17 +57,17 @@ export const ProductCategoryPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<ProductCategory | null>(null);
   const [logTarget, setLogTarget] = useState<ProductCategory | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
-  const { message: formError, fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
+  const { clearMessage, setApiError } = useApiMessage();
+  const { fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
 
   const canAdd = can("PRODUCT_CATEGORY", "ADD");
   const canEdit = can("PRODUCT_CATEGORY", "EDIT");
   const canDelete = can("PRODUCT_CATEGORY", "DELETE");
   const canExport = can("PRODUCT_CATEGORY", "EXPORT");
 
-  const loadCategories = async (nextPage = page) => {
+  const loadCategories = async (nextPage = page, searchOverride = search) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    const response = await getProductCategoriesPage({ search: search.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
+    const response = await getProductCategoriesPage({ search: searchOverride.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
     setCategoryPage(response);
     setCategories(response.records);
   };
@@ -146,12 +146,6 @@ export const ProductCategoryPage = () => {
         title="Product Categories"
         subtitle="Manage product category names, descriptions, and active status for product setup."
       />
-      {errorMessage ? (
-        <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
-          {errorMessage}
-        </div>
-      ) : null}
-
       <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -180,6 +174,11 @@ export const ProductCategoryPage = () => {
               placeholder="Enter Category Name"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onClear={() => {
+                setPage(0);
+                setSearch("");
+                void loadCategories(0, "");
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -291,7 +290,6 @@ export const ProductCategoryPage = () => {
             onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
           />
         </div>
-        {formError ? <div className="mt-4 rounded-[24px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{formError}</div> : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <Button disabled={saving} onClick={() => void saveCategory()}>
             {saving ? "Saving..." : editingCategory ? "Update Category" : "Create Category"}

@@ -49,11 +49,11 @@ export const CustomerListPage = () => {
   const [deleting, setDeleting] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { can } = useAuth();
-  const { message: errorMessage, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
 
-  const loadCustomers = async (nextPage = page) => {
+  const loadCustomers = async (nextPage = page, searchOverride = search) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    const response = await getCustomersPage({ search: search.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
+    const response = await getCustomersPage({ search: searchOverride.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
     setCustomerPage(response);
     setCustomers(response.records);
   };
@@ -165,11 +165,6 @@ export const CustomerListPage = () => {
         title="Customers"
         subtitle="Review purchase totals, payments, discounts, and outstanding balances for every customer from one view."
       />
-      {errorMessage ? (
-        <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">
-          {errorMessage}
-        </div>
-      ) : null}
       <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -195,6 +190,11 @@ export const CustomerListPage = () => {
               placeholder="Enter Customer Name"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onClear={() => {
+                setPage(0);
+                setSearch("");
+                void loadCustomers(0, "");
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();

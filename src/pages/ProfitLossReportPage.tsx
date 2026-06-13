@@ -15,6 +15,10 @@ import { formatCurrency } from "../lib/currency";
 import type { Customer, ExpenseCategory, Invoice, ProfitLossReport } from "../types/api";
 
 const emptyReport: ProfitLossReport = { startDate: null, endDate: null, revenue: 0, expense: 0, netProfit: 0, expenseByCategory: [], revenueVsExpense: [] };
+const todayIso = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+};
 
 export const ProfitLossReportPage = () => {
   const { setApiError } = useApiMessage();
@@ -22,7 +26,7 @@ export const ProfitLossReportPage = () => {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [filters, setFilters] = useState({ startDate: "", endDate: "", expenseType: "", categoryId: "", customerId: "", invoiceId: "", createdByRole: "" });
+  const [filters, setFilters] = useState({ startDate: todayIso(), endDate: todayIso(), expenseType: "", categoryId: "", customerId: "", invoiceId: "", createdByRole: "" });
 
   useEffect(() => {
     void Promise.all([

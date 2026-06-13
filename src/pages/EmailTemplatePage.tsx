@@ -52,14 +52,14 @@ export const EmailTemplatePage = () => {
   const [successToast, setSuccessToast] = useState("");
   const editorRef = useRef<HTMLDivElement | null>(null);
   const { can } = useAuth();
-  const { message: errorToast, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
 
-  const loadTemplates = async (nextPage = 0) => {
+  const loadTemplates = async (nextPage = 0, searchOverride = search) => {
     setLoading(true);
     clearMessage();
     try {
       const data = await getEmailTemplatesPage({
-        search: search.trim() || undefined,
+        search: searchOverride.trim() || undefined,
         page: nextPage,
         size: DEFAULT_PAGE_SIZE
       });
@@ -168,11 +168,6 @@ export const EmailTemplatePage = () => {
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header title="Email Templates" subtitle="Manage reusable reminder and invoice email templates with dynamic variables." />
 
-      {errorToast ? (
-        <div className="glass rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-700">
-          {errorToast}
-        </div>
-      ) : null}
       {successToast ? (
         <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-700">
           {successToast}
@@ -190,6 +185,10 @@ export const EmailTemplatePage = () => {
               placeholder="Search templates"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onClear={() => {
+                setSearch("");
+                void loadTemplates(0, "");
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   void loadTemplates(0);
