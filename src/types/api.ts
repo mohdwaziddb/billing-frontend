@@ -78,8 +78,6 @@ export type DashboardSummary = {
   endDate: string | null;
   totalSales: number;
   totalCollection: number;
-  totalExpense: number;
-  netRevenue: number;
   outstandingAmount: number;
   totalCustomers: number;
   newCustomers: number;
