@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, useForm } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createCustomer, getCustomer, getCustomers, updateCustomer } from "../api/customers";
@@ -11,6 +11,7 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiFormFeedback } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { firstFormErrorMessage } from "../lib/formValidation";
 import { notificationService } from "../services/notificationService";
 import type { CustomerRequest } from "../types/api";
 
@@ -34,6 +35,7 @@ export const CustomerFormPage = () => {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues: {
@@ -49,6 +51,8 @@ export const CustomerFormPage = () => {
     }
   });
   const { fieldErrors, setFieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
+  const watchedValues = watch();
+  const canSaveCustomer = Boolean(watchedValues.name.trim() && watchedValues.mobile.trim());
 
   useEffect(() => {
     if (!customerId) {
@@ -118,6 +122,10 @@ export const CustomerFormPage = () => {
     }
   };
 
+  const onInvalid = (validationErrors: FieldErrors<FormValues>) => {
+    notificationService.showError(firstFormErrorMessage(validationErrors, "Please fill customer name and mobile number before saving."));
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
@@ -138,13 +146,13 @@ export const CustomerFormPage = () => {
               <ArrowLeft size={16} />
               Back
             </Button>
-            <Button disabled={isSubmitting} type="submit" form="customer-form">
+            <Button disabled={isSubmitting || !canSaveCustomer} type="submit" form="customer-form">
               {isSubmitting ? "Saving..." : "Save Customer"}
             </Button>
           </div>
         </div>
 
-        <form id="customer-form" className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
+        <form id="customer-form" className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
           <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="text-sm font-bold uppercase text-slate-500">Customer Details</h3>
             <div className="grid gap-3 md:grid-cols-2">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, Trash2, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getAuditLogs } from "../api/auditLogs";
 import { deleteInvoice, getInvoicesPage, type InvoiceFilterParams } from "../api/invoices";
@@ -9,6 +9,7 @@ import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -419,7 +420,7 @@ const InvoiceTable = ({ invoices, logCounts, canDelete, canViewLogs = false, can
             actions={[
               { label: "View", icon: <Eye size={15} />, to: `/invoices/${item.id}` },
               { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
-              { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
+              { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
             ]}
           />
         )

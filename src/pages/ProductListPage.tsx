@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, History, Pencil, Trash2 } from "lucide-react";
+import { Download, History, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteProduct, getProductsPage } from "../api/products";
 import { ActionDropdown } from "../components/ActionDropdown";
@@ -7,6 +7,7 @@ import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -119,7 +120,7 @@ export const ProductListPage = () => {
         actions={[
           { label: "Edit", icon: <Pencil size={15} />, to: `/products/${item.id}/edit`, hidden: !can("PRODUCTS", "EDIT") },
           { label: "Show Logs", icon: <History size={15} />, hidden: !can("PRODUCTS", "LOGS"), onClick: () => setLogTarget(item) },
-          { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !can("PRODUCTS", "DELETE"), onClick: () => setDeleteTarget(item) }
+          { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("PRODUCTS", "DELETE"), onClick: () => setDeleteTarget(item) }
         ]}
       />
     )

@@ -167,6 +167,11 @@ const ProviderSettingsPage = ({
 
   const Icon = type === "email" ? Mail : MessageSquare;
   const emailProvider = normalizeEmailProvider(form.providerName);
+  const canSaveProvider = type === "email"
+    ? emailProvider === "AWS_SES"
+      ? Boolean(form.senderEmail?.trim() && form.awsAccessKey?.trim() && (editing || form.awsSecretKey?.trim()) && form.awsRegion?.trim())
+      : Boolean(form.senderEmail?.trim() && form.smtpHost?.trim() && form.smtpPort && form.smtpUsername?.trim() && (editing || form.smtpPassword?.trim()))
+    : Boolean(form.providerName?.trim() && form.apiUrl?.trim() && form.username?.trim() && (editing || form.password?.trim()) && form.senderId?.trim() && form.channelName?.trim());
 
   return (
     <div className="space-y-4 pb-6">
@@ -293,7 +298,7 @@ const ProviderSettingsPage = ({
           </label>
           <div className="flex justify-end gap-3 md:col-span-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="button" disabled={saving} onClick={() => void save()}>{saving ? "Saving..." : "Save Provider"}</Button>
+            <Button type="button" disabled={saving || !canSaveProvider} onClick={() => void save()}>{saving ? "Saving..." : "Save Provider"}</Button>
           </div>
         </div>
       </Modal>

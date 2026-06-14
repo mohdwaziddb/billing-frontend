@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, History, PencilLine, Trash2, X } from "lucide-react";
+import { CheckCircle2, History, PencilLine, X } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { FieldDisplayNameMapper } from "../lib/FieldDisplayNameMapper";
 import { formatDateTime } from "../lib/format";
 import { DEFAULT_THEME_COLOR, getContrastTextColor } from "../lib/theme";
 import type { AuditLog } from "../types/api";
+import { CommonDeleteIcon } from "./CommonDeleteAction";
 import { Pagination } from "./Pagination";
 
 type ChangeRow = {
@@ -270,7 +271,7 @@ const actionMeta = (actionType?: string | null) => {
   const action = (actionType ?? "").toUpperCase();
   if (action.includes("DELETE")) {
     return {
-      icon: Trash2,
+      icon: CommonDeleteIcon,
       badgeClass: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200",
       pillClass: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200"
     };

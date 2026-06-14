@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Download, History, Pencil, Trash2 } from "lucide-react";
+import { Download, History, Pencil } from "lucide-react";
 import { createProductCategory, deleteProductCategory, getProductCategoriesPage, updateProductCategory } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -64,6 +65,7 @@ export const ProductCategoryPage = () => {
   const canEdit = can("PRODUCT_CATEGORY", "EDIT");
   const canDelete = can("PRODUCT_CATEGORY", "DELETE");
   const canExport = can("PRODUCT_CATEGORY", "EXPORT");
+  const canSaveCategory = Boolean(form.categoryName.trim());
 
   const loadCategories = async (nextPage = page, searchOverride = search) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
@@ -237,7 +239,7 @@ export const ProductCategoryPage = () => {
                     },
                     {
                       label: "Delete",
-                      icon: <Trash2 size={15} />,
+                      icon: <CommonDeleteIcon />,
                       danger: true,
                       hidden: !canDelete,
                       onClick: () => setDeleteTarget(item)
@@ -291,7 +293,7 @@ export const ProductCategoryPage = () => {
           />
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Button disabled={saving} onClick={() => void saveCategory()}>
+          <Button disabled={saving || !canSaveCategory} onClick={() => void saveCategory()}>
             {saving ? "Saving..." : editingCategory ? "Update Category" : "Create Category"}
           </Button>
           <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>

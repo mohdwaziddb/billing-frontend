@@ -49,6 +49,7 @@ export const AboutCompanyPage = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
+  const canSaveProfile = Boolean(form.name.trim() && form.taxId.trim() && form.phone.trim() && form.email.trim());
 
   const setField = (key: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -190,7 +191,7 @@ export const AboutCompanyPage = () => {
             </section>
 
             <div className="flex flex-wrap gap-3">
-              {canEdit ? <Button disabled={saving} onClick={() => void saveProfile()}>{saving ? "Saving..." : "Save company profile"}</Button> : null}
+              {canEdit ? <Button disabled={saving || !canSaveProfile} onClick={() => void saveProfile()}>{saving ? "Saving..." : "Save company profile"}</Button> : null}
               {!canEdit ? <p className="text-sm text-slate-400">You have view-only access to company profile details.</p> : null}
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { Download, Edit3, History, Plus, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, useForm } from "react-hook-form";
 import { createCompanyUser, deactivateCompanyUser, getCompanyUsersPage, getRoles, updateCompanyUser } from "../api/users";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -21,6 +21,7 @@ import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { exportToExcel } from "../lib/excelExport";
+import { firstFormErrorMessage } from "../lib/formValidation";
 import { formatDateTime } from "../lib/format";
 import { notificationService } from "../services/notificationService";
 import type { CompanyUserRequest, PageResponse, Role, UserProfile } from "../types/api";
@@ -91,6 +92,7 @@ export const UserManagementPage = () => {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues: {
@@ -102,6 +104,14 @@ export const UserManagementPage = () => {
       active: "true"
     }
   });
+  const watchedValues = watch();
+  const canSaveUser = Boolean(
+    watchedValues.fullName.trim() &&
+    watchedValues.email.trim() &&
+    watchedValues.mobileNumber.trim() &&
+    watchedValues.role &&
+    (editingUser || watchedValues.password.trim().length >= 8)
+  );
 
   const filterParams = useMemo(() => ({
     search: filters.search.trim() || undefined,
@@ -218,6 +228,10 @@ export const UserManagementPage = () => {
     } catch (err: any) {
       applyApiError(err, editingUser ? "Unable to update user" : "Unable to create user");
     }
+  };
+
+  const onInvalid = (validationErrors: FieldErrors<FormValues>) => {
+    notificationService.showError(firstFormErrorMessage(validationErrors, "Please fill all required user fields before saving."));
   };
 
   const deactivateUser = async () => {
@@ -410,7 +424,7 @@ export const UserManagementPage = () => {
       </GlassCard>
 
       <Modal open={modalOpen} title={editingUser ? "Edit User" : "Add User"} onClose={() => setModalOpen(false)}>
-        <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
+        <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
           <Input
             label="Full Name"
             requiredMark
@@ -461,7 +475,7 @@ export const UserManagementPage = () => {
           />
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row md:col-span-2">
-            <Button disabled={isSubmitting} type="submit">
+            <Button disabled={isSubmitting || !canSaveUser} type="submit">
               {isSubmitting ? "Saving..." : editingUser ? "Update User" : "Create User"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>

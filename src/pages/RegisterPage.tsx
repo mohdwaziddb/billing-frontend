@@ -25,6 +25,7 @@ export const RegisterPage = () => {
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
   const { fieldErrors, clearFeedback, clearFieldError, applyApiError } = useApiFormFeedback();
+  const canSubmit = Object.values(form).every((value) => value.trim());
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -96,7 +97,7 @@ export const RegisterPage = () => {
             );
           })}
           <div className="md:col-span-2 flex flex-col gap-4 pt-2 md:flex-row md:items-center md:justify-between">
-            <Button disabled={loading} type="submit">
+            <Button disabled={loading || !canSubmit} type="submit">
               {loading ? "Creating workspace..." : "Register company"}
             </Button>
             <p className="text-sm text-slate-600">

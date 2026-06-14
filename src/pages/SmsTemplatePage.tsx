@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Eye, FilePlus2, Pencil, Trash2 } from "lucide-react";
+import { Eye, FilePlus2, Pencil } from "lucide-react";
 import { createSmsTemplate, deleteSmsTemplate, getSmsTemplateVariables, getSmsTemplatesPage, previewSmsTemplate, updateSmsTemplate } from "../api/smsTemplates";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -30,6 +31,7 @@ export const SmsTemplatePage = () => {
   const [preview, setPreview] = useState<EmailPreview | null>(null);
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
+  const canSaveTemplate = Boolean(form.templateName.trim() && form.templateBody.trim());
 
   const loadTemplates = async (nextPage = 0, searchOverride = search) => {
     try {
@@ -117,7 +119,7 @@ export const SmsTemplatePage = () => {
                   <ActionDropdown actions={[
                     { label: "Preview", icon: <Eye size={15} />, onClick: () => void openPreview(item) },
                     { label: "Edit", icon: <Pencil size={15} />, hidden: !can("SMS_TEMPLATES", "EDIT"), onClick: () => openEdit(item) },
-                    { label: "Delete", icon: <Trash2 size={15} />, hidden: !can("SMS_TEMPLATES", "DELETE"), danger: true, onClick: () => void deleteSmsTemplate(item.id).then(() => loadTemplates(templatePage.page)) }
+                    { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("SMS_TEMPLATES", "DELETE"), danger: true, onClick: () => void deleteSmsTemplate(item.id).then(() => loadTemplates(templatePage.page)) }
                   ]} />
                 )
               }
@@ -141,7 +143,7 @@ export const SmsTemplatePage = () => {
             </label>
             <div className="flex justify-end gap-3">
               <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>Cancel</Button>
-              <Button type="button" onClick={() => void saveTemplate()}>{editingTemplate ? "Save Template" : "Create Template"}</Button>
+              <Button type="button" disabled={!canSaveTemplate} onClick={() => void saveTemplate()}>{editingTemplate ? "Save Template" : "Create Template"}</Button>
             </div>
           </div>
           <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">

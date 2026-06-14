@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, useForm } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCustomers } from "../api/customers";
 import { getInvoices } from "../api/invoices";
+import { getPaymentModes } from "../api/paymentModes";
 import { createPayment } from "../api/payments";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
@@ -13,8 +14,9 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
+import { firstFormErrorMessage } from "../lib/formValidation";
 import { notificationService } from "../services/notificationService";
-import type { Customer, Invoice, PaymentMode, PaymentRequest } from "../types/api";
+import type { Customer, Invoice, PaymentMode, PaymentModeMaster, PaymentRequest } from "../types/api";
 
 type FormValues = {
   customerId: string;
@@ -35,6 +37,8 @@ export const PaymentEntryPage = () => {
   const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
+  const [lockedInvoice, setLockedInvoice] = useState<Invoice | null>(null);
   const { clearMessage, setApiError } = useApiMessage();
   const {
     register,
@@ -49,20 +53,27 @@ export const PaymentEntryPage = () => {
       invoiceId: "",
       amount: "",
       paymentDate: todayIso(),
-      mode: "CASH",
+      mode: "",
       remarks: ""
     }
   });
 
   useEffect(() => {
-    void Promise.all([getCustomers({ active: true, size: 1000 }), getInvoices({ size: 1000 })]).then(([customerData, invoiceData]) => {
+    void Promise.all([getCustomers({ active: true, size: 1000 }), getInvoices({ size: 1000 }), getPaymentModes({ active: true, size: 1000 })]).then(([customerData, invoiceData, modeData]) => {
       setCustomers(customerData.filter((customer) => customer.active));
       setInvoices(invoiceData);
+      setPaymentModes(modeData);
+      if (modeData[0]) {
+        setValue("mode", modeData[0].modeCode, { shouldValidate: true });
+      }
     });
-  }, []);
+  }, [setValue]);
 
   const selectedCustomerId = watch("customerId");
   const selectedInvoiceId = watch("invoiceId");
+  const watchedAmount = watch("amount");
+  const watchedPaymentDate = watch("paymentDate");
+  const watchedMode = watch("mode");
   const invoiceOptions = useMemo(() => {
     const customerInvoices = invoices.filter((invoice) => String(invoice.customerId) === selectedCustomerId && Number(invoice.balanceAmount) > 0);
     return customerInvoices.map((invoice) => ({
@@ -70,6 +81,17 @@ export const PaymentEntryPage = () => {
       value: invoice.id
     }));
   }, [invoices, selectedCustomerId]);
+  const selectedInvoice = invoices.find((item) => String(item.id) === selectedInvoiceId);
+  const paymentAmount = Number(watchedAmount);
+  const canSavePayment = Boolean(
+    (lockedInvoice || selectedCustomerId) &&
+    watchedAmount !== "" &&
+    Number.isFinite(paymentAmount) &&
+    paymentAmount > 0 &&
+    (!selectedInvoice || paymentAmount <= Number(selectedInvoice.balanceAmount)) &&
+    watchedPaymentDate &&
+    watchedMode
+  );
 
   useEffect(() => {
     const invoiceId = searchParams.get("invoiceId");
@@ -85,6 +107,7 @@ export const PaymentEntryPage = () => {
     setValue("customerId", String(invoice.customerId), { shouldValidate: true });
     setValue("invoiceId", String(invoice.id), { shouldValidate: true });
     setValue("amount", String(invoice.balanceAmount), { shouldValidate: true });
+    setLockedInvoice(invoice);
   }, [invoices, searchParams, setValue]);
 
   useEffect(() => {
@@ -105,8 +128,8 @@ export const PaymentEntryPage = () => {
     clearMessage();
 
     const payload: PaymentRequest = {
-      customerId: Number(values.customerId),
-      invoiceId: values.invoiceId ? Number(values.invoiceId) : undefined,
+      customerId: lockedInvoice ? Number(lockedInvoice.customerId) : Number(values.customerId),
+      invoiceId: lockedInvoice ? Number(lockedInvoice.id) : values.invoiceId ? Number(values.invoiceId) : undefined,
       amount: Number(values.amount),
       paymentDate: values.paymentDate,
       mode: values.mode,
@@ -115,6 +138,11 @@ export const PaymentEntryPage = () => {
 
     if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
       setApiError({ message: "Payment amount must be greater than 0" }, "Payment amount must be greater than 0");
+      return;
+    }
+    const invoice = invoices.find((item) => String(item.id) === values.invoiceId);
+    if (invoice && payload.amount > Number(invoice.balanceAmount)) {
+      setApiError({ message: "Payment amount cannot exceed outstanding amount" }, "Payment amount cannot exceed outstanding amount");
       return;
     }
 
@@ -126,19 +154,24 @@ export const PaymentEntryPage = () => {
         invoiceId: "",
         amount: "",
         paymentDate: todayIso(),
-        mode: "CASH",
+        mode: paymentModes[0]?.modeCode ?? "",
         remarks: ""
       });
+      setLockedInvoice(null);
     } catch (err: any) {
       setApiError(err, "Unable to record payment");
     }
+  };
+
+  const onInvalid = (validationErrors: FieldErrors<FormValues>) => {
+    notificationService.showError(firstFormErrorMessage(validationErrors, "Please fill all required payment fields before saving."));
   };
 
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title="Payments > Add Payment"
-        subtitle="Record customer collections and map them to invoices with consistent validation and clean form layout."
+        subtitle={lockedInvoice ? `Recording payment for ${lockedInvoice.invoiceNo} | Outstanding ${formatCurrency(lockedInvoice.balanceAmount)}` : "Record customer collections and map them to invoices with consistent validation and clean form layout."}
       />
       <GlassCard className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col p-4 md:p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -151,12 +184,12 @@ export const PaymentEntryPage = () => {
               <ArrowLeft size={16} />
               Back
             </Button>
-            <Button disabled={isSubmitting} type="submit" form="payment-form">
+            <Button disabled={isSubmitting || !canSavePayment} type="submit" form="payment-form">
               {isSubmitting ? "Saving..." : "Save Payment"}
             </Button>
           </div>
         </div>
-        <form id="payment-form" className="grid gap-4 lg:grid-cols-3" onSubmit={handleSubmit(onSubmit)}>
+        <form id="payment-form" className="grid gap-4 lg:grid-cols-3" onSubmit={handleSubmit(onSubmit, onInvalid)}>
           <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="text-sm font-bold uppercase text-slate-500">Customer Information</h3>
             <Select
@@ -165,6 +198,7 @@ export const PaymentEntryPage = () => {
               placeholder="Select Customer"
               error={errors.customerId?.message}
               options={customers.map((customer) => ({ label: customer.name, value: customer.id }))}
+              disabled={Boolean(lockedInvoice)}
               {...register("customerId", { required: "Customer is required" })}
             />
           </section>
@@ -176,6 +210,7 @@ export const PaymentEntryPage = () => {
               placeholder="Select Invoice"
               hint="Optional if you are recording an unapplied customer payment."
               options={invoiceOptions}
+              disabled={Boolean(lockedInvoice)}
               {...register("invoiceId")}
             />
           </section>
@@ -191,7 +226,12 @@ export const PaymentEntryPage = () => {
                 error={errors.amount?.message}
                 {...register("amount", {
                   required: "Amount is required",
-                  validate: (value) => Number(value) > 0 || "Payment amount must be greater than 0"
+                  validate: (value) => {
+                    const amount = Number(value);
+                    if (amount <= 0) return "Payment amount must be greater than 0";
+                    const invoice = invoices.find((item) => String(item.id) === selectedInvoiceId);
+                    return !invoice || amount <= Number(invoice.balanceAmount) || "Payment amount cannot exceed outstanding amount";
+                  }
                 })}
               />
               <Input
@@ -203,19 +243,13 @@ export const PaymentEntryPage = () => {
               />
               <Select
                 label="Mode"
+                requiredMark
                 placeholder="Select Mode"
-                options={[
-                  { label: "UPI", value: "UPI" },
-                  { label: "Cash", value: "CASH" },
-                  { label: "Card", value: "CARD" },
-                  { label: "Bank Transfer", value: "BANK_TRANSFER" },
-                  { label: "Cheque", value: "CHEQUE" },
-                  { label: "Wallet", value: "WALLET" },
-                  { label: "Other", value: "OTHER" }
-                ]}
-                {...register("mode")}
+                error={errors.mode?.message}
+                options={paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))}
+                {...register("mode", { required: "Payment mode is required" })}
               />
-              <Input label="Remarks" {...register("remarks")} />
+              <Input label="Notes" {...register("remarks")} />
             </div>
           </section>
         </form>

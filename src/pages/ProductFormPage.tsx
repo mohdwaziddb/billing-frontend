@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, useForm } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getProductCategories } from "../api/productCategories";
@@ -12,6 +12,7 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { firstFormErrorMessage } from "../lib/formValidation";
 import { notificationService } from "../services/notificationService";
 import type { ProductCategory, ProductRequest } from "../types/api";
 
@@ -91,10 +92,28 @@ export const ProductFormPage = () => {
   }, [productId, reset, setApiError]);
 
   const watchedPurchasePrice = watch("purchasePrice");
+  const watchedValues = watch();
 
   const categoryOptions = useMemo(
     () => categories.map((category) => ({ label: category.categoryName, value: String(category.id) })),
     [categories]
+  );
+  const purchasePriceValue = Number(watchedValues.purchasePrice);
+  const sellingPriceValue = Number(watchedValues.sellingPrice);
+  const taxPercentValue = Number(watchedValues.taxPercent);
+  const canSaveProduct = Boolean(
+    watchedValues.name.trim() &&
+    watchedValues.categoryId &&
+    watchedValues.sku.trim() &&
+    watchedValues.purchasePrice !== "" &&
+    watchedValues.sellingPrice !== "" &&
+    watchedValues.taxPercent !== "" &&
+    Number.isFinite(purchasePriceValue) &&
+    Number.isFinite(sellingPriceValue) &&
+    Number.isFinite(taxPercentValue) &&
+    purchasePriceValue >= 0 &&
+    sellingPriceValue >= purchasePriceValue &&
+    taxPercentValue >= 0
   );
 
   const onSubmit = async (values: FormValues) => {
@@ -127,6 +146,10 @@ export const ProductFormPage = () => {
     }
   };
 
+  const onInvalid = (validationErrors: FieldErrors<FormValues>) => {
+    notificationService.showError(firstFormErrorMessage(validationErrors, "Please fill all required product fields before saving."));
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
@@ -146,13 +169,13 @@ export const ProductFormPage = () => {
               <ArrowLeft size={16} />
               Back
             </Button>
-            <Button disabled={isSubmitting} type="submit" form="product-form">
+            <Button disabled={isSubmitting || !canSaveProduct} type="submit" form="product-form">
               {isSubmitting ? "Saving..." : "Save Product"}
             </Button>
           </div>
         </div>
 
-        <form id="product-form" className="grid flex-1 auto-rows-fr gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
+        <form id="product-form" className="grid flex-1 auto-rows-fr gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
           <section className="h-full space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="text-sm font-bold uppercase text-slate-500">Product Details</h3>
             <div className="grid gap-3 md:grid-cols-2">

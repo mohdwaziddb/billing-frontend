@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Download, Edit3, History, Layers3, Plus, ReceiptIndianRupee, Trash2 } from "lucide-react";
+import { CalendarDays, Download, Edit3, History, Layers3, Plus, ReceiptIndianRupee } from "lucide-react";
 import { getCustomers } from "../api/customers";
 import { getExpenseCategories } from "../api/expenseCategories";
 import { createExpense, deleteExpense, getExpensesPage, updateExpense, type ExpenseFilterParams } from "../api/expenses";
@@ -11,6 +11,7 @@ import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPan
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -40,8 +41,44 @@ const monthStartIso = () => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
 };
 
-const emptyExpenseFilters = { search: "", expenseType: "", categoryId: "", startDate: "", endDate: "", customerId: "", invoiceId: "", createdByRole: "" };
+type DatePreset = "" | "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
+
+type ExpenseFilters = {
+  search: string;
+  expenseType: string;
+  categoryId: string;
+  datePreset: DatePreset;
+  startDate: string;
+  endDate: string;
+  customerId: string;
+  invoiceId: string;
+  createdByRole: string;
+};
+
+const emptyExpenseFilters: ExpenseFilters = { search: "", expenseType: "", categoryId: "", datePreset: "", startDate: "", endDate: "", customerId: "", invoiceId: "", createdByRole: "" };
 type ExpenseDrilldownKey = "total" | "thisMonth" | "today" | "category";
+
+const toIso = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+
+const dateRangeForPreset = (preset: DatePreset) => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (preset === "today") return { startDate: toIso(today), endDate: toIso(today) };
+  if (preset === "yesterday") {
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return { startDate: toIso(yesterday), endDate: toIso(yesterday) };
+  }
+  if (preset === "thisWeek") {
+    const start = new Date(today);
+    const day = start.getDay() || 7;
+    start.setDate(start.getDate() - day + 1);
+    return { startDate: toIso(start), endDate: toIso(today) };
+  }
+  if (preset === "thisMonth") return { startDate: toIso(new Date(today.getFullYear(), today.getMonth(), 1)), endDate: toIso(today) };
+  if (preset === "thisYear") return { startDate: toIso(new Date(today.getFullYear(), 0, 1)), endDate: toIso(today) };
+  return { startDate: "", endDate: "" };
+};
 
 export const ExpenseListPage = () => {
   const { can } = useAuth();
@@ -67,16 +104,21 @@ export const ExpenseListPage = () => {
   const [drilldownLoading, setDrilldownLoading] = useState(false);
   const [form, setForm] = useState({ expenseType: "GENERAL" as ExpenseType, categoryId: "", customerId: "", invoiceId: "", amount: "", expenseDate: todayIso(), description: "", attachmentUrl: "" });
 
-  const params = useMemo<ExpenseFilterParams>(() => ({
-    search: appliedFilters.search || undefined,
-    expenseType: appliedFilters.expenseType || undefined,
-    categoryId: appliedFilters.categoryId || undefined,
-    customerId: appliedFilters.customerId || undefined,
-    invoiceId: appliedFilters.invoiceId || undefined,
-    startDate: appliedFilters.startDate || undefined,
-    endDate: appliedFilters.endDate || undefined,
-    createdByRole: appliedFilters.createdByRole || undefined
-  }), [appliedFilters]);
+  const params = useMemo<ExpenseFilterParams>(() => {
+    const dateRange = appliedFilters.datePreset === "custom"
+      ? { startDate: appliedFilters.startDate, endDate: appliedFilters.endDate }
+      : dateRangeForPreset(appliedFilters.datePreset);
+    return {
+      search: appliedFilters.search || undefined,
+      expenseType: appliedFilters.expenseType || undefined,
+      categoryId: appliedFilters.categoryId || undefined,
+      customerId: appliedFilters.customerId || undefined,
+      invoiceId: appliedFilters.invoiceId || undefined,
+      startDate: dateRange.startDate || undefined,
+      endDate: dateRange.endDate || undefined,
+      createdByRole: appliedFilters.createdByRole || undefined
+    };
+  }, [appliedFilters]);
 
   const activeFilterSummary = useMemo(() => summarizeExpenseFilters(appliedFilters, categories, customers, invoices), [appliedFilters, categories, customers, invoices]);
   const selectedCategory = categories.find((category) => String(category.id) === appliedFilters.categoryId) ?? null;
@@ -85,7 +127,7 @@ export const ExpenseListPage = () => {
     const monthStart = monthStartIso();
     const todayRows = dashboardRows.filter((item) => item.expenseDate === today);
     const monthRows = dashboardRows.filter((item) => item.expenseDate >= monthStart && item.expenseDate <= today);
-    const categoryRows = selectedCategory ? dashboardRows.filter((item) => item.categoryId === selectedCategory.id) : [];
+    const categoryRows = selectedCategory ? dashboardRows.filter((item) => item.categoryId === selectedCategory.id) : dashboardRows;
     return {
       total: sumExpenses(dashboardRows),
       today: sumExpenses(todayRows),
@@ -150,11 +192,6 @@ export const ExpenseListPage = () => {
   };
 
   const openCategoryCard = () => {
-    if (!selectedCategory) {
-      setFiltersOpen(true);
-      notificationService.showInfo("Select a category filter first to view category-wise expenses.");
-      return;
-    }
     openDrilldown("category");
   };
 
@@ -226,6 +263,16 @@ export const ExpenseListPage = () => {
   };
 
   const selectedInvoice = invoices.find((invoice) => String(invoice.id) === form.invoiceId);
+  const expenseAmount = Number(form.amount);
+  const canSaveExpense = Boolean(
+    form.categoryId &&
+    form.amount &&
+    Number.isFinite(expenseAmount) &&
+    expenseAmount > 0 &&
+    form.expenseDate &&
+    (form.expenseType !== "CUSTOMER_RELATED" || form.customerId) &&
+    (form.expenseType !== "INVOICE_RELATED" || (form.invoiceId && selectedInvoice))
+  );
   const expenseColumns = useMemo(() => [
     { key: "type", header: "Expense Type", render: (item: Expense) => typeLabel(item.expenseType) },
     { key: "category", header: "Category", render: (item: Expense) => item.categoryName },
@@ -243,7 +290,7 @@ export const ExpenseListPage = () => {
     render: (item: Expense) => <ActionDropdown actions={[
       { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("EXPENSES", "EDIT"), onClick: () => openForm(item) },
       { label: "Show Logs", icon: <History size={15} />, hidden: !can("EXPENSES", "LOGS"), onClick: () => setLogTarget(item) },
-      { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !can("EXPENSES", "DELETE"), onClick: () => setDeleteTarget(item) }
+      { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("EXPENSES", "DELETE"), onClick: () => setDeleteTarget(item) }
     ]} />
   }), [can, invoices]);
   const visibleExpenseColumns = useMemo(() => applyVisibleColumns(expenseColumns, visibleColumns), [expenseColumns, visibleColumns]);
@@ -269,8 +316,8 @@ export const ExpenseListPage = () => {
     if (activeDrilldown === "thisMonth") {
       return { ...base, startDate: monthStartIso(), endDate: todayIso() };
     }
-    if (activeDrilldown === "category" && selectedCategory) {
-      return { ...base, categoryId: selectedCategory.id };
+    if (activeDrilldown === "category") {
+      return selectedCategory ? { ...base, categoryId: selectedCategory.id } : base;
     }
     return base;
   }, [activeDrilldown, drilldownSearch, selectedCategory]);
@@ -279,7 +326,7 @@ export const ExpenseListPage = () => {
     : activeDrilldown === "thisMonth"
       ? "This Month Expense Details"
       : activeDrilldown === "category"
-        ? `${selectedCategory?.categoryName ?? "Category"} Expense Details`
+        ? `${selectedCategory?.categoryName ?? "Category Wise"} Expense Details`
         : "Total Expense Details";
   const activeDrilldownFilters = activeDrilldown === "today"
     ? [`Date: ${formatDate(todayIso())}`]
@@ -287,6 +334,8 @@ export const ExpenseListPage = () => {
       ? [`Date: ${formatDate(monthStartIso())} - ${formatDate(todayIso())}`]
       : activeDrilldown === "category" && selectedCategory
         ? [`Category: ${selectedCategory.categoryName}`]
+        : activeDrilldown === "category"
+          ? ["All categories"]
         : ["All expenses"];
   const activeDrilldownGrandTotal = useMemo(
     () => formatCurrency(drilldownPage.records.reduce((sum, item) => sum + Number(item.amount ?? 0), 0)),
@@ -311,7 +360,7 @@ export const ExpenseListPage = () => {
         <StatCard label="Total Expenses" value={formatCurrency(dashboardSummary.total)} caption="All expenses" icon={<ReceiptIndianRupee size={18} />} onClick={() => openDrilldown("total")} />
         <StatCard label="This Month Expenses" value={formatCurrency(dashboardSummary.thisMonth)} caption="Current month expenses" icon={<CalendarDays size={18} />} onClick={() => openDrilldown("thisMonth")} />
         <StatCard label="Today's Expenses" value={formatCurrency(dashboardSummary.today)} caption="Only today's expenses" icon={<CalendarDays size={18} />} onClick={() => openDrilldown("today")} />
-        <StatCard label="Category Wise Expenses" value={selectedCategory ? formatCurrency(dashboardSummary.category) : "Select Category"} caption={selectedCategory ? `${selectedCategory.categoryName} | ${dashboardSummary.categoryCount} records` : "Choose category in filters"} icon={<Layers3 size={18} />} onClick={openCategoryCard} />
+        <StatCard label="Category Wise Expenses" value={formatCurrency(dashboardSummary.category)} caption={selectedCategory ? `${selectedCategory.categoryName} | ${dashboardSummary.categoryCount} records` : `All categories | ${dashboardSummary.categoryCount} records`} icon={<Layers3 size={18} />} onClick={openCategoryCard} />
       </div>
 
       <CommonAdvancedFilterPanel
@@ -326,8 +375,21 @@ export const ExpenseListPage = () => {
           <Input label="Search" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} onClear={() => setDraftFilters((current) => ({ ...current, search: "" }))} />
           <Select label="Expense Type" value={draftFilters.expenseType} options={[{ label: "All", value: "" }, ...expenseTypeOptions]} onChange={(event) => setDraftFilters((current) => ({ ...current, expenseType: event.target.value }))} />
           <Select label="Category" value={draftFilters.categoryId} options={[{ label: "All", value: "" }, ...categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, categoryId: event.target.value }))} />
-          <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
-          <Input label="End Date" type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} />
+          <Select label="Expense Date" value={draftFilters.datePreset} options={[
+            { label: "All", value: "" },
+            { label: "Today", value: "today" },
+            { label: "Yesterday", value: "yesterday" },
+            { label: "This Week", value: "thisWeek" },
+            { label: "This Month", value: "thisMonth" },
+            { label: "This Year", value: "thisYear" },
+            { label: "Custom Date Range", value: "custom" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, datePreset: event.target.value as DatePreset, startDate: event.target.value === "custom" ? current.startDate : "", endDate: event.target.value === "custom" ? current.endDate : "" }))} />
+          {draftFilters.datePreset === "custom" ? (
+            <>
+              <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
+              <Input label="End Date" type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} />
+            </>
+          ) : null}
           <Select label="Customer" value={draftFilters.customerId} options={[{ label: "All", value: "" }, ...customers.map((item) => ({ label: item.name, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, customerId: event.target.value }))} />
           <Select label="Invoice" value={draftFilters.invoiceId} options={[{ label: "All", value: "" }, ...invoices.map((item) => ({ label: item.invoiceNo, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, invoiceId: event.target.value }))} />
           <Select label="Created By" value={draftFilters.createdByRole} options={[{ label: "All", value: "" }, { label: "Owner", value: "OWNER" }, { label: "Admin", value: "ADMIN" }, { label: "User", value: "USER" }]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
@@ -373,7 +435,7 @@ export const ExpenseListPage = () => {
           <Input label="Attachment URL" value={form.attachmentUrl} onChange={(event) => setForm((current) => ({ ...current, attachmentUrl: event.target.value }))} />
           <div className="flex justify-end gap-2 md:col-span-2">
             <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={() => void save()}>Save Expense</Button>
+            <Button type="button" disabled={!canSaveExpense} onClick={() => void save()}>Save Expense</Button>
           </div>
         </div>
       </Modal>
@@ -415,16 +477,29 @@ const typeLabel = (value: ExpenseType) => value.replace(/_/g, " ").toLowerCase()
 const sumExpenses = (rows: Expense[]) => rows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
 
 const summarizeExpenseFilters = (
-  filters: typeof emptyExpenseFilters,
+  filters: ExpenseFilters,
   categories: ExpenseCategory[],
   customers: Customer[],
   invoices: Invoice[]
 ) => {
   const summary: string[] = [];
+  const datePresetLabels: Record<DatePreset, string> = {
+    "": "",
+    today: "Today",
+    yesterday: "Yesterday",
+    thisWeek: "This Week",
+    thisMonth: "This Month",
+    thisYear: "This Year",
+    custom: "Custom Date"
+  };
   if (filters.search.trim()) summary.push(`Search: ${filters.search.trim()}`);
   if (filters.expenseType) summary.push(typeLabel(filters.expenseType as ExpenseType));
   if (filters.categoryId) summary.push(`Category: ${categories.find((item) => String(item.id) === filters.categoryId)?.categoryName ?? filters.categoryId}`);
-  if (filters.startDate || filters.endDate) summary.push(`${formatDate(filters.startDate) || "Start"} - ${formatDate(filters.endDate) || "End"}`);
+  if (filters.datePreset === "custom" && (filters.startDate || filters.endDate)) {
+    summary.push(`${formatDate(filters.startDate) || "Start"} - ${formatDate(filters.endDate) || "End"}`);
+  } else if (filters.datePreset) {
+    summary.push(datePresetLabels[filters.datePreset]);
+  }
   if (filters.customerId) summary.push(`Customer: ${customers.find((item) => String(item.id) === filters.customerId)?.name ?? filters.customerId}`);
   if (filters.invoiceId) summary.push(`Invoice: ${invoices.find((item) => String(item.id) === filters.invoiceId)?.invoiceNo ?? filters.invoiceId}`);
   if (filters.createdByRole) summary.push(`Created By: ${filters.createdByRole}`);

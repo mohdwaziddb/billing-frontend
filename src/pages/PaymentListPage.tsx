@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Banknote, CreditCard, Download, History, Smartphone, Trash2, Wallet } from "lucide-react";
+import { AlertCircle, CreditCard, Download, History, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
+import { getPaymentModes } from "../api/paymentModes";
 import { deletePayment, getPaymentsPage, type PaymentFilterParams } from "../api/payments";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -9,6 +10,7 @@ import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
 import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -27,10 +29,10 @@ import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import { notificationService } from "../services/notificationService";
-import type { PageResponse, Payment } from "../types/api";
+import type { PageResponse, Payment, PaymentModeMaster } from "../types/api";
 
 type DatePreset = "" | "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
-type SummaryKey = "total" | "collection" | "cash" | "upi" | "outstanding";
+type SummaryKey = "total" | "collection" | "outstanding" | `mode:${string}`;
 
 type PaymentFilters = {
   search: string;
@@ -119,15 +121,19 @@ export const PaymentListPage = () => {
   const [modalPaymentPage, setModalPaymentPage] = useState<PageResponse<Payment>>(emptyPaymentPage);
   const [logCounts, setLogCounts] = useState<Record<number, number>>({});
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
   const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
-  const activeFilterSummary = useMemo(() => summarizePaymentFilters(appliedFilters), [appliedFilters]);
+  const modeLabelMap = useMemo(() => Object.fromEntries(paymentModes.map((mode) => [mode.modeCode, mode.modeName])), [paymentModes]);
+  const activeFilterSummary = useMemo(() => summarizePaymentFilters(appliedFilters, modeLabelMap), [appliedFilters, modeLabelMap]);
   const summary = useMemo(() => ({
     total: exportRows.length,
     collection: exportRows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
-    cash: exportRows.filter((item) => item.mode === "CASH").reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
-    upi: exportRows.filter((item) => item.mode === "UPI").reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
+    byMode: exportRows.reduce<Record<string, number>>((totals, item) => {
+      totals[item.mode] = (totals[item.mode] ?? 0) + Number(item.amount ?? 0);
+      return totals;
+    }, {}),
     outstandingCollection: exportRows.filter((item) => item.invoiceNo).reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
   }), [exportRows]);
   const modalGrandTotal = useMemo(() => modalPayments.reduce((sum, item) => sum + Number(item.amount ?? 0), 0), [modalPayments]);
@@ -149,6 +155,10 @@ export const PaymentListPage = () => {
   useEffect(() => {
     void Promise.all([loadPayments(0), loadExportRows()]).catch((err: any) => setApiError(err, "Unable to load payments"));
   }, [baseParams]);
+
+  useEffect(() => {
+    void getPaymentModes({ active: true, size: 1000 }).then(setPaymentModes).catch((err: any) => setApiError(err, "Unable to load payment modes"));
+  }, [setApiError]);
 
   useEffect(() => {
     const ids = [...new Set([...payments, ...modalPayments].map((payment) => payment.id))];
@@ -224,8 +234,9 @@ export const PaymentListPage = () => {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Total Payments" value={String(summary.total)} caption="Current filtered payments" icon={<CreditCard size={18} />} onClick={() => openSummary("total")} />
         <StatCard label="Total Collection" value={formatCurrency(summary.collection)} caption="All payment modes" icon={<Wallet size={18} />} onClick={() => openSummary("collection")} />
-        <StatCard label="Cash Collection" value={formatCurrency(summary.cash)} caption="Cash payments" icon={<Banknote size={18} />} onClick={() => openSummary("cash")} />
-        <StatCard label="UPI Collection" value={formatCurrency(summary.upi)} caption="UPI payments" icon={<Smartphone size={18} />} onClick={() => openSummary("upi")} />
+        {paymentModes.slice(0, 2).map((mode) => (
+          <StatCard key={mode.modeCode} label={`${mode.modeName} Collection`} value={formatCurrency(summary.byMode[mode.modeCode] ?? 0)} caption={`${mode.modeName} payments`} icon={<CreditCard size={18} />} onClick={() => openSummary(`mode:${mode.modeCode}`)} />
+        ))}
         <StatCard label="Outstanding Collection" value={formatCurrency(summary.outstandingCollection)} caption="Invoice-linked payments" icon={<AlertCircle size={18} />} onClick={() => openSummary("outstanding")} />
       </div>
 
@@ -248,11 +259,7 @@ export const PaymentListPage = () => {
           ]} onChange={(event) => setDraftFilters((current) => ({ ...current, paymentStatus: event.target.value }))} />
           <Select label="Payment Method" value={draftFilters.mode} options={[
             { label: "All", value: "" },
-            { label: "Cash", value: "CASH" },
-            { label: "UPI", value: "UPI" },
-            { label: "Bank Transfer", value: "BANK_TRANSFER" },
-            { label: "Card", value: "CARD" },
-            { label: "Cheque", value: "CHEQUE" }
+            ...paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))
           ]} onChange={(event) => setDraftFilters((current) => ({ ...current, mode: event.target.value }))} />
           <Select label="Payment Date" value={draftFilters.datePreset} options={[
             { label: "All", value: "" },
@@ -364,7 +371,7 @@ const PaymentTable = ({ payments, columns, logCounts, canDelete, canViewLogs = f
         render: (item) => (
           <ActionDropdown actions={[
             { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
-            { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
+            { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
           ]} />
         )
       }
@@ -414,20 +421,13 @@ const buildParams = (filters: PaymentFilters): PaymentFilterParams => {
   };
 };
 
-const summarizePaymentFilters = (filters: PaymentFilters) => {
+const summarizePaymentFilters = (filters: PaymentFilters, methodLabels: Record<string, string>) => {
   const summary: string[] = [];
   const paymentStatusLabels: Record<string, string> = {
     SUCCESS: "Success",
     PENDING: "Pending",
     FAILED: "Failed",
     CANCELLED: "Cancelled"
-  };
-  const methodLabels: Record<string, string> = {
-    CASH: "Cash",
-    UPI: "UPI",
-    BANK_TRANSFER: "Bank Transfer",
-    CARD: "Card",
-    CHEQUE: "Cheque"
   };
   const datePresetLabels: Record<DatePreset, string> = {
     "": "",
@@ -460,16 +460,14 @@ const summarizePaymentFilters = (filters: PaymentFilters) => {
 
 const summaryParams = (params: PaymentFilterParams, key: SummaryKey, search: string): PaymentFilterParams => {
   const next: PaymentFilterParams = { ...params, search: search.trim() || params.search };
-  if (key === "cash") next.mode = "CASH";
-  if (key === "upi") next.mode = "UPI";
+  if (key.startsWith("mode:")) next.mode = key.slice("mode:".length);
   if (key === "outstanding") next.invoiceLinked = true;
   return next;
 };
 
 const summaryTitle = (key: SummaryKey | null) => {
   if (key === "collection") return "Total Collection Details";
-  if (key === "cash") return "Cash Collection Details";
-  if (key === "upi") return "UPI Collection Details";
+  if (key?.startsWith("mode:")) return `${key.slice("mode:".length).replace(/_/g, " ")} Collection Details`;
   if (key === "outstanding") return "Outstanding Collection Details";
   return "Payment Details";
 };

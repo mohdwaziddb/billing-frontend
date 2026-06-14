@@ -38,6 +38,12 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     clearMessage();
+    const username = form.username.trim();
+
+    if (!username) {
+      setMessage("Enter your registered Mobile Number or Email ID on the sign in screen first.");
+      return;
+    }
 
     if (form.newPassword !== form.confirmPassword) {
       setMessage("New password and confirm password must match.");
@@ -47,7 +53,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
     try {
       setSaving(true);
       await forgotPasswordRequest({
-        username: form.username,
+        username,
         newPassword: form.newPassword
       });
       setMessage("Password updated successfully. Please sign in with your new password.");
@@ -66,7 +72,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--theme-color)] shadow-sm">
             <KeyRound size={18} />
           </span>
-          <p className="min-w-0 text-sm font-medium leading-6 text-slate-600">Enter your registered Mobile Number or Email ID and set a new password.</p>
+          <p className="min-w-0 text-sm font-medium leading-6 text-slate-600">Confirm the registered Mobile Number or Email ID and set a new password.</p>
         </div>
         <Input
           label="Mobile Number or Email ID"
@@ -74,7 +80,8 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
           type="text"
           inputMode="email"
           value={form.username}
-          onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+          readOnly
+          className="cursor-not-allowed bg-slate-100 text-slate-500"
         />
         <PasswordInput
           label="New Password"

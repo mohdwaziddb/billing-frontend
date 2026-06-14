@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Download, History, Pencil, Trash2 } from "lucide-react";
+import { BookOpen, Download, History, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteCustomer, getCustomerLedger, getCustomersPage } from "../api/customers";
 import { getCustomerProfitability } from "../api/expenses";
@@ -8,6 +8,7 @@ import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -140,7 +141,7 @@ export const CustomerListPage = () => {
           { label: "Ledger", icon: <BookOpen size={15} />, onClick: () => void loadLedger(item.id, 0) },
           { label: "Edit", icon: <Pencil size={15} />, to: `/customers/${item.id}/edit`, hidden: !can("CUSTOMERS", "EDIT") },
           { label: "Show Logs", icon: <History size={15} />, hidden: !can("CUSTOMERS", "LOGS"), onClick: () => setLogTarget(item) },
-          { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !can("CUSTOMERS", "DELETE"), onClick: () => setDeleteTarget(item) }
+          { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("CUSTOMERS", "DELETE"), onClick: () => setDeleteTarget(item) }
         ]}
       />
     )

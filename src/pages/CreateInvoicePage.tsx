@@ -1,12 +1,14 @@
-import { ArrowLeft, Eye, History, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, History, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { type FieldErrors, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from "../api/customers";
 import { createInvoice } from "../api/invoices";
+import { getPaymentModes } from "../api/paymentModes";
 import { getProducts } from "../api/products";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
+import { CommonDeleteIconButton } from "../components/CommonDeleteAction";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -22,7 +24,7 @@ import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
 import { InvoiceCalculationService } from "../services/InvoiceCalculationService";
 import { notificationService } from "../services/notificationService";
-import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, Product } from "../types/api";
+import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, PaymentModeMaster, Product } from "../types/api";
 
 type InvoiceItemForm = {
   productId: string;
@@ -38,6 +40,7 @@ type FormValues = {
   invoiceDiscountType: "FIXED" | "PERCENT";
   discountAmount: string;
   paidAmount: string;
+  paymentMode: string;
   items: InvoiceItemForm[];
 };
 
@@ -63,10 +66,36 @@ const todayIso = () => {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 };
 
+const getInvoiceValidationMessage = (errors: FieldErrors<FormValues>) => {
+  if (errors.customerId?.message) {
+    return "Find and select a customer before saving invoice.";
+  }
+  if (errors.invoiceDate?.message) {
+    return String(errors.invoiceDate.message);
+  }
+
+  const itemErrors = errors.items;
+  if (Array.isArray(itemErrors)) {
+    for (const itemError of itemErrors) {
+      const message =
+        itemError?.productId?.message ??
+        itemError?.qty?.message ??
+        itemError?.rate?.message ??
+        itemError?.discountValue?.message;
+      if (message) {
+        return String(message);
+      }
+    }
+  }
+
+  return "Please fill all required invoice fields before saving.";
+};
+
 export const CreateInvoicePage = () => {
   const navigate = useNavigate();
   const { can } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
   const [customerMobile, setCustomerMobile] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
@@ -103,25 +132,30 @@ export const CreateInvoicePage = () => {
       invoiceDiscountType: "FIXED",
       discountAmount: "0",
       paidAmount: "0",
+      paymentMode: "",
       items: [createEmptyItem()]
     }
   });
 
-  const { fields, append, remove, update } = useFieldArray({ control, name: "items" });
+  const { fields, append, remove, update, replace } = useFieldArray({ control, name: "items" });
 
   useEffect(() => {
-    void getProducts({ active: true, size: 1000 })
-      .then((productData) => {
+    void Promise.all([getProducts({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 })])
+      .then(([productData, modeData]) => {
         setProducts(productData.filter((item) => item.active));
+        setPaymentModes(modeData);
       })
-      .catch((err: any) => setApiError(err, "Unable to load products"));
+      .catch((err: any) => setApiError(err, "Unable to load invoice setup data"));
   }, [setApiError]);
 
   const watchedItems = useWatch({ control, name: "items" }) ?? [];
+  const invoiceDateInput = useWatch({ control, name: "invoiceDate" }) ?? "";
   const invoiceDiscountType = useWatch({ control, name: "invoiceDiscountType" }) ?? "FIXED";
   const invoiceDiscountInput = useWatch({ control, name: "discountAmount" }) ?? "0";
   const paidAmountInput = useWatch({ control, name: "paidAmount" }) ?? "0";
+  const paymentModeInput = useWatch({ control, name: "paymentMode" }) ?? "";
   const previousInvoiceDiscountTypeRef = useRef<typeof invoiceDiscountType | null>(null);
+  const autoFillPaidAmountRef = useRef(true);
 
   const productMap = useMemo(
     () => new Map(products.map((product) => [String(product.id), product])),
@@ -153,6 +187,13 @@ export const CreateInvoicePage = () => {
       setValue("discountAmount", "0", { shouldDirty: true, shouldValidate: true });
     }
   }, [invoiceDiscountType, setValue]);
+
+  useEffect(() => {
+    if (!autoFillPaidAmountRef.current) {
+      return;
+    }
+    setValue("paidAmount", invoiceSummary.grandTotal.toFixed(2), { shouldDirty: true, shouldValidate: true });
+  }, [invoiceSummary.grandTotal, setValue]);
 
   const rowIssues = useMemo(() => watchedItems.map((item, index) => {
     const product = productMap.get(item.productId);
@@ -195,23 +236,48 @@ export const CreateInvoicePage = () => {
     if (invoiceDiscountType === "PERCENT" && invoiceDiscountValue > 100) {
       issues.push("Invoice discount percent cannot exceed 100%.");
     }
-    if (invoiceDiscountType === "FIXED" && invoiceDiscountValue > invoiceSummary.afterProductDiscountSubtotal) {
-      issues.push("Invoice discount cannot exceed subtotal after product discounts.");
+    if (invoiceDiscountType === "FIXED" && invoiceDiscountValue > invoiceSummary.totalBeforeInvoiceDiscount) {
+      issues.push("Invoice discount cannot exceed total amount.");
     }
     if (numberValue(paidAmountInput) < 0) {
       issues.push("Paid amount cannot be negative.");
     }
+    if (numberValue(paidAmountInput) > invoiceSummary.grandTotal) {
+      issues.push("Paid amount cannot exceed grand total.");
+    }
+    if (numberValue(paidAmountInput) > 0 && !paymentModeInput) {
+      issues.push("Select payment mode when paid amount is greater than 0.");
+    }
     return issues;
-  }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.afterProductDiscountSubtotal, paidAmountInput]);
+  }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.grandTotal, invoiceSummary.totalBeforeInvoiceDiscount, paidAmountInput, paymentModeInput]);
 
   const hasClientValidationErrors = rowIssues.some((issues) => issues.length > 0) || summaryIssues.length > 0;
   const totalWithoutDiscount = invoiceSummary.grandTotal + invoiceSummary.productDiscountTotal + invoiceSummary.invoiceDiscount;
+  const canProceedWithInvoice = Boolean(selectedCustomer?.active);
+  const hasRequiredInvoiceFields = Boolean(
+    selectedCustomer?.active &&
+    invoiceDateInput &&
+    watchedItems.length > 0 &&
+    watchedItems.every((item) => item.productId && numberValue(item.qty) >= 1 && numberValue(item.rate) >= 0) &&
+    (invoiceSummary.paidAmount <= 0 || paymentModeInput)
+  );
+  const canSaveInvoice = hasRequiredInvoiceFields && !hasClientValidationErrors;
+  const canCreateNewCustomer = Boolean(newCustomer.name.trim() && (customerMobile.trim() || newCustomer.mobile.trim()));
+
+  const resetInvoiceEntry = () => {
+    replace([createEmptyItem()]);
+    setValue("discountAmount", "0", { shouldDirty: true, shouldValidate: true });
+    autoFillPaidAmountRef.current = true;
+    setValue("paidAmount", "0", { shouldDirty: true, shouldValidate: true });
+    setValue("paymentMode", "", { shouldDirty: true, shouldValidate: true });
+  };
 
   const lookupCustomerByMobile = async () => {
     clearMessage();
     setSelectedCustomer(null);
     setPurchaseHistory(null);
     setValue("customerId", "");
+    resetInvoiceEntry();
 
     const mobile = customerMobile.trim();
     if (!mobile) {
@@ -309,6 +375,7 @@ export const CreateInvoicePage = () => {
     setPurchaseHistory(null);
     setShowNewCustomerForm(false);
     setValue("customerId", "", { shouldValidate: true });
+    resetInvoiceEntry();
   };
 
   const syncProductDefaults = (index: number, productId: string) => {
@@ -357,6 +424,8 @@ export const CreateInvoicePage = () => {
       customerId: Number(values.customerId),
       invoiceDate: values.invoiceDate,
       discountAmount: Number(invoiceSummary.invoiceDiscount.toFixed(2)),
+      paidAmount: Number(invoiceSummary.paidAmount.toFixed(2)),
+      paymentMode: values.paymentMode || undefined,
       items: values.items.map((item) => ({
         productId: Number(item.productId),
         qty: Number(item.qty),
@@ -384,11 +453,15 @@ export const CreateInvoicePage = () => {
     }
   };
 
+  const onInvalid = (validationErrors: FieldErrors<FormValues>) => {
+    notificationService.showError(getInvoiceValidationMessage(validationErrors));
+  };
+
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header title="Create Invoice" subtitle="" />
 
-      <form id="create-invoice-form" className="mx-auto grid w-full max-w-[1660px] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]" onSubmit={handleSubmit(onSubmit)}>
+      <form id="create-invoice-form" className="mx-auto grid w-full max-w-[1660px] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]" onSubmit={handleSubmit(onSubmit, onInvalid)}>
         <div className="space-y-4">
           <GlassCard className="p-4 md:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -401,7 +474,7 @@ export const CreateInvoicePage = () => {
                   <ArrowLeft size={16} />
                   Back
                 </Button>
-                <Button disabled={isSubmitting || hasClientValidationErrors} type="submit">
+                <Button disabled={isSubmitting || !canSaveInvoice} type="submit">
                   {isSubmitting ? "Saving..." : "Save Invoice"}
                 </Button>
               </div>
@@ -439,6 +512,7 @@ export const CreateInvoicePage = () => {
                   label="Invoice Date"
                   requiredMark
                   type="date"
+                  disabled={!canProceedWithInvoice}
                   error={errors.invoiceDate?.message}
                   {...register("invoiceDate", { required: "Invoice date is required" })}
                 />
@@ -487,7 +561,7 @@ export const CreateInvoicePage = () => {
                   <Input label="Address" className="md:col-span-2 xl:col-span-4" error={customerCreateFieldErrors.address} value={newCustomer.address} onChange={(event) => setNewCustomer((current) => ({ ...current, address: event.target.value }))} />
                 </div>
                 <div className="mt-3">
-                  <Button type="button" disabled={creatingCustomer} onClick={() => void handleCreateCustomer()}>
+                  <Button type="button" disabled={creatingCustomer || !canCreateNewCustomer} onClick={() => void handleCreateCustomer()}>
                     {creatingCustomer ? "Creating..." : "Add Customer"}
                   </Button>
                 </div>
@@ -495,10 +569,15 @@ export const CreateInvoicePage = () => {
             ) : null}
           </GlassCard>
 
-          <GlassCard className="p-4 md:p-5">
+          <GlassCard className={`p-4 md:p-5 ${canProceedWithInvoice ? "" : "opacity-75"}`}>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-lg font-bold text-slate-950">Products</h3>
-              <Button type="button" variant="secondary" onClick={() => append(createEmptyItem())}>
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">Products</h3>
+                {!canProceedWithInvoice ? (
+                  <p className="mt-1 text-sm font-medium text-slate-500">Find or add a customer first to continue invoice entry.</p>
+                ) : null}
+              </div>
+              <Button type="button" variant="secondary" disabled={!canProceedWithInvoice} onClick={() => append(createEmptyItem())}>
                 <Plus size={16} />
                 Add Product
               </Button>
@@ -531,6 +610,7 @@ export const CreateInvoicePage = () => {
                           <label className="sr-only">Product</label>
                           <select
                             {...productRegister}
+                            disabled={!canProceedWithInvoice}
                             className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white py-0 pl-3 pr-12 text-sm font-medium text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.productId?.message ? "border-rose-400/70" : "border-slate-200"}`}
                             onChange={(event) => {
                               productRegister.onChange(event);
@@ -551,6 +631,7 @@ export const CreateInvoicePage = () => {
                           <input
                             type="number"
                             min={1}
+                            disabled={!canProceedWithInvoice}
                             className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white px-2 text-center text-sm font-semibold text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.qty?.message ? "border-rose-400/70" : "border-slate-200"}`}
                             {...register(`items.${index}.qty`, {
                               required: "Quantity is required",
@@ -566,6 +647,7 @@ export const CreateInvoicePage = () => {
                             type="number"
                             step="0.01"
                             min={0}
+                            disabled={!canProceedWithInvoice}
                             aria-label="Rate"
                             placeholder="Rate"
                             {...rateRegister}
@@ -579,6 +661,7 @@ export const CreateInvoicePage = () => {
                             type="number"
                             step="0.01"
                             min={0}
+                            disabled={!canProceedWithInvoice}
                             aria-label="Discount"
                             placeholder="Discount"
                             {...register(`items.${index}.discountValue`, {
@@ -593,9 +676,7 @@ export const CreateInvoicePage = () => {
                         </div>
 
                         <div className="flex h-[46px] items-center justify-center">
-                          <Button type="button" variant="danger" className="h-10 w-10 min-w-0 px-0" aria-label="Remove product line" title="Remove" onClick={() => removeProductLine(index)}>
-                            <Trash2 size={16} />
-                          </Button>
+                          <CommonDeleteIconButton disabled={!canProceedWithInvoice} label="Remove product line" onClick={() => removeProductLine(index)} />
                         </div>
                       </div>
                     </div>
@@ -607,7 +688,7 @@ export const CreateInvoicePage = () => {
         </div>
 
         <aside className="xl:sticky xl:top-24 xl:self-start">
-          <GlassCard className="p-3 md:p-4">
+          <GlassCard className={`p-3 md:p-4 ${canProceedWithInvoice ? "" : "opacity-75"}`}>
             <section className="space-y-3">
               <h3 className="text-base font-bold text-slate-950">Invoice Summary</h3>
 
@@ -616,12 +697,14 @@ export const CreateInvoicePage = () => {
                   label="Invoice Discount Type"
                   placeholder={null}
                   options={[{ label: "Fixed", value: "FIXED" }, { label: "Percent", value: "PERCENT" }]}
+                  disabled={!canProceedWithInvoice}
                   {...register("invoiceDiscountType")}
                 />
                 <Input
                   label="Invoice Discount"
                   type="number"
                   step="0.01"
+                  disabled={!canProceedWithInvoice}
                   error={summaryIssues.find((issue) => issue.toLowerCase().includes("invoice discount"))}
                   {...register("discountAmount")}
                 />
@@ -629,8 +712,21 @@ export const CreateInvoicePage = () => {
                   label="Paid Amount"
                   type="number"
                   step="0.01"
+                  disabled={!canProceedWithInvoice}
                   error={summaryIssues.find((issue) => issue.toLowerCase().includes("paid amount"))}
-                  {...register("paidAmount")}
+                  {...register("paidAmount", {
+                    onChange: () => {
+                      autoFillPaidAmountRef.current = false;
+                    }
+                  })}
+                />
+                <Select
+                  label="Payment Mode"
+                  disabled={!canProceedWithInvoice || invoiceSummary.paidAmount <= 0}
+                  placeholder="No Mode Selected"
+                  error={summaryIssues.find((issue) => issue.toLowerCase().includes("payment mode"))}
+                  options={[{ label: "No Mode Selected", value: "" }, ...paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))]}
+                  {...register("paymentMode")}
                 />
               </div>
 

@@ -36,6 +36,7 @@ export type InvoiceCalculationResult = {
   subtotal: number;
   productDiscountTotal: number;
   afterProductDiscountSubtotal: number;
+  totalBeforeInvoiceDiscount: number;
   invoiceDiscount: number;
   taxAmount: number;
   grandTotal: number;
@@ -86,15 +87,17 @@ export const InvoiceCalculationService = {
     const subtotal = round2(baseRows.reduce((sum, row) => sum + row.lineTotal, 0));
     const productDiscountTotal = round2(baseRows.reduce((sum, row) => sum + row.productDiscount, 0));
     const afterProductDiscountSubtotal = round2(baseRows.reduce((sum, row) => sum + row.afterProductDiscount, 0));
-    const invoiceDiscount = discountAmount(afterProductDiscountSubtotal, input.invoiceDiscountType, input.invoiceDiscountValue);
+    const taxBeforeInvoiceDiscount = round2(baseRows.reduce((sum, row) => sum + round2(row.lineTotal * row.taxPercent / 100), 0));
+    const totalBeforeInvoiceDiscount = round2(afterProductDiscountSubtotal + taxBeforeInvoiceDiscount);
+    const invoiceDiscount = discountAmount(totalBeforeInvoiceDiscount, input.invoiceDiscountType, input.invoiceDiscountValue);
 
     const rows = baseRows.map((row) => {
-      const invoiceDiscountShare = afterProductDiscountSubtotal > 0
-        ? round2(invoiceDiscount * (row.afterProductDiscount / afterProductDiscountSubtotal))
+      const taxAmount = round2(row.lineTotal * row.taxPercent / 100);
+      const lineTotalBeforeInvoiceDiscount = round2(row.afterProductDiscount + taxAmount);
+      const invoiceDiscountShare = totalBeforeInvoiceDiscount > 0
+        ? round2(invoiceDiscount * (lineTotalBeforeInvoiceDiscount / totalBeforeInvoiceDiscount))
         : 0;
-      const taxableAmount = round2(row.afterProductDiscount - invoiceDiscountShare);
-      const taxAmount = round2(taxableAmount * row.taxPercent / 100);
-      const totalAmount = round2(taxableAmount + taxAmount);
+      const totalAmount = round2(lineTotalBeforeInvoiceDiscount - invoiceDiscountShare);
       return { ...row, invoiceDiscountShare, taxAmount, totalAmount };
     });
 
@@ -108,6 +111,7 @@ export const InvoiceCalculationService = {
       subtotal,
       productDiscountTotal,
       afterProductDiscountSubtotal,
+      totalBeforeInvoiceDiscount,
       invoiceDiscount,
       taxAmount,
       grandTotal,

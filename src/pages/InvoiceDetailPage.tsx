@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Building2, Clock3, CreditCard, Download, ReceiptText, UserRound, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { getInvoiceProfitability } from "../api/expenses";
 import { getInvoice } from "../api/invoices";
 import { getPayments } from "../api/payments";
 import { Button } from "../components/Button";
+import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
-import { downloadInvoicePdf } from "../lib/invoicePdf";
 import { formatCurrency } from "../lib/currency";
 import { formatDate, formatDateTime } from "../lib/format";
+import { downloadInvoicePdf } from "../lib/invoicePdf";
 import type { AuditLog, Invoice, Payment, Profitability } from "../types/api";
 
 export const InvoiceDetailPage = () => {
@@ -24,9 +27,7 @@ export const InvoiceDetailPage = () => {
   const [profitability, setProfitability] = useState<Profitability | null>(null);
 
   useEffect(() => {
-    if (!invoiceId) {
-      return;
-    }
+    if (!invoiceId) return;
     const id = Number(invoiceId);
     void Promise.all([
       getInvoice(id),
@@ -39,166 +40,146 @@ export const InvoiceDetailPage = () => {
       setProfitability(profitabilityData);
       setLogs(logData);
     });
-  }, [invoiceId]);
+  }, [can, invoiceId]);
+
+  const canRecordPayment = Boolean(invoice && invoice.paymentStatus !== "PAID" && Number(invoice.balanceAmount) > 0 && can("PAYMENTS", "ADD"));
 
   return (
     <div className="space-y-4 pb-6">
-      <Header
-        title="Invoice Details"
-        subtitle="Review invoice details, line items, totals, customer information, and download a printable invoice PDF."
-      />
-      <GlassCard className="overflow-hidden p-0">
-        <div className="border-b border-slate-200 bg-white p-6 md:p-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.35em] text-slate-400">Invoice Header</p>
-              <h2 className="mt-2 text-3xl font-extrabold text-slate-950">{invoice?.invoiceNo ?? "--"}</h2>
-              <p className="mt-1 text-sm font-medium text-slate-500">Invoice Date: {formatDate(invoice?.invoiceDate)}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {invoice ? <StatusBadge label={invoice.paymentStatus} /> : null}
-              {invoice && can("INVOICES", "EXPORT") ? (
-                <Button type="button" variant="secondary" onClick={() => downloadInvoicePdf(invoice, user?.company ?? null)}>
-                  Download invoice
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </div>
+      <Header title="Invoice Details" subtitle="Professional invoice view with payment history, status timeline, and outstanding tracking." />
 
-        <div className="grid gap-6 p-6 md:p-8 xl:grid-cols-[0.9fr_1.1fr]">
-          <section className="space-y-5">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Customer Details</h3>
-              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <p className="text-xl font-extrabold text-slate-950">{invoice?.customerName ?? "--"}</p>
-                <p className="mt-1 text-sm font-medium text-slate-600">{invoice?.customerMobile ?? "--"}</p>
-                <p className="mt-3 text-sm text-slate-500">{invoice?.customerAddress ?? "--"}</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Outstanding Summary</h3>
-              <div className="mt-3 grid gap-3">
-                <SummaryRow label="Invoice Amount" value={formatCurrency(invoice?.totalAmount)} />
-                <SummaryRow label="Paid Amount" value={formatCurrency(invoice?.paidAmount)} />
-                <SummaryRow label="Outstanding Amount" value={formatCurrency(invoice?.balanceAmount)} highlight />
-              </div>
-              {can("PAYMENTS", "ADD") ? (
-                <div className="mt-4">
-                  <Link to={invoice ? `/payments?invoiceId=${invoice.id}` : "/payments"}>
-                    <Button>Record payment</Button>
-                  </Link>
-                </div>
-              ) : null}
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Invoice Summary</h3>
-              <div className="mt-3 grid gap-3">
-                <SummaryRow label="Subtotal" value={formatCurrency(invoice?.subtotal)} />
-                <SummaryRow label="Product + Invoice Discount" value={formatCurrency(invoice?.discountAmount)} />
-                <SummaryRow label="Tax" value={formatCurrency(invoice?.taxAmount)} />
-                <SummaryRow label="Grand Total" value={formatCurrency(invoice?.totalAmount)} strong />
-              </div>
-            </div>
-
-            {profitability ? (
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Invoice Profitability</h3>
-                <div className="mt-3 grid gap-3">
-                  <SummaryRow label="Invoice Amount" value={formatCurrency(profitability.revenue)} />
-                  <SummaryRow label="Invoice Expense" value={formatCurrency(profitability.expense)} />
-                  <SummaryRow label="Net Revenue" value={formatCurrency(profitability.netRevenue)} strong />
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="space-y-5">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Product Details</h3>
-              <div className="mt-3">
-                <Table
-                  data={invoice?.items ?? []}
-                  columns={[
-                    { key: "product", header: "Product", render: (item) => item.productName },
-                    { key: "qty", header: "Qty", className: "text-right", render: (item) => <span className="block text-right">{item.qty}</span> },
-                    { key: "price", header: "Rate", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.price)}</span> },
-                    { key: "discount", header: "Discount", className: "text-right", render: (item) => <span className="block text-right">{item.discountPercent}%</span> },
-                    { key: "tax", header: "Tax", className: "text-right", render: (item) => <span className="block text-right">{item.taxPercent}%</span> },
-                    { key: "lineTotal", header: "Line Total", className: "text-right", render: (item) => <span className="block text-right font-semibold text-slate-950">{formatCurrency(item.lineTotal)}</span> }
-                  ]}
-                />
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Payment History</h3>
-              <div className="mt-3">
-                <Table
-                  data={payments}
-                  emptyText="No payments received for this invoice."
-                  columns={[
-                    { key: "date", header: "Date", render: (item) => formatDate(item.paymentDate) },
-                    { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold text-slate-950">{formatCurrency(item.amount)}</span> },
-                    { key: "mode", header: "Mode", render: (item) => item.mode.replace(/_/g, " ") },
-                    { key: "user", header: "User", render: (item) => item.createdBy ?? "--" }
-                  ]}
-                />
-              </div>
-            </div>
-          </section>
-        </div>
-      </GlassCard>
-
-      <GlassCard className="p-6 md:p-7">
-        <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <GlassCard className="p-5 md:p-7">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.35em] text-slate-400">Audit Timeline</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Invoice activity</h2>
+            <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Invoice Details" }]} />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <h2 className="text-3xl font-black text-slate-950">{invoice?.invoiceNo ?? "--"}</h2>
+              {invoice ? <StatusBadge label={invoice.paymentStatus} /> : null}
+            </div>
+            <p className="mt-2 text-sm font-semibold text-slate-500">Invoice Date: {formatDate(invoice?.invoiceDate)} | Created by {invoice?.createdBy ?? "--"}</p>
           </div>
-          <p className="text-sm text-slate-400">Created {formatDateTime(invoice?.createdAt)} by {invoice?.createdBy ?? "--"}</p>
+          <div className="flex flex-wrap gap-2">
+            {canRecordPayment ? (
+              <Link to={`/payments/new?invoiceId=${invoice?.id}`}>
+                <Button type="button"><CreditCard size={16} />Record Payment</Button>
+              </Link>
+            ) : null}
+            {invoice && can("INVOICES", "EXPORT") ? (
+              <Button type="button" variant="secondary" onClick={() => downloadInvoicePdf(invoice, user?.company ?? null)}>
+                <Download size={16} />Download Invoice
+              </Button>
+            ) : null}
+          </div>
         </div>
-        <div className="space-y-3">
-          {logs.length ? logs.map((log) => <TimelineRow key={log.id} log={log} />) : <p className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">No audit timeline available.</p>}
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <InfoPanel icon={<Building2 size={18} />} title="Company Details">
+            <p className="font-extrabold text-slate-950">{user?.company?.name ?? "--"}</p>
+            <p>{user?.company?.email ?? "--"}</p>
+            <p>{user?.company?.phone ?? "--"}</p>
+          </InfoPanel>
+          <InfoPanel icon={<UserRound size={18} />} title="Customer Details">
+            <p className="font-extrabold text-slate-950">{invoice?.customerName ?? "--"}</p>
+            <p>{invoice?.customerMobile ?? "--"}</p>
+            <p>{invoice?.customerAddress ?? "--"}</p>
+          </InfoPanel>
+          <InfoPanel icon={<Wallet size={18} />} title="Payment Summary">
+            <SummaryLine label="Total" value={formatCurrency(invoice?.totalAmount)} />
+            <SummaryLine label="Paid" value={formatCurrency(invoice?.paidAmount)} />
+            <SummaryLine label="Outstanding" value={formatCurrency(invoice?.balanceAmount)} danger />
+          </InfoPanel>
         </div>
       </GlassCard>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <GlassCard className="p-5 md:p-7">
+          <div className="mb-5 flex items-center gap-3">
+            <ReceiptText size={20} className="text-[var(--theme-color)]" />
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">Line Items</p>
+              <h3 className="text-xl font-extrabold text-slate-950">Invoice summary</h3>
+            </div>
+          </div>
+          <Table data={invoice?.items ?? []} columns={[
+            { key: "product", header: "Product", render: (item) => <span className="font-semibold">{item.productName}</span> },
+            { key: "qty", header: "Qty", className: "text-right", render: (item) => <span className="block text-right">{item.qty}</span> },
+            { key: "price", header: "Rate", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.price)}</span> },
+            { key: "tax", header: "Tax", className: "text-right", render: (item) => <span className="block text-right">{item.taxPercent}%</span> },
+            { key: "lineTotal", header: "Total", className: "text-right", render: (item) => <span className="block text-right font-bold text-slate-950">{formatCurrency(item.lineTotal)}</span> }
+          ]} />
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <SummaryBox label="Subtotal" value={formatCurrency(invoice?.subtotal)} />
+            <SummaryBox label="Discount" value={formatCurrency(invoice?.discountAmount)} />
+            <SummaryBox label="Tax" value={formatCurrency(invoice?.taxAmount)} />
+            <SummaryBox label="Grand Total" value={formatCurrency(invoice?.totalAmount)} strong />
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-5 md:p-7">
+          <div className="mb-5 flex items-center gap-3">
+            <Clock3 size={20} className="text-[var(--theme-color)]" />
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400">Status Timeline</p>
+              <h3 className="text-xl font-extrabold text-slate-950">Activity</h3>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {logs.length ? logs.map((log) => <TimelineRow key={log.id} log={log} />) : <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No audit timeline available.</p>}
+          </div>
+        </GlassCard>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <GlassCard className="p-5 md:p-7">
+          <h3 className="mb-4 text-xl font-extrabold text-slate-950">Payment History</h3>
+          <Table data={payments} emptyText="No payments received for this invoice." columns={[
+            { key: "date", header: "Date", render: (item) => formatDate(item.paymentDate) },
+            { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-bold text-slate-950">{formatCurrency(item.amount)}</span> },
+            { key: "mode", header: "Mode", render: (item) => item.mode.replace(/_/g, " ") },
+            { key: "user", header: "Collected By", render: (item) => item.createdBy ?? "--" }
+          ]} />
+        </GlassCard>
+
+        {profitability ? (
+          <GlassCard className="p-5 md:p-7">
+            <h3 className="mb-4 text-xl font-extrabold text-slate-950">Profitability</h3>
+            <div className="space-y-3">
+              <SummaryBox label="Revenue" value={formatCurrency(profitability.revenue)} />
+              <SummaryBox label="Expense" value={formatCurrency(profitability.expense)} />
+              <SummaryBox label="Net Revenue" value={formatCurrency(profitability.netRevenue)} strong />
+            </div>
+          </GlassCard>
+        ) : null}
+      </div>
     </div>
   );
 };
 
-const SummaryRow = ({ label, value, strong = false, highlight = false }: { label: string; value: string; strong?: boolean; highlight?: boolean }) => (
-  <div className={`flex items-center justify-between rounded-2xl border p-4 ${highlight ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-white"}`}>
-    <span className="text-sm font-medium text-slate-500">{label}</span>
-    <span className={`${strong || highlight ? "text-lg font-extrabold" : "font-bold"} ${highlight ? "text-rose-700" : "text-slate-950"}`}>{value}</span>
+const InfoPanel = ({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) => (
+  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+    <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-slate-400">{icon}{title}</div>
+    <div className="space-y-1 text-sm font-medium text-slate-600">{children}</div>
+  </section>
+);
+
+const SummaryLine = ({ label, value, danger }: { label: string; value: string; danger?: boolean }) => (
+  <div className="flex items-center justify-between gap-3 text-sm">
+    <span className="text-slate-500">{label}</span>
+    <span className={`font-extrabold ${danger ? "text-rose-600" : "text-slate-950"}`}>{value}</span>
   </div>
 );
 
-const TimelineRow = ({ log }: { log: AuditLog }) => {
-  const data = parseLogData(log.changedFields) ?? parseLogData(log.newData);
-  const label = log.actionType === "CREATE" ? "Invoice Created" : log.actionType.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="font-bold text-white">{label}</p>
-          <p className="mt-1 text-sm text-slate-400">{formatDateTime(log.createdAt)} | {log.userName ?? "--"}</p>
-        </div>
-        {"paymentAmount" in data ? <span className="font-bold text-emerald-200">{formatCurrency(Number(data.paymentAmount))}</span> : null}
-      </div>
-      {"oldOutstanding" in data || "newOutstanding" in data ? (
-        <p className="mt-3 text-sm text-slate-300">Outstanding: {formatCurrency(Number(data.oldOutstanding ?? 0))} to {formatCurrency(Number(data.newOutstanding ?? 0))}</p>
-      ) : null}
-    </div>
-  );
-};
+const SummaryBox = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+    <p className={`${strong ? "text-xl" : "text-lg"} mt-2 font-black text-slate-950`}>{value}</p>
+  </div>
+);
 
-const parseLogData = (value: string | null) => {
-  if (!value) return {};
-  try {
-    return JSON.parse(value) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-};
+const TimelineRow = ({ log }: { log: AuditLog }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+    <p className="font-bold text-slate-950">{log.actionType.replace(/_/g, " ")}</p>
+    <p className="mt-1 text-xs font-semibold text-slate-500">{formatDateTime(log.createdAt)} | {log.userName ?? "--"}</p>
+  </div>
+);

@@ -1,4 +1,5 @@
-import { Trash2, X } from "lucide-react";
+import { X } from "lucide-react";
+import { CommonDeleteIcon } from "./CommonDeleteAction";
 import { Button } from "./Button";
 import { GlassCard } from "./GlassCard";
 
@@ -24,7 +25,7 @@ export const CommonDeleteModal = ({
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-rose-300/20 bg-rose-500/12 text-rose-100">
-                <Trash2 size={19} />
+                <CommonDeleteIcon size={19} />
               </div>
               <div>
                 <h3 className="card-title text-lg text-slate-950">Confirm Delete</h3>

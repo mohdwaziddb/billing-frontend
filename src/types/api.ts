@@ -103,7 +103,7 @@ export type PageResponse<T> = {
   totalPages: number;
 };
 
-export type DashboardCardKey = "totalSales" | "collections" | "outstanding" | "customers" | "newCustomers" | "existingCustomers" | "invoices" | "products";
+export type DashboardCardKey = "totalSales" | "collections" | "outstanding" | "totalExpense" | "netRevenue" | "customers" | "newCustomers" | "existingCustomers" | "invoices" | "products";
 
 export type DashboardDetailRow = Record<string, string | number | null>;
 
@@ -388,10 +388,12 @@ export type InvoiceRequest = {
   customerId: number;
   invoiceDate: string;
   discountAmount: number;
+  paidAmount?: number;
+  paymentMode?: string;
   items: InvoiceRequestItem[];
 };
 
-export type PaymentMode = "CASH" | "CARD" | "UPI" | "BANK_TRANSFER" | "CHEQUE" | "WALLET" | "OTHER";
+export type PaymentMode = string;
 
 export type Payment = {
   id: number;
@@ -408,6 +410,41 @@ export type Payment = {
   createdBy: string | null;
 };
 
+export type PaymentHierarchyNode = {
+  id: string;
+  parentId: string | null;
+  type: "metric" | "collected" | "mode" | "year" | "month" | "day" | "record" | string;
+  label: string;
+  subtitle: string | null;
+  amount: number;
+  count: number;
+  hasChildren: boolean;
+  tone: string;
+};
+
+export type PaymentHierarchyRecord = {
+  paymentId: number;
+  invoiceNo: string;
+  customerName: string;
+  amount: number;
+  collectedBy: string | null;
+  paymentMode: string;
+  paymentDate: string;
+};
+
+export type PaymentHierarchyResponse = {
+  nodeId: string;
+  nodeType: string;
+  companyName: string;
+  totalReceivable: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  totalExpense: number;
+  netRevenue: number;
+  nodes: PaymentHierarchyNode[];
+  records: PaymentHierarchyRecord[];
+};
+
 export type PaymentRequest = {
   customerId: number;
   invoiceId?: number;
@@ -415,6 +452,24 @@ export type PaymentRequest = {
   paymentDate: string;
   mode: PaymentMode;
   remarks?: string;
+};
+
+export type PaymentModeMaster = {
+  id: number;
+  modeName: string;
+  modeCode: string;
+  description: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+export type PaymentModeRequest = {
+  modeName: string;
+  description?: string;
+  active: boolean;
 };
 
 export type ExpenseType = "GENERAL" | "CUSTOMER_RELATED" | "INVOICE_RELATED";

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Eye, FilePlus2, Italic, Link, List, ListOrdered, Mail, Pencil, Trash2, Type } from "lucide-react";
+import { Eye, FilePlus2, Italic, Link, List, ListOrdered, Mail, Pencil, Type } from "lucide-react";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -53,6 +54,7 @@ export const EmailTemplatePage = () => {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const { can } = useAuth();
   const { clearMessage, setApiError } = useApiMessage();
+  const canSaveTemplate = Boolean(form.templateName.trim() && form.subject.trim() && form.emailBody.trim());
 
   const loadTemplates = async (nextPage = 0, searchOverride = search) => {
     setLoading(true);
@@ -230,7 +232,7 @@ export const EmailTemplatePage = () => {
                     actions={[
                       { label: "Preview", icon: <Eye size={15} />, onClick: () => void openPreview(item) },
                       { label: "Edit", icon: <Pencil size={15} />, hidden: !can("EMAIL_TEMPLATES", "EDIT"), onClick: () => openEdit(item) },
-                      { label: "Delete", icon: <Trash2 size={15} />, hidden: !can("EMAIL_TEMPLATES", "DELETE"), danger: true, onClick: () => void removeTemplate(item) }
+                      { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("EMAIL_TEMPLATES", "DELETE"), danger: true, onClick: () => void removeTemplate(item) }
                     ]}
                   />
                 )
@@ -309,7 +311,7 @@ export const EmailTemplatePage = () => {
             </label>
             <div className="flex justify-end gap-3">
               <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>Cancel</Button>
-              <Button type="button" onClick={() => void saveTemplate()}>{editingTemplate ? "Save Template" : "Create Template"}</Button>
+              <Button type="button" disabled={!canSaveTemplate} onClick={() => void saveTemplate()}>{editingTemplate ? "Save Template" : "Create Template"}</Button>
             </div>
           </div>
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Edit3, History, Plus, Trash2 } from "lucide-react";
+import { Edit3, History, Plus } from "lucide-react";
 import { createExpenseCategory, deleteExpenseCategory, getExpenseCategoriesPage, updateExpenseCategory } from "../api/expenseCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -34,6 +35,7 @@ export const ExpenseCategoryPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<ExpenseCategory | null>(null);
   const [logTarget, setLogTarget] = useState<ExpenseCategory | null>(null);
   const [form, setForm] = useState({ categoryName: "", description: "", active: "true" });
+  const canSaveCategory = Boolean(form.categoryName.trim());
 
   const load = async (page = 0) => {
     const response = await getExpenseCategoriesPage({ search: search || undefined, active: active ? active === "true" : undefined, page, size: DEFAULT_PAGE_SIZE });
@@ -116,7 +118,7 @@ export const ExpenseCategoryPage = () => {
                 <ActionDropdown actions={[
                   { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("EXPENSE_CATEGORIES", "EDIT"), onClick: () => openForm(item) },
                   { label: "Show Logs", icon: <History size={15} />, hidden: !can("EXPENSE_CATEGORIES", "LOGS"), onClick: () => setLogTarget(item) },
-                  { label: "Delete", icon: <Trash2 size={15} />, danger: true, hidden: !can("EXPENSE_CATEGORIES", "DELETE"), onClick: () => setDeleteTarget(item) }
+                  { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("EXPENSE_CATEGORIES", "DELETE"), onClick: () => setDeleteTarget(item) }
                 ]} />
               )
             }
@@ -132,7 +134,7 @@ export const ExpenseCategoryPage = () => {
           <Select label="Status" value={form.active} options={[{ label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => setForm((current) => ({ ...current, active: event.target.value }))} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => { setFormOpen(false); setEditing(null); setForm({ categoryName: "", description: "", active: "true" }); }}>Cancel</Button>
-            <Button type="button" onClick={() => void save()}>Save</Button>
+            <Button type="button" disabled={!canSaveCategory} onClick={() => void save()}>Save</Button>
           </div>
         </div>
       </Modal>

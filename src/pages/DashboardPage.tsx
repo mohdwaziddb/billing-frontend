@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Banknote, Boxes, ChevronDown, ChevronUp, CreditCard, Download, FileText, Search, TrendingUp, Users, Wallet } from "lucide-react";
 import {
   Area,
@@ -114,6 +114,29 @@ const detailConfig: Record<DashboardCardKey, { title: string; columns: DetailCol
       { key: "paidAmount", header: "Paid Amount", type: "currency", sortable: true },
       { key: "outstandingAmount", header: "Outstanding Amount", type: "currency", sortable: true },
       { key: "dueDate", header: "Due Date", type: "date", sortable: true }
+    ]
+  },
+  totalExpense: {
+    title: "Total Expense Details",
+    defaultSort: "expenseDate",
+    columns: [
+      { key: "expenseType", header: "Expense Type", sortable: true },
+      { key: "categoryName", header: "Category", sortable: true },
+      { key: "customerName", header: "Customer", sortable: true },
+      { key: "invoiceNo", header: "Invoice No", sortable: true },
+      { key: "amount", header: "Amount", type: "currency", sortable: true },
+      { key: "expenseDate", header: "Expense Date", type: "date", sortable: true },
+      { key: "description", header: "Description", sortable: true }
+    ]
+  },
+  netRevenue: {
+    title: "Net Revenue Details",
+    defaultSort: "date",
+    columns: [
+      { key: "date", header: "Date", type: "date", sortable: true },
+      { key: "totalRevenue", header: "Total Revenue", type: "currency", sortable: true },
+      { key: "totalExpense", header: "Total Expense", type: "currency", sortable: true },
+      { key: "netRevenue", header: "Net Revenue", type: "currency", sortable: true }
     ]
   },
   customers: {
@@ -356,31 +379,50 @@ const buildListTotalRow = (rows: DashboardListRow[], config: { columns: Dashboar
   return totalRow;
 };
 
-const CustomerSummaryCompactCard = ({
-  total,
-  newCustomers,
-  existingCustomers,
+const DashboardCompactCard = ({
+  label,
+  value,
+  caption,
+  icon,
+  accentColor = "var(--theme-color)",
+  meta,
   onClick
 }: {
-  total: number;
-  newCustomers: number;
-  existingCustomers: number;
+  label: string;
+  value: string | number;
+  caption: string;
+  icon: ReactNode;
+  accentColor?: string;
+  meta?: Array<{ label: string; value: string | number }>;
   onClick: () => void;
 }) => (
   <button
     type="button"
-    className="group flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--theme-color)_28%,white)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)]"
+    className="group h-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--compact-accent)_30%,white)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--compact-accent)_34%,transparent)]"
+    style={{ "--compact-accent": accentColor } as CSSProperties}
     onClick={onClick}
   >
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--theme-color)_10%,white)] text-[var(--theme-color)]">
-      <Users size={17} />
-    </span>
-    <span className="min-w-0 flex-1">
-      <span className="block truncate text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Customers</span>
-      <span className="mt-1 block text-2xl font-extrabold text-slate-950">{total}</span>
-      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-slate-500">
-        <span>New: {newCustomers}</span>
-        <span>Existing: {existingCustomers}</span>
+    <span className="flex min-h-[118px] flex-col justify-between gap-3">
+      <span className="flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block truncate text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{label}</span>
+          <span className="mt-2 block text-3xl font-extrabold leading-none text-slate-950">{value}</span>
+        </span>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--compact-accent)_11%,white)] text-[var(--compact-accent)] shadow-[0_10px_22px_color-mix(in_srgb,var(--compact-accent)_12%,transparent)]">
+          {icon}
+        </span>
+      </span>
+      <span className="block min-w-0">
+        <span className="block truncate text-xs font-semibold text-slate-500">{caption}</span>
+        {meta?.length ? (
+          <span className="mt-3 flex flex-wrap gap-2">
+            {meta.map((item) => (
+              <span key={item.label} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                {item.label}: {item.value}
+              </span>
+            ))}
+          </span>
+        ) : null}
       </span>
     </span>
   </button>
@@ -711,33 +753,47 @@ export const DashboardPage = () => {
             onClick={card.key ? () => openDetails(card.key) : undefined}
           />
         ))}
-        <StatCard label="Total Expense" value={formatCurrency(summary?.totalExpense)} caption="Recorded business spend" icon={<Banknote size={18} />} />
-        <StatCard label="Net Revenue" value={formatCurrency(summary?.netRevenue)} caption="Revenue minus expense" icon={<TrendingUp size={18} />} />
+        <StatCard
+          label="Total Expense"
+          value={formatCurrency(summary?.totalExpense)}
+          caption="Recorded business spend"
+          icon={<Banknote size={18} />}
+          analyticsColor="#f97316"
+          onClick={() => openDetails("totalExpense")}
+        />
+        <StatCard
+          label="Net Revenue"
+          value={formatCurrency(summary?.netRevenue)}
+          caption="Revenue minus expense"
+          icon={<TrendingUp size={18} />}
+          analyticsColor="#0d9488"
+          onClick={() => openDetails("netRevenue")}
+        />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <CustomerSummaryCompactCard
-          total={summary?.totalCustomers ?? 0}
-          newCustomers={summary?.newCustomers ?? 0}
-          existingCustomers={summary?.existingCustomers ?? 0}
+      <div className="grid gap-3 md:grid-cols-3">
+        <DashboardCompactCard
+          label="Customers"
+          value={summary?.totalCustomers ?? 0}
+          caption="Active buying base"
+          icon={<Users size={18} />}
+          accentColor="#8b5cf6"
+          meta={[
+            { label: "New", value: summary?.newCustomers ?? 0 },
+            { label: "Existing", value: summary?.existingCustomers ?? 0 }
+          ]}
           onClick={() => openDetails("customers")}
         />
         {compactMetrics.map((metric) => (
-          <button
+          <DashboardCompactCard
             key={metric.label}
-            type="button"
-            className="group flex min-h-[92px] items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--theme-color)_28%,white)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)]"
+            label={metric.label}
+            value={metric.value}
+            caption={metric.caption}
+            icon={metric.icon}
+            accentColor={metric.key === "products" ? "#f97316" : "#2563eb"}
             onClick={() => openDetails(metric.key)}
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--theme-color)_10%,white)] text-[var(--theme-color)]">
-              {metric.icon}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{metric.label}</span>
-              <span className="mt-1 block text-2xl font-extrabold text-slate-950">{metric.value}</span>
-              <span className="mt-1 block truncate text-xs font-semibold text-slate-500">{metric.caption}</span>
-            </span>
-          </button>
+          />
         ))}
       </div>
 

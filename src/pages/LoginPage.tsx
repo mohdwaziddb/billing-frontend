@@ -16,6 +16,8 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { clearMessage, setApiError } = useApiMessage();
+  const canOpenForgotPassword = form.username.trim().length > 0;
+  const canSubmit = Boolean(form.username.trim() && form.password.trim());
 
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/dashboard";
 
@@ -67,13 +69,15 @@ export const LoginPage = () => {
             <div className="flex justify-end">
               <button
                 type="button"
-                className="text-sm font-semibold text-[var(--theme-color)] transition hover:text-[var(--theme-hover)]"
+                className="text-sm font-semibold text-[var(--theme-color)] transition hover:text-[var(--theme-hover)] disabled:cursor-not-allowed disabled:text-slate-400"
+                disabled={!canOpenForgotPassword}
+                title={canOpenForgotPassword ? "Reset password" : "Enter Mobile Number or Email ID first"}
                 onClick={() => setForgotPasswordOpen(true)}
               >
                 Forgot password?
               </button>
             </div>
-            <Button className="w-full" disabled={loading} type="submit">
+            <Button className="w-full" disabled={loading || !canSubmit} type="submit">
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
