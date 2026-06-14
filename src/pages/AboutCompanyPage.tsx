@@ -1,7 +1,8 @@
 import { Building2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getCompanySettings, updateCompanySettings, uploadCompanyLogo, type CompanySettingsRequest } from "../api/company";
+import { deleteCompanyLogo, getCompanySettings, updateCompanySettings, uploadCompanyLogo, type CompanySettingsRequest } from "../api/company";
 import { Button } from "../components/Button";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -49,6 +50,8 @@ export const AboutCompanyPage = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
+  const [deletingLogo, setDeletingLogo] = useState(false);
+  const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
   const canSaveProfile = Boolean(form.name.trim() && form.taxId.trim() && form.phone.trim() && form.email.trim());
 
   const setField = (key: keyof FormState, value: string) => {
@@ -110,6 +113,23 @@ export const AboutCompanyPage = () => {
     }
   };
 
+  const removeLogo = async () => {
+    clearMessage();
+    setSuccess("");
+    setDeletingLogo(true);
+    try {
+      const updated = await deleteCompanyLogo();
+      setLogoUrl(updated.logoUrl ?? null);
+      await refreshProfile();
+      notificationService.showSuccess(CommonSuccessMessageUtil.updated("Company Logo"));
+    } catch (err: any) {
+      setApiError(err, "Unable to remove company logo");
+    } finally {
+      setDeletingLogo(false);
+      setConfirmRemoveLogo(false);
+    }
+  };
+
   const uploadLogo = async (file?: File) => {
     if (!file) {
       return;
@@ -124,9 +144,7 @@ export const AboutCompanyPage = () => {
       const updated = await uploadCompanyLogo(file);
       setLogoUrl(updated.logoUrl ?? null);
       await refreshProfile();
-      const message = CommonSuccessMessageUtil.updated("Company Logo");
-      setSuccess(message);
-      notificationService.showSuccess(message);
+      notificationService.showSuccess(CommonSuccessMessageUtil.updated("Company Logo"));
     } catch (err: any) {
       setApiError(err, "Unable to upload company logo");
     }
@@ -155,11 +173,18 @@ export const AboutCompanyPage = () => {
                 </div>
               </div>
               {canEdit ? (
-                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-white/10 bg-white/8 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/12">
-                  <Upload size={16} />
-                  Upload logo
-                  <input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadLogo(event.target.files?.[0])} />
-                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-white/10 bg-white/8 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/12">
+                    <Upload size={16} />
+                    Upload logo
+                    <input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadLogo(event.target.files?.[0])} />
+                  </label>
+                  {logoUrl ? (
+                    <Button type="button" variant="danger" disabled={deletingLogo} onClick={() => setConfirmRemoveLogo(true)}>
+                      Remove logo
+                    </Button>
+                  ) : null}
+                </div>
               ) : null}
             </div>
 
@@ -197,6 +222,13 @@ export const AboutCompanyPage = () => {
           </div>
         )}
       </GlassCard>
+
+      <CommonDeleteModal
+        open={confirmRemoveLogo}
+        loading={deletingLogo}
+        onCancel={() => setConfirmRemoveLogo(false)}
+        onConfirm={() => void removeLogo()}
+      />
     </div>
   );
 };

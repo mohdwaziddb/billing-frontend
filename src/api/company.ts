@@ -40,6 +40,11 @@ export const uploadCompanyLogo = async (logo: File) => {
   return response.data.data;
 };
 
+export const deleteCompanyLogo = async () => {
+  const response = await apiClient.delete<ApiResponse<CompanySummary>>("/v1/company/logo");
+  return response.data.data;
+};
+
 export const getCompanyTheme = async () => {
   const response = await apiClient.get<ApiResponse<CompanyTheme>>("/v1/company/theme");
   return response.data.data;
