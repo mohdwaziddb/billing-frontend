@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, History, Pencil } from "lucide-react";
+import { Download, History, Pencil, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
-import { deleteProduct, getProductsPage } from "../api/products";
+import { deleteProduct, deleteProductsBulk, getProductsPage } from "../api/products";
+import { BulkDeleteModal } from "../components/BulkDeleteModal";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
@@ -16,8 +17,10 @@ import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { CommonBulkActionToolbar } from "../components/CommonBulkActionToolbar";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { useBulkSelection } from "../hooks/useBulkSelection";
 import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
@@ -42,9 +45,12 @@ export const ProductListPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [logTarget, setLogTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { can } = useAuth();
   const { clearMessage, setApiError } = useApiMessage();
+
+  const bulkSelection = useBulkSelection<Product>(products);
 
   const loadProducts = async (nextPage = page, searchOverride = search) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
@@ -64,6 +70,30 @@ export const ProductListPage = () => {
       await loadProducts(page);
       setDeleteTarget(null);
       notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Product"));
+    } catch (err: any) {
+      setApiError(err, CommonErrorMessageUtil.deleteFailed);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!bulkSelection.selectedIds.length) {
+      return;
+    }
+    try {
+      setDeleting(true);
+      clearMessage();
+      const resp = await deleteProductsBulk(bulkSelection.selectedIds);
+      await loadProducts(page);
+      bulkSelection.clearSelection();
+      setBulkDeleteOpen(false);
+      const message = `${resp.deleted} products deleted successfully${resp.failed ? `, ${resp.failed} failed` : ""}`;
+      if (resp.failed && resp.failed > 0) {
+        notificationService.showError(message);
+      } else {
+        notificationService.showSuccess(message);
+      }
     } catch (err: any) {
       setApiError(err, CommonErrorMessageUtil.deleteFailed);
     } finally {
@@ -152,13 +182,19 @@ export const ProductListPage = () => {
             <div>
               <CommonBreadcrumb items={[{ label: "Products" }]} />
             </div>
-            {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") ? (
+            {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") || can("PRODUCT_DATAPORT", "VIEW") ? (
               <div className="flex flex-wrap gap-2">
                 <CommonColumnSelector tableName="PRODUCTS" availableColumns={productColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
                 {can("PRODUCTS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!products.length} onClick={() => exportToExcel("products.xlsx", products, productExportColumns)}>
                   <Download size={16} />
                   Export Excel
                 </Button> : null}
+                {can("PRODUCT_DATAPORT", "VIEW") ? <Link to="/data-port/products">
+                  <Button type="button" variant="secondary">
+                    <Upload size={16} />
+                    Product DataPort
+                  </Button>
+                </Link> : null}
                 {can("PRODUCTS", "ADD") ? <Link to="/products/new">
                   <Button>Add product</Button>
                 </Link> : null}
@@ -203,10 +239,24 @@ export const ProductListPage = () => {
           </div>
         </div>
         <div className="flex-1">
+          <CommonBulkActionToolbar
+            selectedCount={bulkSelection.selectedCount}
+            canDelete={can("PRODUCTS", "DELETE")}
+            onClearSelection={bulkSelection.clearSelection}
+            onDeleteSelected={() => setBulkDeleteOpen(true)}
+          />
           <Table
             data={products}
             emptyText="No products match the current filters."
             emptyAction={can("PRODUCTS", "ADD") ? <Link to="/products/new"><Button>Add product</Button></Link> : null}
+            rowSelection={can("PRODUCTS", "DELETE") ? {
+              selectedRowIds: bulkSelection.selectedIds,
+              onToggleRow: bulkSelection.toggleRow,
+              onToggleAll: (checked) => checked ? bulkSelection.selectAll() : bulkSelection.clearSelection(),
+              allSelected: bulkSelection.selectedCount > 0 && bulkSelection.selectedIds.length === products.length,
+              someSelected: bulkSelection.selectedCount > 0 && bulkSelection.selectedIds.length < products.length,
+              getRowId: (item: Product) => item.id
+            } : undefined}
             columns={[...visibleProductColumns, productActionColumn]}
           />
         </div>
@@ -225,6 +275,13 @@ export const ProductListPage = () => {
       </GlassCard>
       <AuditLogModal open={Boolean(logTarget)} moduleName="Product" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Product Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
+      <BulkDeleteModal
+        open={bulkDeleteOpen}
+        loading={deleting}
+        selectedCount={bulkSelection.selectedCount}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={() => void handleBulkDelete()}
+      />
     </div>
   );
 };

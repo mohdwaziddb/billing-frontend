@@ -58,3 +58,9 @@ export const deleteProduct = async (id: number) => {
   await apiClient.delete(`/v1/products/${id}`);
   sessionCache.clear(ACTIVE_PRODUCTS_CACHE_KEY);
 };
+
+export const deleteProductsBulk = async (ids: number[]) => {
+  const response = await apiClient.delete<ApiResponse<{ deleted: number; failed: number; failures: Record<number, string> }>>(`/v1/products/bulk-delete`, { data: { ids } });
+  sessionCache.clear(ACTIVE_PRODUCTS_CACHE_KEY);
+  return response.data.data;
+};

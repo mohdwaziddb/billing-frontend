@@ -6,11 +6,15 @@ import { GlassCard } from "./GlassCard";
 export const CommonDeleteModal = ({
   open,
   loading = false,
+  title = "Confirm Delete",
+  description = "Do you want to delete this record?",
   onCancel,
   onConfirm
 }: {
   open: boolean;
   loading?: boolean;
+  title?: string;
+  description?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) => {
@@ -28,8 +32,8 @@ export const CommonDeleteModal = ({
                 <CommonDeleteIcon size={19} />
               </div>
               <div>
-                <h3 className="card-title text-lg text-slate-950">Confirm Delete</h3>
-                <p className="mt-2 text-sm text-slate-600">Do you want to delete this record?</p>
+                  <h3 className="card-title text-lg text-slate-950">{title ?? "Confirm Delete"}</h3>
+                  <p className="mt-2 text-sm text-slate-600">{description ?? "Do you want to delete this record?"}</p>
               </div>
             </div>
             <button type="button" className="text-slate-400 transition hover:text-slate-950" aria-label="Close dialog" onClick={onCancel}>

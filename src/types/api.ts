@@ -341,6 +341,46 @@ export type ProductRequest = {
   active: boolean;
 };
 
+export type ProductDataPortRow = {
+  rowNumber: number;
+  productName: string;
+  productCategory: string;
+  sku: string;
+  active: string;
+  brand: string | null;
+  hsnCode: string | null;
+  purchasePrice: string;
+  sellingPrice: string;
+  openingStockQty: string;
+  minimumStockQty: string;
+  taxPercent: string;
+  productCategoryId: number | null;
+  activeValue: boolean | null;
+  valid: boolean;
+  validationErrors: Record<string, string>;
+};
+
+export type ProductDataPortReferenceData = {
+  categories: Array<{
+    id: number;
+    name: string;
+  }>;
+  existingSkus: string[];
+};
+
+export type DataPortPreviewResponse<T, R = unknown> = {
+  rows: T[];
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  referenceData: R;
+};
+
+export type ImportResult = {
+  importedRecords: number;
+  failedRecords: number;
+};
+
 export type InvoiceItem = {
   id: number;
   productId: number;
@@ -562,6 +602,12 @@ export type AuditLog = {
   ipAddress: string | null;
   userAgent: string | null;
   createdAt: string;
+};
+
+export type BulkDeleteResponse = {
+  deleted: number;
+  failed: number;
+  failures: Record<number, string>;
 };
 
 export type NotificationChannel = {

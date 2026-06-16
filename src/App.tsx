@@ -22,6 +22,7 @@ import { ExpenseListPage } from "./pages/ExpenseListPage";
 import { ProfitLossReportPage } from "./pages/ProfitLossReportPage";
 import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductCategoryPage } from "./pages/ProductCategoryPage";
+import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
@@ -47,6 +48,7 @@ function App() {
           <Route path="/products" element={<PermissionRoute menuCode="PRODUCTS"><ProductListPage /></PermissionRoute>} />
           <Route path="/products/new" element={<PermissionRoute menuCode="PRODUCTS" actionCode="ADD"><ProductFormPage /></PermissionRoute>} />
           <Route path="/products/:productId/edit" element={<PermissionRoute menuCode="PRODUCTS" actionCode="EDIT"><ProductFormPage /></PermissionRoute>} />
+          <Route path="/data-port/products" element={<PermissionRoute menuCode="PRODUCT_DATAPORT"><ProductDataPortPage /></PermissionRoute>} />
           <Route path="/setup/product-categories" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/product-category" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/expense-categories" element={<PermissionRoute menuCode="EXPENSE_CATEGORIES"><ExpenseCategoryPage /></PermissionRoute>} />
