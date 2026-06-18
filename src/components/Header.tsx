@@ -45,7 +45,7 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 export const Header = ({ title, subtitle }: { title: string; subtitle: string }) => {
-  const { user, can, logout, permissions, platform, preferences, setDarkMode } = useAuth();
+  const { user, can, logout, permissions, platform, preferences, setDarkMode, sessionType, platformAdmin } = useAuth();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
@@ -64,6 +64,10 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
     ? (platform.platformLogo.startsWith("http") ? platform.platformLogo : `${apiOrigin}${platform.platformLogo}`)
     : null;
   const headerTitle = title;
+  const profileName = sessionType === "platform-admin" ? "Platform Admin" : (user?.fullName ?? "Owner");
+  const profileRole = sessionType === "platform-admin" ? "Platform Administrator" : (user?.role ?? "OWNER");
+  const profileEmail = sessionType === "platform-admin" ? (platformAdmin?.username ?? "Platform Admin") : (user?.email ?? user?.role ?? "User");
+  const profileInitial = sessionType === "platform-admin" ? "P" : (user?.fullName ?? "O").slice(0, 1).toUpperCase();
 
   useEffect(() => {
     document.title = `${title} | ${platform.platformName || user?.company?.name || "Billing"}`;
@@ -228,11 +232,11 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
               onClick={() => setProfileOpen((current) => !current)}
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--theme-color)] text-sm font-bold text-[var(--theme-contrast)]">
-                {(user?.fullName ?? "O").slice(0, 1).toUpperCase()}
+                {profileInitial}
               </div>
               <div className="hidden min-w-0 text-left sm:block">
-                <p className="truncate text-sm font-bold text-slate-950">{user?.fullName ?? "Owner"}</p>
-                <p className="truncate text-xs text-slate-500">{user?.role ?? "OWNER"}</p>
+                <p className="truncate text-sm font-bold text-slate-950">{profileName}</p>
+                <p className="truncate text-xs text-slate-500">{profileRole}</p>
               </div>
               <ChevronDown className={`hidden text-slate-400 transition sm:block ${profileOpen ? "rotate-180" : ""}`} size={16} />
             </button>
@@ -240,8 +244,8 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
             {profileOpen ? (
               <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_24px_70px_rgba(15,23,42,0.16)]" role="menu">
                 <div className="border-b border-slate-100 px-3 py-3">
-                  <p className="truncate text-sm font-bold text-slate-950">{user?.fullName ?? "Owner"}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">{user?.email ?? user?.role ?? "User"}</p>
+                  <p className="truncate text-sm font-bold text-slate-950">{profileName}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{profileEmail}</p>
                 </div>
                 <button
                   type="button"

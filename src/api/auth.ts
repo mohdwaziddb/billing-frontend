@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { ApiResponse, AuthPayload, UserProfile } from "../types/api";
+import type { ApiResponse, AuthPayload, PlatformAdminAuthPayload, UserProfile } from "../types/api";
 
 export const loginRequest = async (payload: { username: string; password: string }) => {
   const response = await apiClient.post<ApiResponse<AuthPayload>>("/v1/auth/login", payload);
@@ -19,6 +19,11 @@ export const registerRequest = async (payload: {
   adminPassword: string;
 }) => {
   const response = await apiClient.post<ApiResponse<AuthPayload>>("/v1/auth/register-company", payload);
+  return response.data.data;
+};
+
+export const platformAdminLoginRequest = async (payload: { username: string; password: string }) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminAuthPayload>>("/v1/platform-admin/login", payload);
   return response.data.data;
 };
 

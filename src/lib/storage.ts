@@ -1,13 +1,13 @@
-import type { AuthPayload } from "../types/api";
+import type { StoredAuthSession } from "../types/api";
 
 const AUTH_KEY = "billing_frontend_auth";
 
 export const authStorage = {
-  get(): AuthPayload | null {
+  get(): StoredAuthSession | null {
     const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? (JSON.parse(raw) as AuthPayload) : null;
+    return raw ? (JSON.parse(raw) as StoredAuthSession) : null;
   },
-  set(value: AuthPayload) {
+  set(value: StoredAuthSession) {
     localStorage.setItem(AUTH_KEY, JSON.stringify(value));
   },
   clear() {

@@ -1,17 +1,29 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCompanyTheme } from "../api/company";
 import { getMyMenus } from "../api/permissions";
-import { loginRequest, logoutRequest, meRequest, registerRequest } from "../api/auth";
-import { defaultPlatformSettings, getPlatformSettings } from "../api/platform";
-import { sessionCache } from "../lib/sessionCache";
+import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
-import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
+import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest, registerRequest } from "../api/auth";
 import { authStorage } from "../lib/storage";
+import { sessionCache } from "../lib/sessionCache";
+import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
-import type { AuthPayload, CompanyTheme, PermissionMatrix, PlatformSettings, UserPreference, UserProfile } from "../types/api";
+import type {
+  AuthPayload,
+  CompanyTheme,
+  PermissionMatrix,
+  PlatformAdminAuthPayload,
+  PlatformSettings,
+  StoredAuthSession,
+  UserPreference,
+  UserProfile
+} from "../types/api";
 
 type AuthContextValue = {
-  auth: AuthPayload | null;
+  auth: AuthPayload | PlatformAdminAuthPayload | null;
+  sessionType: "user" | "platform-admin" | null;
+  isPlatformAdmin: boolean;
+  platformAdmin: PlatformAdminAuthPayload | null;
   user: UserProfile | null;
   permissions: PermissionMatrix | null;
   theme: CompanyTheme;
@@ -24,6 +36,7 @@ type AuthContextValue = {
   can: (menuCode: string, actionCode?: string) => boolean;
   firstAccessibleRoute: () => string | null;
   login: (payload: { username: string; password: string }) => Promise<string | null>;
+  loginPlatformAdmin: (payload: { username: string; password: string }) => Promise<string>;
   register: (payload: {
     companyName: string;
     companyEmail: string;
@@ -54,14 +67,38 @@ type AuthBootstrapCache = {
 let bootstrapPromise: Promise<AuthBootstrapCache> | null = null;
 let bootstrapPromiseToken: string | null = null;
 
+const clearLocalState = (
+  setSession: (value: StoredAuthSession | null) => void,
+  setUser: (value: UserProfile | null) => void,
+  setPermissions: (value: PermissionMatrix | null) => void,
+  setTheme: (value: CompanyTheme) => void,
+  setPlatform: (value: PlatformSettings) => void,
+  setPreferences: (value: UserPreference) => void
+) => {
+  authStorage.clear();
+  sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
+  ThemeBootstrapService.clear();
+  setSession(null);
+  setUser(null);
+  setPermissions(null);
+  setTheme({ themeColor: DEFAULT_THEME_COLOR });
+  setPlatform(defaultPlatformSettings);
+  setPreferences({ darkModeEnabled: false });
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const cachedThemeState = ThemeBootstrapService.getCachedState();
-  const [auth, setAuth] = useState<AuthPayload | null>(authStorage.get());
-  const [user, setUser] = useState<UserProfile | null>(authStorage.get()?.user ?? null);
+  const [session, setSession] = useState<StoredAuthSession | null>(authStorage.get());
+  const [user, setUser] = useState<UserProfile | null>(session?.type === "user" ? session.auth.user : null);
   const [permissions, setPermissions] = useState<PermissionMatrix | null>(null);
   const [theme, setTheme] = useState<CompanyTheme>({ themeColor: cachedThemeState.themeColor });
   const [platform, setPlatform] = useState<PlatformSettings>(defaultPlatformSettings);
   const [preferences, setPreferences] = useState<UserPreference>({ darkModeEnabled: cachedThemeState.darkModeEnabled });
+
+  const auth = session?.auth ?? null;
+  const sessionType = session?.type ?? null;
+  const isPlatformAdmin = session?.type === "platform-admin";
+  const platformAdmin = isPlatformAdmin ? session.auth : null;
 
   useEffect(() => {
     applyThemeColor(theme.themeColor);
@@ -72,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [preferences.darkModeEnabled]);
 
   useEffect(() => {
-    if (!auth?.accessToken) {
+    if (!session?.auth.accessToken) {
       setUser(null);
       setPermissions(null);
       setPlatform(defaultPlatformSettings);
@@ -80,8 +117,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    if (session.type === "platform-admin") {
+      setUser(null);
+      setPermissions(null);
+      sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
+      ThemeBootstrapService.clear();
+      setTheme({ themeColor: DEFAULT_THEME_COLOR });
+      setPreferences({ darkModeEnabled: false });
+      getPlatformSettings()
+        .then(setPlatform)
+        .catch(() => setPlatform(defaultPlatformSettings));
+      return;
+    }
+
+    const accessToken = session.auth.accessToken;
     const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
-    if (cached?.accessToken === auth.accessToken) {
+    if (cached?.accessToken === accessToken) {
       setUser(cached.user);
       setPermissions(cached.permissions);
       setTheme(cached.theme);
@@ -91,8 +142,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    if (!bootstrapPromise || bootstrapPromiseToken !== auth.accessToken) {
-      bootstrapPromiseToken = auth.accessToken;
+    if (!bootstrapPromise || bootstrapPromiseToken !== accessToken) {
+      bootstrapPromiseToken = accessToken;
       bootstrapPromise = Promise.all([
         meRequest(),
         getMyMenus(),
@@ -100,7 +151,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         getPlatformSettings().catch(() => defaultPlatformSettings),
         getMyPreferences().catch(() => ({ darkModeEnabled: false }))
       ]).then(([profile, permissionData, themeData, platformData, preferenceData]) => ({
-        accessToken: auth.accessToken,
+        accessToken,
         user: profile,
         permissions: permissionData,
         theme: themeData,
@@ -111,7 +162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     bootstrapPromise
       .then((bootstrap) => {
-        if (bootstrap.accessToken !== auth.accessToken) {
+        if (bootstrap.accessToken !== accessToken) {
           return;
         }
         setUser(bootstrap.user);
@@ -123,87 +174,95 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ThemeBootstrapService.save(bootstrap.theme, bootstrap.preferences);
       })
       .catch(() => {
-        authStorage.clear();
-        setAuth(null);
-        setUser(null);
-        setPermissions(null);
-        sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
-        ThemeBootstrapService.clear();
-        setTheme({ themeColor: DEFAULT_THEME_COLOR });
-        setPlatform(defaultPlatformSettings);
-        setPreferences({ darkModeEnabled: false });
+        clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
       })
       .finally(() => {
         bootstrapPromise = null;
         bootstrapPromiseToken = null;
       });
-  }, [auth?.accessToken]);
+  }, [session?.auth.accessToken, session?.type]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       auth,
+      sessionType,
+      isPlatformAdmin,
+      platformAdmin,
       user,
       permissions,
       theme,
       platform,
       preferences,
       async refreshProfile() {
-        if (!auth?.accessToken) {
+        if (!session?.auth.accessToken || session.type !== "user") {
           setUser(null);
           return;
         }
         const profile = await meRequest();
         setUser(profile);
         const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
-        if (cached && cached.accessToken === auth.accessToken) {
+        if (cached && cached.accessToken === session.auth.accessToken) {
           sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, user: profile });
         }
-        if (auth) {
-          const nextAuth = { ...auth, user: profile };
-          authStorage.set(nextAuth);
-          setAuth(nextAuth);
-        }
+        const nextSession: StoredAuthSession = {
+          type: "user",
+          auth: { ...session.auth, user: profile }
+        };
+        authStorage.set(nextSession);
+        setSession(nextSession);
       },
       async refreshPermissions() {
-        if (!auth?.accessToken) {
+        if (!session?.auth.accessToken || session.type !== "user") {
           setPermissions(null);
           return;
         }
         const nextPermissions = await getMyMenus();
         setPermissions(nextPermissions);
         const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
-        if (cached && cached.accessToken === auth.accessToken) {
+        if (cached && cached.accessToken === session.auth.accessToken) {
           sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, permissions: nextPermissions });
         }
       },
       async refreshTheme() {
-        if (!auth?.accessToken) {
+        if (!session?.auth.accessToken) {
           setTheme({ themeColor: DEFAULT_THEME_COLOR });
           ThemeBootstrapService.clear();
+          return;
+        }
+        if (session.type === "platform-admin") {
+          setTheme({ themeColor: DEFAULT_THEME_COLOR });
+          setPlatform(await getPlatformSettings().catch(() => defaultPlatformSettings));
           return;
         }
         const nextTheme = await getCompanyTheme();
         setTheme(nextTheme);
         const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
-        if (cached && cached.accessToken === auth.accessToken) {
+        if (cached && cached.accessToken === session.auth.accessToken) {
           sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, theme: nextTheme });
         }
         ThemeBootstrapService.save(nextTheme, preferences);
       },
       async setDarkMode(enabled) {
+        if (session?.type === "platform-admin") {
+          setPreferences({ darkModeEnabled: enabled });
+          return;
+        }
         setPreferences({ darkModeEnabled: enabled });
         ThemeBootstrapService.saveDarkMode(enabled);
-        if (auth?.accessToken) {
+        if (session?.auth.accessToken && session.type === "user") {
           const nextPreferences = await updateMyPreferences({ darkModeEnabled: enabled });
           setPreferences(nextPreferences);
           const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
-          if (cached && cached.accessToken === auth.accessToken) {
+          if (cached && cached.accessToken === session.auth.accessToken) {
             sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, preferences: nextPreferences });
           }
           ThemeBootstrapService.save(theme, nextPreferences);
         }
       },
       can(menuCode, actionCode = "VIEW") {
+        if (session?.type === "platform-admin") {
+          return false;
+        }
         const menu = findMenu(permissions?.menus ?? [], menuCode);
         if (!menu?.canView) {
           return false;
@@ -217,11 +276,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return Boolean(menu.actions.find((action) => action.actionCode === actionCode)?.allowed);
       },
       firstAccessibleRoute() {
+        if (session?.type === "platform-admin") {
+          return "/platform-admin/dashboard";
+        }
         return findFirstRoute(permissions?.menus ?? []);
       },
       async login(payload) {
         const nextAuth = await loginRequest(payload);
-        authStorage.set(nextAuth);
+        const nextSession: StoredAuthSession = { type: "user", auth: nextAuth };
+        authStorage.set(nextSession);
         const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
           getMyMenus(),
           getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
@@ -240,14 +303,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           platform: nextPlatform,
           preferences: nextPreferences
         });
-        setAuth(nextAuth);
+        setSession(nextSession);
         setUser(nextAuth.user);
         ThemeBootstrapService.save(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
+      async loginPlatformAdmin(payload) {
+        const nextAuth = await platformAdminLoginRequest(payload);
+        const nextSession: StoredAuthSession = { type: "platform-admin", auth: nextAuth };
+        authStorage.set(nextSession);
+        setSession(nextSession);
+        setUser(null);
+        setPermissions(null);
+        setTheme({ themeColor: DEFAULT_THEME_COLOR });
+        setPreferences({ darkModeEnabled: false });
+        setPlatform(await getPlatformSettings().catch(() => defaultPlatformSettings));
+        sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
+        ThemeBootstrapService.clear();
+        return "/platform-admin/dashboard";
+      },
       async register(payload) {
         const nextAuth = await registerRequest(payload);
-        authStorage.set(nextAuth);
+        const nextSession: StoredAuthSession = { type: "user", auth: nextAuth };
+        authStorage.set(nextSession);
         const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
           getMyMenus(),
           getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
@@ -266,31 +344,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           platform: nextPlatform,
           preferences: nextPreferences
         });
-        setAuth(nextAuth);
+        setSession(nextSession);
         setUser(nextAuth.user);
         ThemeBootstrapService.save(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
       async logout() {
-        if (auth?.refreshToken) {
+        if (session?.type === "user" && session.auth.refreshToken) {
           try {
-            await logoutRequest(auth.refreshToken);
+            await logoutRequest(session.auth.refreshToken);
           } catch {
-            // Ignore network logout failures and clear local state.
+            // Ignore logout failures and clear local session anyway.
           }
         }
-        authStorage.clear();
-        sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
-        ThemeBootstrapService.clear();
-        setAuth(null);
-        setUser(null);
-        setPermissions(null);
-        setTheme({ themeColor: DEFAULT_THEME_COLOR });
-        setPlatform(defaultPlatformSettings);
-        setPreferences({ darkModeEnabled: false });
+        clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
       }
     }),
-    [auth, user, permissions, theme, platform, preferences]
+    [auth, sessionType, isPlatformAdmin, platformAdmin, user, permissions, theme, platform, preferences, session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

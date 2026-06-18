@@ -2,8 +2,8 @@ import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { forgotPasswordRequest } from "../api/auth";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { notificationService } from "../services/notificationService";
 import { Button } from "./Button";
-import { Input } from "./Input";
 import { Modal } from "./Modal";
 import { PasswordInput } from "./PasswordInput";
 
@@ -20,7 +20,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
     confirmPassword: ""
   });
   const [saving, setSaving] = useState(false);
-  const { message, setMessage, clearMessage, setApiError } = useApiMessage();
+  const { clearMessage, setApiError } = useApiMessage();
 
   useEffect(() => {
     if (open) {
@@ -41,12 +41,12 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
     const username = form.username.trim();
 
     if (!username) {
-      setMessage("Enter your Email / Mobile / Username on the sign in screen first.");
+      notificationService.showError("Enter your account identifier on the sign in screen first.");
       return;
     }
 
     if (form.newPassword !== form.confirmPassword) {
-      setMessage("New password and confirm password must match.");
+      notificationService.showError("New password and confirm password must match.");
       return;
     }
 
@@ -56,8 +56,9 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
         username,
         newPassword: form.newPassword
       });
-      setMessage("Password updated successfully. Please sign in with your new password.");
       setForm((current) => ({ ...current, newPassword: "", confirmPassword: "" }));
+      notificationService.showSuccess("Password updated successfully");
+      close();
     } catch (err: any) {
       setApiError(err, "Unable to update password");
     } finally {
@@ -72,16 +73,8 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--theme-color)] shadow-sm">
             <KeyRound size={18} />
           </span>
-          <p className="min-w-0 text-sm font-medium leading-6 text-slate-600">Confirm the Email / Mobile / Username and set a new password.</p>
+          <p className="min-w-0 text-sm font-medium leading-6 text-slate-600">Set a new password for your account.</p>
         </div>
-        <Input
-          label="Email / Mobile / Username"
-          requiredMark
-          type="text"
-          value={form.username}
-          readOnly
-          className="cursor-not-allowed bg-slate-100 text-slate-500"
-        />
         <PasswordInput
           label="New Password"
           requiredMark
@@ -94,13 +87,8 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose }: For
           value={form.confirmPassword}
           onChange={(event) => setForm((current) => ({ ...current, confirmPassword: event.target.value }))}
         />
-        {message ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-            {message}
-          </div>
-        ) : null}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button type="button" variant="ghost" onClick={close}>
+          <Button type="button" variant="ghost" disabled={saving} onClick={close}>
             Close
           </Button>
           <Button type="submit" disabled={saving}>

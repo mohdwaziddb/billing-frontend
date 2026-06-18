@@ -5,7 +5,7 @@ export type ApiResponse<T> = {
   timestamp: string;
 };
 
-export type Role = "SUPER_ADMIN" | "OWNER" | "ADMIN" | "USER";
+export type Role = "OWNER" | "ADMIN" | "USER";
 
 export type CompanySummary = {
   id: number;
@@ -74,21 +74,24 @@ export type AuthPayload = {
   user: UserProfile;
 };
 
-export type SuperAdminDashboardSummary = {
+export type PlatformAdminAuthPayload = {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  username: string;
+};
+
+export type StoredAuthSession =
+  | { type: "user"; auth: AuthPayload }
+  | { type: "platform-admin"; auth: PlatformAdminAuthPayload };
+
+export type PlatformAdminDashboardSummary = {
   totalCompanies: number;
   activeCompanies: number;
   inactiveCompanies: number;
-  totalOwners: number;
-  totalAdmins: number;
-  totalUsers: number;
-  totalProducts: number;
-  totalCustomers: number;
-  totalInvoices: number;
-  totalRevenue: number;
-  totalExpenses: number;
 };
 
-export type SuperAdminCompany = {
+export type PlatformAdminCompany = {
   id: number;
   name: string;
   ownerName: string | null;
@@ -96,10 +99,20 @@ export type SuperAdminCompany = {
   mobile: string;
   active: boolean;
   createdAt: string | null;
+  ownerCount: number;
+  adminCount: number;
+  userCount: number;
   totalUsers: number;
 };
 
-export type SuperAdminUser = {
+export type PlatformAdminCompanyOverview = {
+  companyCount: number;
+  ownerCount: number;
+  adminCount: number;
+  userCount: number;
+};
+
+export type PlatformAdminUser = {
   id: number;
   companyId: number;
   companyName: string;
@@ -112,21 +125,21 @@ export type SuperAdminUser = {
   createdAt: string | null;
 };
 
-export type SuperAdminRevenueRow = {
-  companyId: number;
-  companyName: string;
-  totalRevenue: number;
-  invoiceCount: number;
-};
-
-export type SuperAdminCompanyDetails = {
-  company: SuperAdminCompany;
-  owner: SuperAdminUser | null;
+export type PlatformAdminCompanyDetails = {
+  company: PlatformAdminCompany;
+  owner: PlatformAdminUser | null;
   ownerCount: number;
   adminCount: number;
   userCount: number;
   auditLogCount: number;
-  users: SuperAdminUser[];
+  users: PlatformAdminUser[];
+};
+
+export type PlatformAdminSettings = {
+  platformName: string;
+  platformLogo: string | null;
+  platformTagline: string | null;
+  username: string;
 };
 
 export type DashboardSummary = {

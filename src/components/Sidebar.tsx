@@ -45,14 +45,20 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 export const Sidebar = () => {
-  const { user, permissions, platform } = useAuth();
+  const { user, permissions, platform, sessionType, platformAdmin } = useAuth();
   const location = useLocation();
   const [openMenus, setOpenMenus] = useState<Record<number, boolean>>({});
   const [collapsed, setCollapsed] = useState(false);
-  const menus = useMemo(
-    () => permissions?.menus.filter((menu) => menu.canView).sort((a, b) => a.displayOrder - b.displayOrder) ?? [],
-    [permissions?.menus]
-  );
+  const menus = useMemo(() => {
+    if (sessionType === "platform-admin") {
+      return [
+        { id: 1, menuName: "Platform Dashboard", menuIcon: "LayoutDashboard", menuRoute: "/platform-admin/dashboard", displayOrder: 1, canView: true, actions: [], children: [] },
+        { id: 2, menuName: "Companies", menuIcon: "Building2", menuRoute: "/platform-admin/companies", displayOrder: 2, canView: true, actions: [], children: [] },
+        { id: 3, menuName: "Platform Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 3, canView: true, actions: [], children: [] }
+      ];
+    }
+    return permissions?.menus.filter((menu) => menu.canView).sort((a, b) => a.displayOrder - b.displayOrder) ?? [];
+  }, [permissions?.menus, sessionType]);
 
   useEffect(() => {
     const activeParent = menus.find((menu) => (menu.children ?? []).some((child) => child.menuRoute === location.pathname));
@@ -65,6 +71,8 @@ export const Sidebar = () => {
   const company = user?.company;
   const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
   const companyLogoUrl = company?.logoUrl ? (company.logoUrl.startsWith("http") ? company.logoUrl : `${apiOrigin}${company.logoUrl}`) : null;
+  const title = sessionType === "platform-admin" ? (platform.platformName || "Platform Admin") : (company?.name ?? "Workspace");
+  const subtitle = sessionType === "platform-admin" ? "Platform Administrator" : (user?.role ?? "User");
 
   return (
     <aside className={`flex w-full flex-col rounded-[24px] bg-[linear-gradient(180deg,var(--theme-dark),color-mix(in_srgb,var(--theme-dark)_76%,#020617))] p-4 text-white shadow-[0_22px_55px_rgba(7,19,48,0.18)] transition-all duration-300 lg:h-full lg:max-h-[calc(100vh-2.5rem)] ${collapsed ? "lg:w-[92px] lg:px-3" : "lg:w-[292px]"}`}>
@@ -75,19 +83,19 @@ export const Sidebar = () => {
               type="button"
               className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_12px_28px_rgba(2,6,23,0.16)] transition duration-200 ${collapsed ? "cursor-pointer hover:scale-105 hover:shadow-[0_14px_34px_rgba(255,255,255,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" : "cursor-default"}`}
               aria-label={collapsed ? "Expand sidebar" : `${company?.name ?? "Company"} logo`}
-              title={collapsed ? "Expand sidebar" : company?.name ?? "Company"}
+              title={collapsed ? "Expand sidebar" : title}
               onClick={() => {
                 if (collapsed) {
                   setCollapsed(false);
                 }
               }}
             >
-              {companyLogoUrl ? <img src={companyLogoUrl} alt={`${company?.name ?? "Company"} logo`} className="h-full w-full object-contain p-1.5" /> : <ReceiptText className="text-[var(--theme-color)]" size={28} />}
+              {sessionType !== "platform-admin" && companyLogoUrl ? <img src={companyLogoUrl} alt={`${company?.name ?? "Company"} logo`} className="h-full w-full object-contain p-1.5" /> : <ReceiptText className="text-[var(--theme-color)]" size={28} />}
             </button>
             {!collapsed ? (
               <div className="min-w-0 text-center">
-                <h2 className="truncate text-xl font-extrabold tracking-tight text-white">{company?.name ?? "Workspace"}</h2>
-                <p className="mt-0.5 truncate text-sm text-white/68">{user?.role ?? "User"}</p>
+                <h2 className="truncate text-xl font-extrabold tracking-tight text-white">{title}</h2>
+                <p className="mt-0.5 truncate text-sm text-white/68">{subtitle}</p>
               </div>
             ) : null}
           </div>

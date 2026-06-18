@@ -347,7 +347,7 @@ export const UserManagementPage = () => {
             value={filters.role}
             options={[
               { label: "All Roles", value: "" },
-              ...roles.filter((role) => role && role !== "SUPER_ADMIN").map(toRoleOption)
+              ...roles.filter(Boolean).map(toRoleOption)
             ]}
             onChange={(event) => {
               setPage(0);
@@ -489,7 +489,7 @@ export const UserManagementPage = () => {
             requiredMark
             placeholder={null}
             error={fieldErrors.role}
-            options={roles.filter((role) => role && role !== "SUPER_ADMIN").map(toRoleOption)}
+            options={roles.filter(Boolean).map(toRoleOption)}
             {...register("role", { required: "Role is required" })}
           />
           <Select

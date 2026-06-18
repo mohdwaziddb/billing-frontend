@@ -1,5 +1,6 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { DefaultRoute } from "./components/DefaultRoute";
+import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
 import { PermissionRoute } from "./components/PermissionRoute";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -11,7 +12,9 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { EmailTemplatePage } from "./pages/EmailTemplatePage";
 import { InvoiceDetailPage } from "./pages/InvoiceDetailPage";
 import { InvoiceListPage } from "./pages/InvoiceListPage";
+import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
+import { PlatformAdminLoginPage } from "./pages/PlatformAdminLoginPage";
 import { OutstandingCustomersPage } from "./pages/OutstandingCustomersPage";
 import { PaymentEntryPage } from "./pages/PaymentEntryPage";
 import { PaymentHierarchyPage } from "./pages/PaymentHierarchyPage";
@@ -24,7 +27,6 @@ import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductCategoryPage } from "./pages/ProductCategoryPage";
 import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
-import { RegisterPage } from "./pages/RegisterPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
 import { EmailSettingsPage, SmsSettingsPage } from "./pages/NotificationSettingsPages";
 import { RolePermissionsPage } from "./pages/RolePermissionsPage";
@@ -32,13 +34,15 @@ import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
 import { ThemeSettingsPage } from "./pages/ThemeSettingsPage";
 import { UserManagementPage } from "./pages/UserManagementPage";
 import { SmsTemplatePage } from "./pages/SmsTemplatePage";
-import { SuperAdminPage } from "./pages/SuperAdminPage";
+import { PlatformAdminPage } from "./pages/PlatformAdminPage";
 
 function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
+      <Route path="/register" element={<Navigate replace to="/login" />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
@@ -76,13 +80,17 @@ function App() {
           <Route path="/setup/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/setup/role-permissions" element={<PermissionRoute menuCode="ROLE_PERMISSIONS"><RolePermissionsPage /></PermissionRoute>} />
-          <Route path="/super-admin" element={<PermissionRoute menuCode="SUPER_ADMIN_DASHBOARD"><SuperAdminPage mode="dashboard" /></PermissionRoute>} />
-          <Route path="/super-admin/dashboard" element={<PermissionRoute menuCode="SUPER_ADMIN_DASHBOARD"><SuperAdminPage mode="dashboard" /></PermissionRoute>} />
-          <Route path="/super-admin/companies" element={<PermissionRoute menuCode="SUPER_ADMIN_COMPANIES"><SuperAdminPage mode="companies" /></PermissionRoute>} />
-          <Route path="/super-admin/users" element={<PermissionRoute menuCode="SUPER_ADMIN_USERS"><SuperAdminPage mode="users" /></PermissionRoute>} />
-          <Route path="/super-admin/company-details" element={<PermissionRoute menuCode="SUPER_ADMIN_COMPANY_DETAILS"><SuperAdminPage mode="details" /></PermissionRoute>} />
           <Route path="/no-menu" element={<NoMenuPage />} />
-          <Route path="/" element={<DefaultRoute />} />
+        </Route>
+      </Route>
+
+      <Route element={<PlatformAdminRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/platform-admin" element={<PlatformAdminPage mode="dashboard" />} />
+          <Route path="/platform-admin/dashboard" element={<PlatformAdminPage mode="dashboard" />} />
+          <Route path="/platform-admin/companies" element={<PlatformAdminPage mode="companies" />} />
+          <Route path="/platform-admin/company-details" element={<PlatformAdminPage mode="details" />} />
+          <Route path="/platform-admin/settings" element={<PlatformAdminPage mode="settings" />} />
         </Route>
       </Route>
 

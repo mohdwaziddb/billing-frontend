@@ -4,7 +4,7 @@ import { getApiErrorMessage } from "../lib/errors";
 import { authStorage } from "../lib/storage";
 import { notificationService } from "../services/notificationService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
-import type { ApiResponse, AuthPayload } from "../types/api";
+import type { ApiResponse, AuthPayload, StoredAuthSession } from "../types/api";
 
 declare module "axios" {
   interface AxiosRequestConfig {
@@ -44,7 +44,19 @@ const flushPendingRequests = (error: unknown, token?: string) => {
   pendingRequests = [];
 };
 
+const getLoginPath = (session?: StoredAuthSession | null) => {
+  if (session?.type === "platform-admin") {
+    return "/platform-admin/login";
+  }
+  if (window.location.pathname.startsWith("/platform-admin")) {
+    return "/platform-admin/login";
+  }
+  return "/login";
+};
+
 const clearSessionAndRedirect = (message?: string) => {
+  const session = authStorage.get();
+  const loginPath = getLoginPath(session);
   authStorage.clear();
   try {
     sessionStorage.clear();
@@ -55,8 +67,8 @@ const clearSessionAndRedirect = (message?: string) => {
     // Ignore session storage errors in private / restricted browser modes.
   }
   ThemeBootstrapService.clear();
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
+  if (window.location.pathname !== loginPath) {
+    window.location.href = loginPath;
   }
 };
 
@@ -74,7 +86,9 @@ const isAuthBypassRoute = (url?: string) => {
     "/v1/auth/register-company",
     "/v1/auth/forgot-password",
     "/v1/auth/logout",
-    "/v1/auth/refresh"
+    "/v1/auth/refresh",
+    "/v1/platform-admin/login",
+    "/v1/platform-settings"
   ].some((route) => url.includes(route));
 };
 
@@ -84,9 +98,9 @@ apiClient.interceptors.request.use((config) => {
     return config;
   }
 
-  const auth = authStorage.get();
-  if (auth?.accessToken) {
-    config.headers.Authorization = `Bearer ${auth.accessToken}`;
+  const session = authStorage.get();
+  if (session?.auth.accessToken) {
+    config.headers.Authorization = `Bearer ${session.auth.accessToken}`;
   }
   return config;
 });
@@ -122,8 +136,8 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const auth = authStorage.get();
-    if (!auth?.refreshToken) {
+    const session = authStorage.get();
+    if (!session || session.type !== "user" || !session.auth.refreshToken) {
       clearSessionAndRedirect();
       return Promise.reject(error);
     }
@@ -146,10 +160,10 @@ apiClient.interceptors.response.use(
     try {
       const refreshResponse = await refreshClient.post<ApiResponse<AuthPayload>>(
         "/v1/auth/refresh",
-        { refreshToken: auth.refreshToken }
+        { refreshToken: session.auth.refreshToken }
       );
       const nextAuth = refreshResponse.data.data;
-      authStorage.set(nextAuth);
+      authStorage.set({ type: "user", auth: nextAuth });
       flushPendingRequests(null, nextAuth.accessToken);
       originalRequest.headers.Authorization = `Bearer ${nextAuth.accessToken}`;
       return apiClient(originalRequest);
