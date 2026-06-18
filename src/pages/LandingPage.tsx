@@ -104,9 +104,9 @@ export const LandingPage = () => {
       .catch(() => setPlatformSettings(defaultPlatformSettings));
   }, []);
 
-  const productName = platformSettings.platformName?.trim() || "Wazid Billing";
+  const productName = platformSettings.platformName?.trim() || "Bizfinity";
   const productTagline = platformSettings.platformTagline?.trim() || "A complete business management platform for billing, stock, payments, expenses and analytics.";
-  const brandEyebrow = platformSettings.platformTagline?.trim() || "Business Platform";
+  const brandEyebrow = platformSettings.platformTagline?.trim() || "Empowering Businesses, Simplifying Growth";
   const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
   const platformLogoUrl = platformSettings.platformLogo
     ? (platformSettings.platformLogo.startsWith("http") ? platformSettings.platformLogo : `${apiOrigin}${platformSettings.platformLogo}`)
