@@ -31,6 +31,7 @@ type AuthContextValue = {
     companyAddress: string;
     taxId: string;
     adminFullName: string;
+    adminUsername: string;
     adminMobileNumber: string;
     adminEmail: string;
     adminPassword: string;

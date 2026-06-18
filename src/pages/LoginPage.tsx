@@ -53,10 +53,10 @@ export const LoginPage = () => {
           <h2 className="mt-4 text-3xl font-extrabold text-slate-950">Sign in to your workspace</h2>
           <form className="mt-8 space-y-4" onSubmit={submit}>
             <Input
-              label="Mobile Number or Email ID"
+              label="Email / Mobile / Username"
               requiredMark
               type="text"
-              inputMode="email"
+              placeholder="Email / Mobile / Username"
               value={form.username}
               onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
             />
@@ -71,7 +71,7 @@ export const LoginPage = () => {
                 type="button"
                 className="text-sm font-semibold text-[var(--theme-color)] transition hover:text-[var(--theme-hover)] disabled:cursor-not-allowed disabled:text-slate-400"
                 disabled={!canOpenForgotPassword}
-                title={canOpenForgotPassword ? "Reset password" : "Enter Mobile Number or Email ID first"}
+                title={canOpenForgotPassword ? "Reset password" : "Enter Email / Mobile / Username first"}
                 onClick={() => setForgotPasswordOpen(true)}
               >
                 Forgot password?

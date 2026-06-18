@@ -5,6 +5,7 @@ export type UserFilterParams = {
   page?: number;
   size?: number;
   name?: string;
+  username?: string;
   mobileNumber?: string;
   email?: string;
   search?: string;

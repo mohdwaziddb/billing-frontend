@@ -13,6 +13,7 @@ export const registerRequest = async (payload: {
   companyAddress: string;
   taxId: string;
   adminFullName: string;
+  adminUsername: string;
   adminMobileNumber: string;
   adminEmail: string;
   adminPassword: string;

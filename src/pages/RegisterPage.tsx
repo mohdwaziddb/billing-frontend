@@ -14,6 +14,7 @@ const initialForm = {
   companyAddress: "",
   taxId: "",
   adminFullName: "",
+  adminUsername: "",
   adminMobileNumber: "",
   adminEmail: "",
   adminPassword: ""
@@ -48,6 +49,7 @@ export const RegisterPage = () => {
     ["companyAddress", "Company Address", true],
     ["taxId", "Tax ID", true],
     ["adminFullName", "Admin Name", true],
+    ["adminUsername", "Admin Username", true],
     ["adminMobileNumber", "Admin Mobile Number", true],
     ["adminEmail", "Admin Email", true],
     ["adminPassword", "Admin Password", true]

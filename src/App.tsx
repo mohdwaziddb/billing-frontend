@@ -32,6 +32,7 @@ import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
 import { ThemeSettingsPage } from "./pages/ThemeSettingsPage";
 import { UserManagementPage } from "./pages/UserManagementPage";
 import { SmsTemplatePage } from "./pages/SmsTemplatePage";
+import { SuperAdminPage } from "./pages/SuperAdminPage";
 
 function App() {
   return (
@@ -75,6 +76,11 @@ function App() {
           <Route path="/setup/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/setup/role-permissions" element={<PermissionRoute menuCode="ROLE_PERMISSIONS"><RolePermissionsPage /></PermissionRoute>} />
+          <Route path="/super-admin" element={<PermissionRoute menuCode="SUPER_ADMIN_DASHBOARD"><SuperAdminPage mode="dashboard" /></PermissionRoute>} />
+          <Route path="/super-admin/dashboard" element={<PermissionRoute menuCode="SUPER_ADMIN_DASHBOARD"><SuperAdminPage mode="dashboard" /></PermissionRoute>} />
+          <Route path="/super-admin/companies" element={<PermissionRoute menuCode="SUPER_ADMIN_COMPANIES"><SuperAdminPage mode="companies" /></PermissionRoute>} />
+          <Route path="/super-admin/users" element={<PermissionRoute menuCode="SUPER_ADMIN_USERS"><SuperAdminPage mode="users" /></PermissionRoute>} />
+          <Route path="/super-admin/company-details" element={<PermissionRoute menuCode="SUPER_ADMIN_COMPANY_DETAILS"><SuperAdminPage mode="details" /></PermissionRoute>} />
           <Route path="/no-menu" element={<NoMenuPage />} />
           <Route path="/" element={<DefaultRoute />} />
         </Route>

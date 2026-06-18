@@ -2,6 +2,7 @@ import { Info, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CommonToastError } from "./CommonToastError";
 import { CommonToastSuccess } from "./CommonToastSuccess";
+import { PENDING_AUTH_TOAST_KEY } from "../api/apiClient";
 import { type AppNotification, notificationService } from "../services/notificationService";
 
 const AUTO_CLOSE_MS = 4500;
@@ -17,6 +18,15 @@ export const CommonToastContainer = () => {
     setNotifications((current) => [...current, notification]);
     window.setTimeout(() => close(notification.id), AUTO_CLOSE_MS);
   }), []);
+
+  useEffect(() => {
+    const pendingMessage = sessionStorage.getItem(PENDING_AUTH_TOAST_KEY);
+    if (!pendingMessage) {
+      return;
+    }
+    sessionStorage.removeItem(PENDING_AUTH_TOAST_KEY);
+    notificationService.showError(pendingMessage);
+  }, []);
 
   if (!notifications.length) {
     return null;

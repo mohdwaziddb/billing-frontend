@@ -28,6 +28,7 @@ import type { CompanyUserRequest, PageResponse, Role, UserProfile } from "../typ
 
 type FormValues = {
   fullName: string;
+  username: string;
   mobileNumber: string;
   email: string;
   password: string;
@@ -50,12 +51,14 @@ const toRoleOption = (role?: Role | string | null) => ({
 
 type UserFilters = {
   search: string;
+  username: string;
   role: Role | "";
   active: "" | "true" | "false";
 };
 
 const emptyFilters: UserFilters = {
   search: "",
+  username: "",
   role: "",
   active: "true"
 };
@@ -97,6 +100,7 @@ export const UserManagementPage = () => {
   } = useForm<FormValues>({
     defaultValues: {
       fullName: "",
+      username: "",
       mobileNumber: "",
       email: "",
       password: "",
@@ -107,6 +111,7 @@ export const UserManagementPage = () => {
   const watchedValues = watch();
   const canSaveUser = Boolean(
     watchedValues.fullName.trim() &&
+    watchedValues.username.trim() &&
     watchedValues.email.trim() &&
     watchedValues.mobileNumber.trim() &&
     watchedValues.role &&
@@ -115,6 +120,7 @@ export const UserManagementPage = () => {
 
   const filterParams = useMemo(() => ({
     search: filters.search.trim() || undefined,
+    username: filters.username.trim() || undefined,
     role: filters.role || undefined,
     active: filters.active === "" ? undefined : filters.active === "true"
   }), [filters]);
@@ -175,6 +181,7 @@ export const UserManagementPage = () => {
     setEditingUser(null);
     reset({
       fullName: "",
+      username: "",
       mobileNumber: "",
       email: "",
       password: "",
@@ -189,6 +196,7 @@ export const UserManagementPage = () => {
     setEditingUser(target);
     reset({
       fullName: target.fullName,
+      username: target.username,
       mobileNumber: target.mobileNumber,
       email: target.email,
       password: "",
@@ -203,6 +211,7 @@ export const UserManagementPage = () => {
 
     const payload: CompanyUserRequest = {
       fullName: values.fullName.trim(),
+      username: values.username.trim(),
       mobileNumber: values.mobileNumber.trim(),
       email: values.email.trim(),
       role: values.role,
@@ -314,14 +323,23 @@ export const UserManagementPage = () => {
           ) : null}
         </div>
 
-        <div className="mb-5 grid gap-4 md:grid-cols-3">
+        <div className="mb-5 grid gap-4 md:grid-cols-4">
           <Input
             label="Search Users"
-            placeholder="Search by name, mobile number or email"
+            placeholder="Search by name, username, mobile number or email"
             value={filters.search}
             onChange={(event) => {
               setPage(0);
               setFilters((current) => ({ ...current, search: event.target.value }));
+            }}
+          />
+          <Input
+            label="Username"
+            placeholder="Filter by username"
+            value={filters.username}
+            onChange={(event) => {
+              setPage(0);
+              setFilters((current) => ({ ...current, username: event.target.value }));
             }}
           />
           <Select
@@ -329,7 +347,7 @@ export const UserManagementPage = () => {
             value={filters.role}
             options={[
               { label: "All Roles", value: "" },
-              ...roles.filter(Boolean).map(toRoleOption)
+              ...roles.filter((role) => role && role !== "SUPER_ADMIN").map(toRoleOption)
             ]}
             onChange={(event) => {
               setPage(0);
@@ -361,6 +379,11 @@ export const UserManagementPage = () => {
               key: "name",
               header: "Name",
               render: (item) => <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
+            },
+            {
+              key: "username",
+              header: "Username",
+              render: (item) => <span className="whitespace-nowrap font-semibold text-slate-700">{item.username || "--"}</span>
             },
             {
               key: "mobileNumber",
@@ -432,6 +455,12 @@ export const UserManagementPage = () => {
             {...register("fullName", { required: "Full name is required" })}
           />
           <Input
+            label="Username"
+            requiredMark
+            error={fieldErrors.username ?? errors.username?.message}
+            {...register("username", { required: "Username is required" })}
+          />
+          <Input
             label="Email Address"
             requiredMark
             type="email"
@@ -460,7 +489,7 @@ export const UserManagementPage = () => {
             requiredMark
             placeholder={null}
             error={fieldErrors.role}
-            options={roles.filter(Boolean).map(toRoleOption)}
+            options={roles.filter((role) => role && role !== "SUPER_ADMIN").map(toRoleOption)}
             {...register("role", { required: "Role is required" })}
           />
           <Select
@@ -494,7 +523,7 @@ export const UserManagementPage = () => {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <Input
               label="Search Modal Users"
-              placeholder="Search by name, mobile number or email"
+              placeholder="Search by name, username, mobile number or email"
               value={modalSearch}
               onChange={(event) => {
                 setModalPage(0);
@@ -514,6 +543,11 @@ export const UserManagementPage = () => {
                 key: "name",
                 header: "Name",
                 render: (item) => <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
+              },
+              {
+                key: "username",
+                header: "Username",
+                render: (item) => <span className="whitespace-nowrap font-semibold text-slate-700">{item.username || "--"}</span>
               },
               {
                 key: "mobileNumber",
@@ -540,6 +574,7 @@ export const UserManagementPage = () => {
 
 const userExportColumns = [
   { key: "fullName", header: "Name" },
+  { key: "username", header: "Username" },
   { key: "mobileNumber", header: "Mobile Number" },
   { key: "email", header: "Email Address" },
   { key: "role", header: "Role", value: (row: UserProfile) => formatRoleLabel(row.role) },

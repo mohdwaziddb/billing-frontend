@@ -19,6 +19,7 @@ const fieldDisplayNames: Record<string, string> = {
   customer_name: "Customer Name",
   category_name: "Category Name",
   full_name: "Full Name",
+  username: "Username",
   mobile_number: "Mobile Number",
   email_body: "Email Body"
 };

@@ -177,7 +177,7 @@ export const RolePermissionsPage = () => {
   if (!can("ROLE_PERMISSIONS", "VIEW")) {
     return (
       <div className="space-y-4 pb-6">
-        <Header title="Role Permissions" subtitle="Manage company role and user permissions." />
+        <Header title="Roles & Permissions" subtitle="Manage company role and user permissions." />
         <GlassCard className="p-6 md:p-7">
           <p className="text-sm text-slate-300">You do not have permission to manage role permissions.</p>
         </GlassCard>
@@ -187,7 +187,7 @@ export const RolePermissionsPage = () => {
 
   return (
     <div className="space-y-4 pb-6">
-      <Header title="Role Permissions" subtitle="Owner-managed company role and user permission assignment." />
+      <Header title="Roles & Permissions" subtitle="Owner-managed company role and user permission assignment." />
 
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">

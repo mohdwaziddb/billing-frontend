@@ -63,7 +63,11 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
   const platformLogoUrl = platform.platformLogo
     ? (platform.platformLogo.startsWith("http") ? platform.platformLogo : `${apiOrigin}${platform.platformLogo}`)
     : null;
-  const headerTitle = platform.platformName || user?.company?.name || title;
+  const headerTitle = title;
+
+  useEffect(() => {
+    document.title = `${title} | ${platform.platformName || user?.company?.name || "Billing"}`;
+  }, [platform.platformName, title, user?.company?.name]);
 
   const navigateToResult = (result: MenuSearchResult) => {
     setSearchValue("");
@@ -131,7 +135,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
           <div className="min-w-0">
             <p className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{title}</p>
             <h1 className="page-title truncate text-xl tracking-tight text-slate-950 md:text-2xl">{headerTitle}</h1>
-            <p className="mt-0.5 truncate text-sm text-slate-500">{platform.platformTagline || subtitle}</p>
+            <p className="mt-0.5 truncate text-sm text-slate-500">{subtitle}</p>
           </div>
         </div>
         <label ref={searchRef} className="relative hidden min-w-0 lg:block">

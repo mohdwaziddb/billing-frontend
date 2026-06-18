@@ -3,6 +3,7 @@ import { env } from "../config/env";
 import { getApiErrorMessage } from "../lib/errors";
 import { authStorage } from "../lib/storage";
 import { notificationService } from "../services/notificationService";
+import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
 import type { ApiResponse, AuthPayload } from "../types/api";
 
 declare module "axios" {
@@ -15,6 +16,8 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
   skipAuthRefresh?: boolean;
 };
+
+export const PENDING_AUTH_TOAST_KEY = "billing_frontend_pending_auth_toast";
 
 export const apiClient = axios.create({
   baseURL: env.apiBaseUrl
@@ -41,11 +44,25 @@ const flushPendingRequests = (error: unknown, token?: string) => {
   pendingRequests = [];
 };
 
-const clearSessionAndRedirect = () => {
+const clearSessionAndRedirect = (message?: string) => {
   authStorage.clear();
+  try {
+    sessionStorage.clear();
+    if (message) {
+      sessionStorage.setItem(PENDING_AUTH_TOAST_KEY, message);
+    }
+  } catch {
+    // Ignore session storage errors in private / restricted browser modes.
+  }
+  ThemeBootstrapService.clear();
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";
   }
+};
+
+const isCompanyInactiveResponse = (error: any) => {
+  const message = error?.response?.data?.message;
+  return error?.response?.status === 403 && typeof message === "string" && message.trim() === "Company is inactive";
 };
 
 const isAuthBypassRoute = (url?: string) => {
@@ -79,6 +96,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
     const status = error.response?.status;
+
+    if (isCompanyInactiveResponse(error)) {
+      const message = "Company is inactive. Please contact administrator.";
+      notificationService.showError(message, error);
+      clearSessionAndRedirect(message);
+      return Promise.reject(error);
+    }
 
     if (status === 403) {
       notificationService.showError(getApiErrorMessage(error, "You do not have permission to access this resource"), error);

@@ -5,7 +5,7 @@ export type ApiResponse<T> = {
   timestamp: string;
 };
 
-export type Role = "OWNER" | "ADMIN" | "USER";
+export type Role = "SUPER_ADMIN" | "OWNER" | "ADMIN" | "USER";
 
 export type CompanySummary = {
   id: number;
@@ -59,6 +59,7 @@ export type UserProfile = {
   fullName: string;
   mobileNumber: string;
   email: string;
+  username: string;
   role: Role;
   active: boolean;
   createdAt?: string | null;
@@ -71,6 +72,61 @@ export type AuthPayload = {
   tokenType: string;
   expiresIn: number;
   user: UserProfile;
+};
+
+export type SuperAdminDashboardSummary = {
+  totalCompanies: number;
+  activeCompanies: number;
+  inactiveCompanies: number;
+  totalOwners: number;
+  totalAdmins: number;
+  totalUsers: number;
+  totalProducts: number;
+  totalCustomers: number;
+  totalInvoices: number;
+  totalRevenue: number;
+  totalExpenses: number;
+};
+
+export type SuperAdminCompany = {
+  id: number;
+  name: string;
+  ownerName: string | null;
+  email: string;
+  mobile: string;
+  active: boolean;
+  createdAt: string | null;
+  totalUsers: number;
+};
+
+export type SuperAdminUser = {
+  id: number;
+  companyId: number;
+  companyName: string;
+  fullName: string;
+  username: string;
+  email: string;
+  mobileNumber: string;
+  role: Role;
+  active: boolean;
+  createdAt: string | null;
+};
+
+export type SuperAdminRevenueRow = {
+  companyId: number;
+  companyName: string;
+  totalRevenue: number;
+  invoiceCount: number;
+};
+
+export type SuperAdminCompanyDetails = {
+  company: SuperAdminCompany;
+  owner: SuperAdminUser | null;
+  ownerCount: number;
+  adminCount: number;
+  userCount: number;
+  auditLogCount: number;
+  users: SuperAdminUser[];
 };
 
 export type DashboardSummary = {
@@ -731,6 +787,7 @@ export type HierarchyNode = {
 
 export type CompanyUserRequest = {
   fullName: string;
+  username: string;
   mobileNumber: string;
   email: string;
   password?: string;
