@@ -59,6 +59,14 @@ export const ThemeBootstrapService = {
     document.documentElement.classList.toggle("dark", state.darkModeEnabled);
     return state;
   },
+  remember(theme: CompanyTheme, preferences: UserPreference) {
+    const state = {
+      themeColor: normalizeHexColor(theme.themeColor ?? DEFAULT_THEME_COLOR),
+      darkModeEnabled: Boolean(preferences.darkModeEnabled)
+    };
+    write(state);
+    return state;
+  },
   saveTheme(theme: CompanyTheme) {
     const current = read();
     return this.save(theme, { darkModeEnabled: current.darkModeEnabled });

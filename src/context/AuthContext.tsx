@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import { getCompanyTheme } from "../api/company";
 import { getMyMenus } from "../api/permissions";
 import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
@@ -54,6 +55,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const AUTH_BOOTSTRAP_CACHE_KEY = "billing_frontend_auth_bootstrap";
+const PUBLIC_THEME_ROUTES = new Set(["/", "/login", "/register", "/platform-admin/login"]);
 
 type AuthBootstrapCache = {
   accessToken: string;
@@ -87,6 +89,7 @@ const clearLocalState = (
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const location = useLocation();
   const cachedThemeState = ThemeBootstrapService.getCachedState();
   const [session, setSession] = useState<StoredAuthSession | null>(authStorage.get());
   const [user, setUser] = useState<UserProfile | null>(session?.type === "user" ? session.auth.user : null);
@@ -99,14 +102,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const sessionType = session?.type ?? null;
   const isPlatformAdmin = session?.type === "platform-admin";
   const platformAdmin = isPlatformAdmin ? session.auth : null;
+  const usePublicTheme = PUBLIC_THEME_ROUTES.has(location.pathname);
 
   useEffect(() => {
-    applyThemeColor(theme.themeColor);
-  }, [theme.themeColor]);
+    applyThemeColor(usePublicTheme ? DEFAULT_THEME_COLOR : theme.themeColor);
+  }, [theme.themeColor, usePublicTheme]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", preferences.darkModeEnabled);
-  }, [preferences.darkModeEnabled]);
+    document.documentElement.classList.toggle("dark", !usePublicTheme && preferences.darkModeEnabled);
+  }, [preferences.darkModeEnabled, usePublicTheme]);
 
   useEffect(() => {
     if (!session?.auth.accessToken) {
@@ -138,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setTheme(cached.theme);
       setPlatform(cached.platform);
       setPreferences(cached.preferences);
-      ThemeBootstrapService.save(cached.theme, cached.preferences);
+      ThemeBootstrapService.remember(cached.theme, cached.preferences);
       return;
     }
 
@@ -171,7 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setPlatform(bootstrap.platform);
         setPreferences(bootstrap.preferences);
         sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, bootstrap);
-        ThemeBootstrapService.save(bootstrap.theme, bootstrap.preferences);
+        ThemeBootstrapService.remember(bootstrap.theme, bootstrap.preferences);
       })
       .catch(() => {
         clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
@@ -240,7 +244,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (cached && cached.accessToken === session.auth.accessToken) {
           sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, theme: nextTheme });
         }
-        ThemeBootstrapService.save(nextTheme, preferences);
+        ThemeBootstrapService.remember(nextTheme, preferences);
       },
       async setDarkMode(enabled) {
         if (session?.type === "platform-admin") {
@@ -248,7 +252,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
         setPreferences({ darkModeEnabled: enabled });
-        ThemeBootstrapService.saveDarkMode(enabled);
+        ThemeBootstrapService.remember(theme, { darkModeEnabled: enabled });
         if (session?.auth.accessToken && session.type === "user") {
           const nextPreferences = await updateMyPreferences({ darkModeEnabled: enabled });
           setPreferences(nextPreferences);
@@ -256,7 +260,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (cached && cached.accessToken === session.auth.accessToken) {
             sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, preferences: nextPreferences });
           }
-          ThemeBootstrapService.save(theme, nextPreferences);
+          ThemeBootstrapService.remember(theme, nextPreferences);
         }
       },
       can(menuCode, actionCode = "VIEW") {
@@ -305,7 +309,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         setSession(nextSession);
         setUser(nextAuth.user);
-        ThemeBootstrapService.save(nextTheme, nextPreferences);
+        ThemeBootstrapService.remember(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
       async loginPlatformAdmin(payload) {
@@ -346,7 +350,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         setSession(nextSession);
         setUser(nextAuth.user);
-        ThemeBootstrapService.save(nextTheme, nextPreferences);
+        ThemeBootstrapService.remember(nextTheme, nextPreferences);
         return findFirstRoute(nextPermissions.menus);
       },
       async logout() {
