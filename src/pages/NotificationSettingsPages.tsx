@@ -11,6 +11,7 @@ import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { notificationService } from "../services/notificationService";
 import type { ProviderSettings, ProviderSettingsRequest } from "../types/api";
 
 const emailDefaults: ProviderSettingsRequest = {
@@ -89,7 +90,6 @@ const ProviderSettingsPage = ({
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
   const [testRecipient, setTestRecipient] = useState("");
-  const [successToast, setSuccessToast] = useState("");
   const { setApiError } = useApiMessage();
 
   const refresh = async () => {
@@ -136,13 +136,12 @@ const ProviderSettingsPage = ({
   const save = async () => {
     try {
       setSaving(true);
-      setSuccessToast("");
       if (editing) {
         await update(editing.id, form);
       } else {
         await create(form);
       }
-      setSuccessToast(`${type === "email" ? "Email" : "SMS"} provider saved successfully.`);
+      notificationService.showSuccess(`${type === "email" ? "Email" : "SMS"} provider saved successfully.`);
       setOpen(false);
       await refresh();
     } catch (error) {
@@ -155,9 +154,8 @@ const ProviderSettingsPage = ({
   const testEmail = async (record: ProviderSettings) => {
     try {
       setTestingId(record.id);
-      setSuccessToast("");
       await sendTestEmail(testRecipient);
-      setSuccessToast("Test email sent successfully.");
+      notificationService.showSuccess("Test email sent successfully.");
     } catch (error) {
       setApiError(error, "Unable to send test email");
     } finally {
@@ -176,11 +174,6 @@ const ProviderSettingsPage = ({
   return (
     <div className="space-y-4 pb-6">
       <Header title={title} subtitle={subtitle} />
-      {successToast ? (
-        <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">
-          {successToast}
-        </div>
-      ) : null}
       <GlassCard className="p-6 md:p-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <CommonBreadcrumb items={[{ label: breadcrumb }]} />

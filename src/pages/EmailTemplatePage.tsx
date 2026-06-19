@@ -23,6 +23,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatDate } from "../lib/format";
+import { notificationService } from "../services/notificationService";
 import type { EmailPreview, EmailTemplate, EmailTemplateRequest, PageResponse } from "../types/api";
 
 const emptyPage: PageResponse<EmailTemplate> = {
@@ -50,7 +51,6 @@ export const EmailTemplatePage = () => {
   const [form, setForm] = useState<EmailTemplateRequest>(defaultForm);
   const [preview, setPreview] = useState<EmailPreview | null>(null);
   const [previewTitle, setPreviewTitle] = useState("Email Preview");
-  const [successToast, setSuccessToast] = useState("");
   const editorRef = useRef<HTMLDivElement | null>(null);
   const { can } = useAuth();
   const { clearMessage, setApiError } = useApiMessage();
@@ -115,7 +115,6 @@ export const EmailTemplatePage = () => {
   const saveTemplate = async () => {
     syncEditor();
     clearMessage();
-    setSuccessToast("");
     try {
       const payload = {
         ...form,
@@ -123,10 +122,10 @@ export const EmailTemplatePage = () => {
       };
       if (editingTemplate) {
         await updateEmailTemplate(editingTemplate.id, payload);
-        setSuccessToast("Email template updated successfully.");
+        notificationService.showSuccess("Email template updated successfully.");
       } else {
         await createEmailTemplate(payload);
-        setSuccessToast("Email template created successfully.");
+        notificationService.showSuccess("Email template created successfully.");
       }
       setFormOpen(false);
       await loadTemplates(templatePage.page);
@@ -137,10 +136,9 @@ export const EmailTemplatePage = () => {
 
   const removeTemplate = async (template: EmailTemplate) => {
     clearMessage();
-    setSuccessToast("");
     try {
       await deleteEmailTemplate(template.id);
-      setSuccessToast("Email template deleted successfully.");
+      notificationService.showSuccess("Email template deleted successfully.");
       await loadTemplates(templatePage.page);
     } catch (err: any) {
       setApiError(err, "Unable to delete email template");
@@ -169,12 +167,6 @@ export const EmailTemplatePage = () => {
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header title="Email Templates" subtitle="Manage reusable reminder and invoice email templates with dynamic variables." />
-
-      {successToast ? (
-        <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-700">
-          {successToast}
-        </div>
-      ) : null}
 
       <GlassCard className="flex min-h-[640px] flex-1 flex-col p-6 md:p-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

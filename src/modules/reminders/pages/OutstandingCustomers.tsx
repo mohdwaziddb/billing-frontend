@@ -16,6 +16,7 @@ import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../../../components/Pagination";
 import { useAuth } from "../../../context/AuthContext";
+import { notificationService } from "../../../services/notificationService";
 import { ReminderHistoryModal } from "../components/ReminderHistoryModal";
 import { getActiveEmailTemplates, previewEmailTemplate } from "../../../api/emailTemplates";
 import { getActiveSmsTemplates, previewSmsTemplate } from "../../../api/smsTemplates";
@@ -38,7 +39,6 @@ export const OutstandingCustomersReminderPage = () => {
     totalPages: 0
   });
   const [loading, setLoading] = useState(false);
-  const [successToast, setSuccessToast] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
   const { can } = useAuth();
   const [filters, setFilters] = useState({
@@ -181,14 +181,13 @@ export const OutstandingCustomersReminderPage = () => {
       return;
     }
     clearMessage();
-    setSuccessToast("");
     try {
       await sendReminder({
         customerId: reminderTarget.customerId,
         channel: reminderForm.channel,
         templateId: reminderForm.templateId ? Number(reminderForm.templateId) : undefined
       });
-      setSuccessToast("Reminder sent successfully.");
+      notificationService.showSuccess("Reminder sent successfully.");
       setReminderTarget(null);
       setEmailPreview(null);
       await loadCustomers(filters, customerPage.page);
@@ -203,12 +202,6 @@ export const OutstandingCustomersReminderPage = () => {
         title="Outstanding Reminders"
         subtitle="Search overdue customers, review due balances, and trigger reminder workflows that are logged by the backend."
       />
-
-      {successToast ? (
-        <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">
-          {successToast}
-        </div>
-      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <GlassCard className="p-6 md:p-7">
