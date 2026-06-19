@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { DefaultRoute } from "./components/DefaultRoute";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
 import { PermissionRoute } from "./components/PermissionRoute";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -28,6 +27,7 @@ import { ProductCategoryPage } from "./pages/ProductCategoryPage";
 import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { EmailSettingsPage, SmsSettingsPage } from "./pages/NotificationSettingsPages";
 import { RolePermissionsPage } from "./pages/RolePermissionsPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
@@ -94,7 +94,7 @@ function App() {
         </Route>
       </Route>
 
-      <Route path="*" element={<DefaultRoute />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

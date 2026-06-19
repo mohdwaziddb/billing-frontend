@@ -24,6 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { env } from "../config/env";
 import { useAuth } from "../context/AuthContext";
+import type { MenuPermission } from "../types/api";
 
 const iconMap: Record<string, LucideIcon> = {
   BarChart3,
@@ -45,20 +46,31 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 export const Sidebar = () => {
-  const { user, permissions, platform, sessionType, platformAdmin } = useAuth();
+  const { user, permissions, platform, sessionType, isPlatformAdmin } = useAuth();
   const location = useLocation();
   const [openMenus, setOpenMenus] = useState<Record<number, boolean>>({});
   const [collapsed, setCollapsed] = useState(false);
   const menus = useMemo(() => {
-    if (sessionType === "platform-admin") {
+    if (isPlatformAdmin) {
       return [
-        { id: 1, menuName: "Platform Dashboard", menuIcon: "LayoutDashboard", menuRoute: "/platform-admin/dashboard", displayOrder: 1, canView: true, actions: [], children: [] },
-        { id: 2, menuName: "Companies", menuIcon: "Building2", menuRoute: "/platform-admin/companies", displayOrder: 2, canView: true, actions: [], children: [] },
-        { id: 3, menuName: "Platform Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 3, canView: true, actions: [], children: [] }
+        {
+          id: -1,
+          menuName: "Platform Administration",
+          menuIcon: "ShieldCheck",
+          menuRoute: "",
+          displayOrder: 1,
+          canView: true,
+          actions: [],
+          children: [
+            { id: -2, menuName: "Dashboard", menuIcon: "LayoutDashboard", menuRoute: "/platform-admin/dashboard", displayOrder: 1, canView: true, actions: [], children: [] },
+            { id: -3, menuName: "Companies", menuIcon: "Building2", menuRoute: "/platform-admin/companies", displayOrder: 2, canView: true, actions: [], children: [] },
+            { id: -4, menuName: "Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 3, canView: true, actions: [], children: [] }
+          ]
+        }
       ];
     }
-    return permissions?.menus.filter((menu) => menu.canView).sort((a, b) => a.displayOrder - b.displayOrder) ?? [];
-  }, [permissions?.menus, sessionType]);
+    return filterCompanyMenus(permissions?.menus ?? []);
+  }, [isPlatformAdmin, permissions?.menus]);
 
   useEffect(() => {
     const activeParent = menus.find((menu) => (menu.children ?? []).some((child) => child.menuRoute === location.pathname));
@@ -208,3 +220,25 @@ export const Sidebar = () => {
     </aside>
   );
 };
+
+const isPlatformAdminMenu = (menu: MenuPermission) => {
+  const name = menu.menuName.trim().toLowerCase();
+  const route = menu.menuRoute.trim().toLowerCase();
+  const code = menu.menuCode.trim().toLowerCase();
+  return (
+    route.startsWith("/platform-admin") ||
+    name === "platform administration" ||
+    name.startsWith("platform admin") ||
+    code.includes("platform_admin")
+  );
+};
+
+const filterCompanyMenus = (menus: MenuPermission[]): MenuPermission[] =>
+  menus
+    .filter((menu) => menu.canView && !isPlatformAdminMenu(menu))
+    .map((menu) => ({
+      ...menu,
+      children: filterCompanyMenus(menu.children ?? [])
+    }))
+    .filter((menu) => menu.menuRoute || (menu.children?.length ?? 0) > 0)
+    .sort((a, b) => a.displayOrder - b.displayOrder);

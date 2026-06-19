@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  Bell,
   Boxes,
   Building2,
   ChevronDown,
@@ -218,10 +217,6 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
                 <Palette size={18} />
               </Link>
             ) : null}
-            <button type="button" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:text-[var(--theme-color)]" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">5</span>
-            </button>
           </div>
           <div ref={profileRef} className="relative">
             <button

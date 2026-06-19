@@ -274,8 +274,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
         <div className="grid gap-5 bg-[linear-gradient(135deg,#0f172a,#155e75)] px-6 py-6 text-white md:grid-cols-[1fr_auto] md:items-center">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Platform Administration</p>
-            <h2 className="mt-2 text-2xl font-extrabold">Separate platform-owner control layer</h2>
+            <h2 className="text-2xl font-extrabold">Separate platform-owner control layer</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-white/76">
               This session is isolated from company users and is powered only by credentials stored in platform settings.
             </p>

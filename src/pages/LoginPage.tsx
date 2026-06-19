@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
@@ -9,13 +9,26 @@ import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 
 export const LoginPage = () => {
-  const { login } = useAuth();
+  const { auth, sessionType, permissions, firstAccessibleRoute, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const { clearMessage, setApiError } = useApiMessage();
   const canSubmit = Boolean(form.username.trim() && form.password.trim());
+
+  useEffect(() => {
+    if (!auth?.accessToken) {
+      return;
+    }
+    if (sessionType === "platform-admin") {
+      navigate("/platform-admin/dashboard", { replace: true });
+      return;
+    }
+    if (sessionType === "user" && permissions) {
+      navigate(firstAccessibleRoute() ?? "/dashboard", { replace: true });
+    }
+  }, [auth?.accessToken, firstAccessibleRoute, navigate, permissions, sessionType]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();

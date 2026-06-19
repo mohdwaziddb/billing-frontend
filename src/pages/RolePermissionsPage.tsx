@@ -22,6 +22,12 @@ const ACTION_LABELS: Record<string, string> = {
   EMAIL_SEND: "Send Email",
   SMS_SEND: "Send SMS"
 };
+
+const LEGACY_PLATFORM_ADMIN_MENU_CODE_PREFIX = "SUPER" + "_ADMIN_";
+
+const isLegacySuperAdminMenu = (menu: PermissionMatrix["menus"][number]) =>
+  menu.menuCode.startsWith(LEGACY_PLATFORM_ADMIN_MENU_CODE_PREFIX) || menu.menuRoute.startsWith("/super-admin") || menu.menuRoute.startsWith("/platform-admin");
+
 const toRoleOption = (role?: Role | string | null) => {
   const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
   return {
@@ -65,7 +71,9 @@ export const RolePermissionsPage = () => {
 
   const filteredPermissionMenus = useMemo(() => {
     const search = permissionSearch.trim().toLowerCase();
-    return (permissionMatrix?.menus ?? []).filter((menu) => !search || menu.menuName.toLowerCase().includes(search) || menu.menuCode.toLowerCase().includes(search));
+    return (permissionMatrix?.menus ?? [])
+      .filter((menu) => !isLegacySuperAdminMenu(menu))
+      .filter((menu) => !search || menu.menuName.toLowerCase().includes(search) || menu.menuCode.toLowerCase().includes(search));
   }, [permissionMatrix, permissionSearch]);
 
   const setMenuActions = (menuId: number, updater: (actions: ActionPermission[]) => ActionPermission[]) => {
@@ -152,15 +160,17 @@ export const RolePermissionsPage = () => {
       const payload = {
         roleCode: permissionMode === "role" ? selectedRole : undefined,
         userId: permissionMode === "user" ? Number(selectedUserId) : undefined,
-        menus: permissionMatrix.menus.map((menu) => ({
-          menuId: menu.id,
-          canView: menu.canView,
-          actions: menu.actions.map((action) => ({
-            actionId: action.id,
-            allowed: action.allowed,
-            overrideAllowed: permissionMode === "user" ? action.overrideAllowed ?? false : undefined
+        menus: permissionMatrix.menus
+          .filter((menu) => !isLegacySuperAdminMenu(menu))
+          .map((menu) => ({
+            menuId: menu.id,
+            canView: menu.canView,
+            actions: menu.actions.map((action) => ({
+              actionId: action.id,
+              allowed: action.allowed,
+              overrideAllowed: permissionMode === "user" ? action.overrideAllowed ?? false : undefined
+            }))
           }))
-        }))
       };
       const nextMatrix = permissionMode === "role" ? await saveRolePermissionMatrix(payload) : await saveUserPermissionMatrix(payload);
       setPermissionMatrix(nextMatrix);
