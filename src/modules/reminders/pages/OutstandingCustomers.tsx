@@ -27,7 +27,7 @@ import type { EmailPreview, EmailTemplate, PageResponse, SmsTemplate } from "../
 const channelOptions = [
   { label: "Email", value: "EMAIL" },
   { label: "SMS", value: "SMS" },
-  { label: "WhatsApp (Future)", value: "WHATSAPP" }
+  { label: "WhatsApp", value: "WHATSAPP" }
 ] as const;
 
 export const OutstandingCustomersReminderPage = () => {
@@ -373,7 +373,11 @@ export const OutstandingCustomersReminderPage = () => {
                 </Button>
                 <Button
                   type="button"
-                  disabled={(reminderForm.channel === "EMAIL" && (!reminderForm.templateId || !reminderTarget.email)) || (reminderForm.channel === "SMS" && !reminderForm.templateId)}
+                  disabled={
+                    (reminderForm.channel === "EMAIL" && (!reminderForm.templateId || !reminderTarget.email))
+                    || (reminderForm.channel === "SMS" && !reminderForm.templateId)
+                    || (reminderForm.channel === "WHATSAPP" && !reminderTarget.mobile)
+                  }
                   onClick={() => void sendCustomerReminder()}
                 >
                   Send
@@ -381,6 +385,8 @@ export const OutstandingCustomersReminderPage = () => {
               </div>
               {reminderForm.channel === "EMAIL" && !reminderTarget.email ? (
                 <p className="text-sm text-rose-700">Customer email missing. Add email before sending reminder.</p>
+              ) : reminderForm.channel === "WHATSAPP" && !reminderTarget.mobile ? (
+                <p className="text-sm text-rose-700">Customer mobile number missing. Add mobile before sending reminder.</p>
               ) : null}
             </div>
             <div className="rounded-[var(--radius-card)] border border-slate-200 bg-white p-4">
@@ -400,7 +406,7 @@ export const OutstandingCustomersReminderPage = () => {
                 </div>
               ) : (
                 <PreviewSurface className="mt-4 flex min-h-[280px] items-center justify-center rounded-xl border-dashed text-sm">
-                  Preview email before sending.
+                  {reminderForm.channel === "WHATSAPP" ? "WhatsApp reminders use direct message delivery." : "Preview email before sending."}
                 </PreviewSurface>
               )}
             </div>

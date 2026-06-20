@@ -6,7 +6,9 @@ import type {
   PlatformAdminCompanyDetails,
   PlatformAdminCompanyOverview,
   PlatformAdminDashboardSummary,
-  PlatformAdminSettings
+  PlatformAdminSettings,
+  ProviderSettings,
+  ProviderSettingsRequest
 } from "../types/api";
 
 export type PlatformAdminCompanyFilters = {
@@ -78,5 +80,65 @@ export const getPlatformAdminSettings = async () => {
 
 export const updatePlatformAdminSettings = async (payload: UpdatePlatformAdminSettingsPayload) => {
   const response = await apiClient.put<ApiResponse<PlatformAdminSettings>>("/v1/platform-admin/settings", payload);
+  return response.data.data;
+};
+
+export const getPlatformAdminEmailSettings = async (companyId: number) => {
+  const response = await apiClient.get<ApiResponse<ProviderSettings[]>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings`);
+  return response.data.data;
+};
+
+export const createPlatformAdminEmailSettings = async (companyId: number, payload: ProviderSettingsRequest) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings`, payload);
+  return response.data.data;
+};
+
+export const updatePlatformAdminEmailSettings = async (companyId: number, id: number, payload: ProviderSettingsRequest) => {
+  const response = await apiClient.put<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings/${id}`, payload);
+  return response.data.data;
+};
+
+export const testPlatformAdminEmailSettings = async (companyId: number, recipientEmail: string) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings/test`, { recipientEmail });
+  return response.data.data;
+};
+
+export const getPlatformAdminSmsSettings = async (companyId: number) => {
+  const response = await apiClient.get<ApiResponse<ProviderSettings[]>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings`);
+  return response.data.data;
+};
+
+export const createPlatformAdminSmsSettings = async (companyId: number, payload: ProviderSettingsRequest) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings`, payload);
+  return response.data.data;
+};
+
+export const updatePlatformAdminSmsSettings = async (companyId: number, id: number, payload: ProviderSettingsRequest) => {
+  const response = await apiClient.put<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/${id}`, payload);
+  return response.data.data;
+};
+
+export const testPlatformAdminSmsSettings = async (companyId: number, mobileNumber: string) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/test`, { mobileNumber });
+  return response.data.data;
+};
+
+export const getPlatformAdminWhatsAppSettings = async (companyId: number) => {
+  const response = await apiClient.get<ApiResponse<ProviderSettings[]>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings`);
+  return response.data.data;
+};
+
+export const createPlatformAdminWhatsAppSettings = async (companyId: number, payload: ProviderSettingsRequest) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings`, payload);
+  return response.data.data;
+};
+
+export const updatePlatformAdminWhatsAppSettings = async (companyId: number, id: number, payload: ProviderSettingsRequest) => {
+  const response = await apiClient.put<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/${id}`, payload);
+  return response.data.data;
+};
+
+export const testPlatformAdminWhatsAppSettings = async (companyId: number, mobileNumber: string, message: string) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/test`, { mobileNumber, message });
   return response.data.data;
 };

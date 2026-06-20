@@ -64,7 +64,8 @@ export const Sidebar = () => {
           children: [
             { id: -2, menuName: "Dashboard", menuIcon: "LayoutDashboard", menuRoute: "/platform-admin/dashboard", displayOrder: 1, canView: true, actions: [], children: [] },
             { id: -3, menuName: "Companies", menuIcon: "Building2", menuRoute: "/platform-admin/companies", displayOrder: 2, canView: true, actions: [], children: [] },
-            { id: -4, menuName: "Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 3, canView: true, actions: [], children: [] }
+            { id: -4, menuName: "Communication", menuIcon: "Mail", menuRoute: "/platform-admin/communication", displayOrder: 3, canView: true, actions: [], children: [] },
+            { id: -5, menuName: "Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 4, canView: true, actions: [], children: [] }
           ]
         }
       ];

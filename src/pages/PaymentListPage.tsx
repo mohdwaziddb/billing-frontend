@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CreditCard, Download, History, Wallet } from "lucide-react";
+import { AlertCircle, CreditCard, Download, History, Send, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
+import { sendEmailNotification, sendSmsNotification, sendWhatsAppNotification } from "../api/notifications";
 import { getPaymentModes } from "../api/paymentModes";
 import { deletePayment, getPaymentsPage, type PaymentFilterParams } from "../api/payments";
 import { ActionDropdown } from "../components/ActionDropdown";
@@ -113,7 +114,9 @@ export const PaymentListPage = () => {
   const [exportRows, setExportRows] = useState<Payment[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
   const [logTarget, setLogTarget] = useState<Payment | null>(null);
+  const [reminderTarget, setReminderTarget] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const [activeSummary, setActiveSummary] = useState<SummaryKey | null>(null);
   const [modalPage, setModalPage] = useState(0);
   const [modalSearch, setModalSearch] = useState("");
@@ -122,6 +125,11 @@ export const PaymentListPage = () => {
   const [logCounts, setLogCounts] = useState<Record<number, number>>({});
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
+  const [reminderForm, setReminderForm] = useState({
+    channel: "SMS" as "EMAIL" | "SMS" | "WHATSAPP",
+    subject: "Payment Reminder",
+    message: ""
+  });
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
   const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
@@ -221,6 +229,56 @@ export const PaymentListPage = () => {
     exportToExcel(fileName, rows.length ? [...rows, buildGrandTotal(rows)] : [], visiblePaymentExportColumns);
   };
 
+  const openReminder = (payment: Payment) => {
+    setReminderTarget(payment);
+    setReminderForm({
+      channel: payment.customerEmail ? "EMAIL" : payment.customerMobile ? "SMS" : "WHATSAPP",
+      subject: `Payment Reminder - ${payment.invoiceNo ?? paymentRef(payment)}`,
+      message: buildPaymentReminderMessage(payment)
+    });
+  };
+
+  const sendReminder = async () => {
+    if (!reminderTarget) {
+      return;
+    }
+    try {
+      setSendingReminder(true);
+      if (reminderForm.channel === "EMAIL") {
+        if (!reminderTarget.customerEmail) {
+          throw new Error("Customer email is not available");
+        }
+        await sendEmailNotification({
+          toEmails: [reminderTarget.customerEmail],
+          subject: reminderForm.subject,
+          message: reminderForm.message
+        });
+      } else if (reminderForm.channel === "SMS") {
+        if (!reminderTarget.customerMobile) {
+          throw new Error("Customer mobile number is not available");
+        }
+        await sendSmsNotification({
+          mobileNumbers: [reminderTarget.customerMobile],
+          message: reminderForm.message
+        });
+      } else {
+        if (!reminderTarget.customerMobile) {
+          throw new Error("Customer mobile number is not available");
+        }
+        await sendWhatsAppNotification({
+          mobileNumbers: [reminderTarget.customerMobile],
+          message: reminderForm.message
+        });
+      }
+      notificationService.showSuccess("Reminder sent successfully.");
+      setReminderTarget(null);
+    } catch (err: any) {
+      setApiError(err, "Unable to send payment reminder");
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
   const openSummary = (key: SummaryKey) => {
     setActiveSummary(key);
     setModalPage(0);
@@ -316,7 +374,20 @@ export const PaymentListPage = () => {
           ) : null}
         </div>
         <div className="flex-1">
-          <PaymentTable payments={payments} columns={visiblePaymentColumns} logCounts={logCounts} canDelete={can("PAYMENTS", "DELETE")} canViewLogs={can("PAYMENTS", "LOGS")} canAdd={can("PAYMENTS", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <PaymentTable
+            payments={payments}
+            columns={visiblePaymentColumns}
+            logCounts={logCounts}
+            canDelete={can("PAYMENTS", "DELETE")}
+            canViewLogs={can("PAYMENTS", "LOGS")}
+            canAdd={can("PAYMENTS", "ADD")}
+            canSendEmail={can("EMAIL_TEMPLATES", "EMAIL_SEND")}
+            canSendSms={can("SMS_TEMPLATES", "SMS_SEND")}
+            canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
+            onDelete={setDeleteTarget}
+            onShowLogs={setLogTarget}
+            onSendReminder={openReminder}
+          />
         </div>
         <div className="mt-auto">
           <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => {
@@ -346,8 +417,68 @@ export const PaymentListPage = () => {
               Export Excel
             </Button>
           </div>
-          <PaymentTable payments={modalPayments} columns={visiblePaymentColumns} logCounts={logCounts} canDelete={false} canViewLogs={can("PAYMENTS", "LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <PaymentTable
+            payments={modalPayments}
+            columns={visiblePaymentColumns}
+            logCounts={logCounts}
+            canDelete={false}
+            canViewLogs={can("PAYMENTS", "LOGS")}
+            canSendEmail={can("EMAIL_TEMPLATES", "EMAIL_SEND")}
+            canSendSms={can("SMS_TEMPLATES", "SMS_SEND")}
+            canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
+            onDelete={setDeleteTarget}
+            onShowLogs={setLogTarget}
+            onSendReminder={openReminder}
+          />
           <Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
+        </div>
+      </Modal>
+
+      <Modal open={Boolean(reminderTarget)} title="Send Reminder" onClose={() => setReminderTarget(null)}>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-950">{reminderTarget?.customerName ?? "--"}</p>
+            <p>{reminderTarget?.customerEmail ?? reminderTarget?.customerMobile ?? "--"}</p>
+            <p className="mt-2">Reference: {reminderTarget ? reminderTarget.invoiceNo ?? paymentRef(reminderTarget) : "--"}</p>
+          </div>
+          <Select
+            label="Reminder Channel"
+            value={reminderForm.channel}
+            options={[
+              { label: "Email", value: "EMAIL" },
+              { label: "SMS", value: "SMS" },
+              { label: "WhatsApp", value: "WHATSAPP" }
+            ]}
+            onChange={(event) => setReminderForm((current) => ({ ...current, channel: event.target.value as "EMAIL" | "SMS" | "WHATSAPP" }))}
+          />
+          {reminderForm.channel === "EMAIL" ? (
+            <Input label="Subject" value={reminderForm.subject} onChange={(event) => setReminderForm((current) => ({ ...current, subject: event.target.value }))} />
+          ) : null}
+          <label className="block space-y-2">
+            <span className="block text-sm font-semibold text-slate-700">Message</span>
+            <textarea className="min-h-[144px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]" value={reminderForm.message} onChange={(event) => setReminderForm((current) => ({ ...current, message: event.target.value }))} />
+          </label>
+          {reminderForm.channel === "EMAIL" && !reminderTarget?.customerEmail ? (
+            <p className="text-sm text-rose-700">Customer email missing.</p>
+          ) : null}
+          {(reminderForm.channel === "SMS" || reminderForm.channel === "WHATSAPP") && !reminderTarget?.customerMobile ? (
+            <p className="text-sm text-rose-700">Customer mobile number missing.</p>
+          ) : null}
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setReminderTarget(null)}>Cancel</Button>
+            <Button
+              type="button"
+              disabled={
+                sendingReminder
+                || !reminderForm.message.trim()
+                || (reminderForm.channel === "EMAIL" && (!reminderForm.subject.trim() || !reminderTarget?.customerEmail))
+                || ((reminderForm.channel === "SMS" || reminderForm.channel === "WHATSAPP") && !reminderTarget?.customerMobile)
+              }
+              onClick={() => void sendReminder()}
+            >
+              {sendingReminder ? "Sending..." : "Send Reminder"}
+            </Button>
+          </div>
         </div>
       </Modal>
 
@@ -357,7 +488,33 @@ export const PaymentListPage = () => {
   );
 };
 
-const PaymentTable = ({ payments, columns, logCounts, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { payments: Payment[]; columns: ReturnType<typeof basePaymentColumns>; logCounts: Record<number, number>; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (payment: Payment) => void; onShowLogs?: (payment: Payment) => void }) => (
+const PaymentTable = ({
+  payments,
+  columns,
+  logCounts,
+  canDelete,
+  canViewLogs = false,
+  canAdd = false,
+  canSendEmail = false,
+  canSendSms = false,
+  canSendWhatsApp = false,
+  onDelete,
+  onShowLogs,
+  onSendReminder
+}: {
+  payments: Payment[];
+  columns: ReturnType<typeof basePaymentColumns>;
+  logCounts: Record<number, number>;
+  canDelete: boolean;
+  canViewLogs?: boolean;
+  canAdd?: boolean;
+  canSendEmail?: boolean;
+  canSendSms?: boolean;
+  canSendWhatsApp?: boolean;
+  onDelete: (payment: Payment) => void;
+  onShowLogs?: (payment: Payment) => void;
+  onSendReminder?: (payment: Payment) => void;
+}) => (
   <Table
     data={payments}
     emptyText="No payments match the selected filters."
@@ -370,6 +527,12 @@ const PaymentTable = ({ payments, columns, logCounts, canDelete, canViewLogs = f
         className: "text-right",
         render: (item) => (
           <ActionDropdown actions={[
+            {
+              label: "Send Reminder",
+              icon: <Send size={15} />,
+              hidden: !(canSendEmail || canSendSms || canSendWhatsApp) || (!item.customerEmail && !item.customerMobile),
+              onClick: () => onSendReminder?.(item)
+            },
             { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
             { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
           ]} />
@@ -483,3 +646,6 @@ const paymentExportColumns = [
   { key: "amount", header: "Amount", type: "amount" as const },
   { key: "createdBy", header: "Created By" }
 ];
+
+const buildPaymentReminderMessage = (payment: Payment) =>
+  `Hello ${payment.customerName}, this is a reminder for ${payment.invoiceNo ?? paymentRef(payment)}. We have received a payment of Rs. ${Number(payment.amount).toFixed(2)} on ${formatDate(payment.paymentDate)}. If any balance is still pending, please clear it at the earliest.`;

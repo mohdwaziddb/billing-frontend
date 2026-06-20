@@ -1,21 +1,26 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Building2, Clock3, CreditCard, Download, ReceiptText, UserRound, Wallet } from "lucide-react";
+import { Building2, Clock3, CreditCard, Download, ReceiptText, Send, UserRound, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { getInvoiceProfitability } from "../api/expenses";
 import { getInvoice } from "../api/invoices";
+import { sendWhatsAppNotification } from "../api/notifications";
 import { getPayments } from "../api/payments";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
+import { Input } from "../components/Input";
+import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
+import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { formatDate, formatDateTime } from "../lib/format";
-import { downloadInvoicePdf } from "../lib/invoicePdf";
+import { buildInvoicePdfBase64, downloadInvoicePdf } from "../lib/invoicePdf";
+import { notificationService } from "../services/notificationService";
 import type { AuditLog, Invoice, Payment, Profitability } from "../types/api";
 
 export const InvoiceDetailPage = () => {
@@ -25,6 +30,14 @@ export const InvoiceDetailPage = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [profitability, setProfitability] = useState<Profitability | null>(null);
+  const [whatsAppOpen, setWhatsAppOpen] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [whatsAppForm, setWhatsAppForm] = useState({
+    message: "",
+    includePdf: true,
+    includeLink: true
+  });
+  const { setApiError } = useApiMessage();
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -43,6 +56,48 @@ export const InvoiceDetailPage = () => {
   }, [can, invoiceId]);
 
   const canRecordPayment = Boolean(invoice && invoice.paymentStatus !== "PAID" && Number(invoice.balanceAmount) > 0 && can("PAYMENTS", "ADD"));
+  const canSendWhatsApp = Boolean(invoice?.customerMobile && can("COMMUNICATION", "WHATSAPP_SEND"));
+
+  useEffect(() => {
+    if (!invoice) {
+      return;
+    }
+    setWhatsAppForm({
+      message: defaultInvoiceWhatsAppMessage(invoice),
+      includePdf: true,
+      includeLink: true
+    });
+  }, [invoice]);
+
+  const handleSendWhatsApp = async () => {
+    if (!invoice || !invoice.customerMobile) {
+      return;
+    }
+    try {
+      setSendingWhatsApp(true);
+      const message = whatsAppForm.includeLink
+        ? `${whatsAppForm.message.trim()}\nInvoice Link: ${window.location.origin}/invoices/${invoice.id}`
+        : whatsAppForm.message.trim();
+      const attachments = whatsAppForm.includePdf
+        ? [{
+          fileName: `${invoice.invoiceNo}.pdf`,
+          contentType: "application/pdf",
+          base64Content: await buildInvoicePdfBase64(invoice, user?.company ?? null)
+        }]
+        : [];
+      await sendWhatsAppNotification({
+        mobileNumbers: [invoice.customerMobile],
+        message,
+        attachments
+      });
+      notificationService.showSuccess("Invoice sent on WhatsApp successfully.");
+      setWhatsAppOpen(false);
+    } catch (error) {
+      setApiError(error, "Unable to send invoice on WhatsApp");
+    } finally {
+      setSendingWhatsApp(false);
+    }
+  };
 
   return (
     <div className="space-y-4 pb-6">
@@ -67,6 +122,11 @@ export const InvoiceDetailPage = () => {
             {invoice && can("INVOICES", "EXPORT") ? (
               <Button type="button" variant="secondary" onClick={() => downloadInvoicePdf(invoice, user?.company ?? null)}>
                 <Download size={16} />Download Invoice
+              </Button>
+            ) : null}
+            {canSendWhatsApp ? (
+              <Button type="button" variant="secondary" onClick={() => setWhatsAppOpen(true)}>
+                <Send size={16} />Send WhatsApp
               </Button>
             ) : null}
           </div>
@@ -152,9 +212,42 @@ export const InvoiceDetailPage = () => {
           </GlassCard>
         ) : null}
       </div>
+
+      <Modal open={whatsAppOpen} title="Send Invoice on WhatsApp" onClose={() => setWhatsAppOpen(false)}>
+        <div className="space-y-4">
+          <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-950">{invoice?.customerName}</p>
+            <p>{invoice?.customerMobile ?? "--"}</p>
+            <p className="mt-2">Invoice: {invoice?.invoiceNo ?? "--"}</p>
+          </div>
+          <label className="block space-y-2">
+            <span className="block text-sm font-semibold text-slate-700">Message</span>
+            <textarea className="min-h-[148px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]" value={whatsAppForm.message} onChange={(event) => setWhatsAppForm((current) => ({ ...current, message: event.target.value }))} />
+          </label>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+              <input type="checkbox" checked={whatsAppForm.includePdf} onChange={(event) => setWhatsAppForm((current) => ({ ...current, includePdf: event.target.checked }))} />
+              Attach invoice PDF
+            </label>
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+              <input type="checkbox" checked={whatsAppForm.includeLink} onChange={(event) => setWhatsAppForm((current) => ({ ...current, includeLink: event.target.checked }))} />
+              Include invoice link
+            </label>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setWhatsAppOpen(false)}>Cancel</Button>
+            <Button type="button" disabled={sendingWhatsApp || !whatsAppForm.message.trim()} onClick={() => void handleSendWhatsApp()}>
+              {sendingWhatsApp ? "Sending..." : "Send WhatsApp"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
+
+const defaultInvoiceWhatsAppMessage = (invoice: Invoice) =>
+  `Hello ${invoice.customerName}, your invoice ${invoice.invoiceNo} for Rs. ${Number(invoice.totalAmount).toFixed(2)} is ready. Outstanding amount: Rs. ${Number(invoice.balanceAmount).toFixed(2)}.`;
 
 const InfoPanel = ({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) => (
   <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">

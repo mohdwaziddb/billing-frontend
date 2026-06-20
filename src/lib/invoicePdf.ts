@@ -63,7 +63,7 @@ const currentThemeRgb = () => {
   ] as const;
 };
 
-export const downloadInvoicePdf = async (invoice: Invoice, company: CompanySummary | null) => {
+const buildInvoicePdfDocument = async (invoice: Invoice, company: CompanySummary | null) => {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable")
@@ -184,5 +184,15 @@ export const downloadInvoicePdf = async (invoice: Invoice, company: CompanySumma
   doc.text("Authorized Signature", pageWidth - 40, y + 38, { align: "right" });
   doc.line(pageWidth - 170, y + 28, pageWidth - 40, y + 28);
 
+  return doc;
+};
+
+export const downloadInvoicePdf = async (invoice: Invoice, company: CompanySummary | null) => {
+  const doc = await buildInvoicePdfDocument(invoice, company);
   doc.save(`${invoice.invoiceNo}.pdf`);
+};
+
+export const buildInvoicePdfBase64 = async (invoice: Invoice, company: CompanySummary | null) => {
+  const doc = await buildInvoicePdfDocument(invoice, company);
+  return doc.output("datauristring").split(",", 2)[1] ?? "";
 };

@@ -467,6 +467,7 @@ export type Invoice = {
   customerId: number;
   customerName: string;
   customerMobile: string;
+  customerEmail?: string | null;
   customerAddress: string | null;
   subtotal: number;
   taxAmount: number;
@@ -509,6 +510,7 @@ export type Payment = {
   customerId: number;
   customerName: string;
   customerMobile?: string | null;
+  customerEmail?: string | null;
   invoiceId: number | null;
   invoiceNo: string | null;
   amount: number;
@@ -721,6 +723,19 @@ export type EmailLog = {
   sentAt: string | null;
 };
 
+export type NotificationLog = {
+  id: number;
+  channel: string;
+  templateId: number | null;
+  recipient: string;
+  subject: string | null;
+  message: string | null;
+  providerResponse: string | null;
+  status: string;
+  sentBy: string | null;
+  sentAt: string | null;
+};
+
 export type SmsTemplate = {
   id: number;
   templateName: string;
@@ -747,10 +762,14 @@ export type ProviderSettings = {
   smtpTlsEnabled?: boolean;
   awsAccessKey?: string | null;
   awsRegion?: string | null;
+  sendgridApiKey?: string | null;
   apiUrl?: string | null;
-  username?: string | null;
+  providerType?: string | null;
+  authKey?: string | null;
   senderId?: string | null;
-  channelName?: string | null;
+  templateId?: string | null;
+  whatsappNumber?: string | null;
+  senderName?: string | null;
   active: boolean;
 };
 
@@ -765,12 +784,34 @@ export type ProviderSettingsRequest = {
   awsAccessKey?: string;
   awsSecretKey?: string;
   awsRegion?: string;
+  sendgridApiKey?: string;
   apiUrl?: string;
-  username?: string;
-  password?: string;
+  providerType?: string;
+  authKey?: string;
   senderId?: string;
-  channelName?: string;
+  templateId?: string;
+  whatsappNumber?: string;
+  senderName?: string;
   active?: boolean;
+};
+
+export type NotificationAttachmentPayload = {
+  fileName: string;
+  contentType: string;
+  base64Content: string;
+};
+
+export type NotificationSendRequest = {
+  channel?: "EMAIL" | "SMS" | "WHATSAPP";
+  templateId?: number;
+  subject?: string;
+  message?: string;
+  toEmails?: string[];
+  ccEmails?: string[];
+  bccEmails?: string[];
+  mobileNumbers?: string[];
+  attachments?: NotificationAttachmentPayload[];
+  variables?: Record<string, string | number | boolean | null>;
 };
 
 export type HierarchyNode = {

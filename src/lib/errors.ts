@@ -1,3 +1,11 @@
+const normalizeApiErrorMessage = (message: string) => {
+  const trimmedMessage = message.trim();
+  if (/invalid .*username.*password/i.test(trimmedMessage)) {
+    return "Invalid Mobile Number/Email ID/Username or Password.";
+  }
+  return trimmedMessage;
+};
+
 export const getFieldErrors = (error: unknown): Record<string, string> => {
   const data = (error as any)?.response?.data?.data;
   if (!data || typeof data !== "object" || Array.isArray(data)) {
@@ -16,17 +24,17 @@ export const getApiErrorMessage = (error: unknown, fallback: string) => {
   const fieldErrors = getFieldErrors(error);
   const firstFieldError = Object.values(fieldErrors)[0];
   if (firstFieldError) {
-    return firstFieldError;
+    return normalizeApiErrorMessage(firstFieldError);
   }
 
   const responseMessage = (error as any)?.response?.data?.message;
   if (typeof responseMessage === "string" && responseMessage.trim()) {
-    return responseMessage;
+    return normalizeApiErrorMessage(responseMessage);
   }
 
   const directMessage = (error as any)?.message;
   if (typeof directMessage === "string" && directMessage.trim() && directMessage !== "Network Error") {
-    return directMessage;
+    return normalizeApiErrorMessage(directMessage);
   }
 
   return fallback;
