@@ -33,6 +33,11 @@ export const getCompanyUsers = async (params?: UserFilterParams) => {
   return response.records;
 };
 
+export const getActiveReferralUsers = async () => {
+  const response = await apiClient.get<ApiResponse<UserProfile[]>>("/v1/users/active-referrers");
+  return response.data.data;
+};
+
 export const createCompanyUser = async (payload: CompanyUserRequest) => {
   const response = await apiClient.post<ApiResponse<UserProfile>>("/v1/users", payload);
   return response.data.data;

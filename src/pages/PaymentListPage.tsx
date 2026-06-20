@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CreditCard, Download, History, Send, Wallet } from "lucide-react";
+import { AlertCircle, CreditCard, Download, History, RotateCcw, Send, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { sendEmailNotification, sendSmsNotification, sendWhatsAppNotification } from "../api/notifications";
 import { getPaymentModes } from "../api/paymentModes";
-import { deletePayment, getPaymentsPage, type PaymentFilterParams } from "../api/payments";
+import { deletePayment, getPaymentsPage, restorePayment, type PaymentFilterParams } from "../api/payments";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
@@ -45,6 +45,7 @@ type PaymentFilters = {
   maxAmount: string;
   mode: string;
   createdByRole: string;
+  recordStatus: "ACTIVE" | "DELETED" | "ALL";
 };
 
 const emptyPaymentPage: PageResponse<Payment> = {
@@ -64,7 +65,8 @@ const emptyFilters: PaymentFilters = {
   minAmount: "",
   maxAmount: "",
   mode: "",
-  createdByRole: ""
+  createdByRole: "",
+  recordStatus: "ACTIVE"
 };
 
 const toIso = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
@@ -116,6 +118,7 @@ export const PaymentListPage = () => {
   const [logTarget, setLogTarget] = useState<Payment | null>(null);
   const [reminderTarget, setReminderTarget] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [activeSummary, setActiveSummary] = useState<SummaryKey | null>(null);
   const [modalPage, setModalPage] = useState(0);
@@ -222,6 +225,20 @@ export const PaymentListPage = () => {
       setApiError(err, CommonErrorMessageUtil.deleteFailed);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleRestore = async (payment: Payment) => {
+    try {
+      setRestoringId(payment.id);
+      await restorePayment(payment.id);
+      await loadPayments(page);
+      await loadExportRows();
+      notificationService.showSuccess(CommonSuccessMessageUtil.updated("Payment"));
+    } catch (err: any) {
+      setApiError(err, "Unable to restore payment");
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -342,6 +359,11 @@ export const PaymentListPage = () => {
             { label: "Admin", value: "ADMIN" },
             { label: "User", value: "USER" }
           ]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
+          <Select label="Record Status" value={draftFilters.recordStatus} options={[
+            { label: "Active", value: "ACTIVE" },
+            { label: "Deleted", value: "DELETED" },
+            { label: "All", value: "ALL" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, recordStatus: event.target.value as PaymentFilters["recordStatus"] }))} />
           <div className="flex items-end">
             <Button type="button" className="w-full" onClick={applyFilters}>Apply Filters</Button>
           </div>
@@ -379,12 +401,15 @@ export const PaymentListPage = () => {
             columns={visiblePaymentColumns}
             logCounts={logCounts}
             canDelete={can("PAYMENTS", "DELETE")}
+            canRestore={can("PAYMENTS", "RESTORE")}
             canViewLogs={can("PAYMENTS", "LOGS")}
             canAdd={can("PAYMENTS", "ADD")}
             canSendEmail={can("EMAIL_TEMPLATES", "EMAIL_SEND")}
             canSendSms={can("SMS_TEMPLATES", "SMS_SEND")}
             canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
+            restoringId={restoringId}
             onDelete={setDeleteTarget}
+            onRestore={(payment) => void handleRestore(payment)}
             onShowLogs={setLogTarget}
             onSendReminder={openReminder}
           />
@@ -422,11 +447,14 @@ export const PaymentListPage = () => {
             columns={visiblePaymentColumns}
             logCounts={logCounts}
             canDelete={false}
+            canRestore={can("PAYMENTS", "RESTORE")}
             canViewLogs={can("PAYMENTS", "LOGS")}
             canSendEmail={can("EMAIL_TEMPLATES", "EMAIL_SEND")}
             canSendSms={can("SMS_TEMPLATES", "SMS_SEND")}
             canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
+            restoringId={restoringId}
             onDelete={setDeleteTarget}
+            onRestore={(payment) => void handleRestore(payment)}
             onShowLogs={setLogTarget}
             onSendReminder={openReminder}
           />
@@ -493,12 +521,15 @@ const PaymentTable = ({
   columns,
   logCounts,
   canDelete,
+  canRestore,
   canViewLogs = false,
   canAdd = false,
   canSendEmail = false,
   canSendSms = false,
   canSendWhatsApp = false,
+  restoringId = null,
   onDelete,
+  onRestore,
   onShowLogs,
   onSendReminder
 }: {
@@ -506,12 +537,15 @@ const PaymentTable = ({
   columns: ReturnType<typeof basePaymentColumns>;
   logCounts: Record<number, number>;
   canDelete: boolean;
+  canRestore: boolean;
   canViewLogs?: boolean;
   canAdd?: boolean;
   canSendEmail?: boolean;
   canSendSms?: boolean;
   canSendWhatsApp?: boolean;
+  restoringId?: number | null;
   onDelete: (payment: Payment) => void;
+  onRestore: (payment: Payment) => void;
   onShowLogs?: (payment: Payment) => void;
   onSendReminder?: (payment: Payment) => void;
 }) => (
@@ -530,11 +564,12 @@ const PaymentTable = ({
             {
               label: "Send Reminder",
               icon: <Send size={15} />,
-              hidden: !(canSendEmail || canSendSms || canSendWhatsApp) || (!item.customerEmail && !item.customerMobile),
+              hidden: item.deleted || !(canSendEmail || canSendSms || canSendWhatsApp) || (!item.customerEmail && !item.customerMobile),
               onClick: () => onSendReminder?.(item)
             },
             { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
-            { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
+            { label: restoringId === item.id ? "Restoring..." : "Restore", icon: <RotateCcw size={15} />, hidden: !item.deleted || !canRestore, onClick: () => onRestore(item) },
+            { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: item.deleted || !canDelete, onClick: () => onDelete(item) }
           ]} />
         )
       }
@@ -557,7 +592,7 @@ const basePaymentColumns = () => [
   { key: "invoice", header: "Invoice Number", render: (item: Payment) => item.invoiceNo ?? "Unapplied" },
   { key: "date", header: "Payment Date", render: (item: Payment) => formatDate(item.paymentDate) },
   { key: "mode", header: "Method", render: (item: Payment) => item.mode.replace(/_/g, " ") },
-  { key: "status", header: "Status", render: () => <StatusBadge label="SUCCESS" /> },
+  { key: "status", header: "Status", render: (item: Payment) => <div className="flex flex-wrap gap-2"><StatusBadge label="SUCCESS" />{item.deleted ? <StatusBadge label="Deleted" /> : null}</div> },
   { key: "createdBy", header: "Created By", render: (item: Payment) => item.createdBy ?? "--" },
   { key: "amount", header: "Amount", className: "text-right", render: (item: Payment) => <span className="block text-right font-semibold text-white">{formatCurrency(item.amount)}</span> }
 ];
@@ -580,7 +615,8 @@ const buildParams = (filters: PaymentFilters): PaymentFilterParams => {
     minAmount: filters.minAmount || undefined,
     maxAmount: filters.maxAmount || undefined,
     mode: filters.mode || undefined,
-    createdByRole: filters.createdByRole || undefined
+    createdByRole: filters.createdByRole || undefined,
+    recordStatus: filters.recordStatus
   };
 };
 
@@ -606,6 +642,11 @@ const summarizePaymentFilters = (filters: PaymentFilters, methodLabels: Record<s
     ADMIN: "Admin",
     USER: "User"
   };
+  const recordStatusLabels: Record<PaymentFilters["recordStatus"], string> = {
+    ACTIVE: "Active Records",
+    DELETED: "Deleted Records",
+    ALL: "All Records"
+  };
 
   if (filters.search.trim()) summary.push(`Search: ${filters.search.trim()}`);
   if (filters.paymentStatus) summary.push(paymentStatusLabels[filters.paymentStatus] ?? filters.paymentStatus);
@@ -618,6 +659,7 @@ const summarizePaymentFilters = (filters: PaymentFilters, methodLabels: Record<s
   if (filters.minAmount) summary.push(`Amount > ${filters.minAmount}`);
   if (filters.maxAmount) summary.push(`Amount < ${filters.maxAmount}`);
   if (filters.createdByRole) summary.push(`Created By: ${roleLabels[filters.createdByRole] ?? filters.createdByRole}`);
+  if (filters.recordStatus !== "ACTIVE") summary.push(recordStatusLabels[filters.recordStatus]);
   return summary;
 };
 
@@ -643,6 +685,7 @@ const paymentExportColumns = [
   { key: "paymentDate", header: "Payment Date", type: "date" as const },
   { key: "mode", header: "Method" },
   { key: "status", header: "Status", value: (row: Payment | Record<string, unknown>) => String((row as Record<string, unknown>).status ?? "Success") },
+  { key: "deleted", header: "Record Status", value: (row: Payment | Record<string, unknown>) => (row as Payment).deleted ? "Deleted" : "Active" },
   { key: "amount", header: "Amount", type: "amount" as const },
   { key: "createdBy", header: "Created By" }
 ];

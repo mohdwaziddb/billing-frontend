@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Maximize2, Minimize2, RefreshCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { getPaymentHierarchyChildren, type PaymentHierarchyParams } from "../api/paymentHierarchy";
 import { Button } from "../components/Button";
@@ -70,7 +70,7 @@ const buildRange = (preset: DatePreset) => {
   return { startDate: toIso(new Date(today.getFullYear(), 0, 1)), endDate: toIso(today) };
 };
 
-const rootNode = (summary: SummaryState): PaymentHierarchyNode => ({
+const companyRootNode = (summary: SummaryState): PaymentHierarchyNode => ({
   id: "company",
   parentId: null,
   type: "company",
@@ -82,9 +82,68 @@ const rootNode = (summary: SummaryState): PaymentHierarchyNode => ({
   tone: "company"
 });
 
+const summaryMetricNodes = (summary: SummaryState, counts: Record<string, number> = {}): PaymentHierarchyNode[] => [
+  {
+    id: "total-sales",
+    parentId: "company",
+    type: "metric",
+    label: "Total Sales",
+    subtitle: "Total invoiced amount",
+    amount: summary.totalReceivable,
+    count: counts["total-sales"] ?? 0,
+    hasChildren: true,
+    tone: "sales"
+  },
+  {
+    id: "total-collection",
+    parentId: "company",
+    type: "metric",
+    label: "Total Collection",
+    subtitle: "Received amount",
+    amount: summary.totalCollected,
+    count: counts["total-collection"] ?? 0,
+    hasChildren: true,
+    tone: "collected"
+  },
+  {
+    id: "total-outstanding",
+    parentId: "company",
+    type: "metric",
+    label: "Outstanding",
+    subtitle: "Pending amount",
+    amount: summary.totalOutstanding,
+    count: counts["total-outstanding"] ?? 0,
+    hasChildren: true,
+    tone: "danger"
+  },
+  {
+    id: "total-expense",
+    parentId: "company",
+    type: "metric",
+    label: "Expense",
+    subtitle: "Total expense",
+    amount: summary.totalExpense,
+    count: counts["total-expense"] ?? 0,
+    hasChildren: true,
+    tone: "expense"
+  },
+  {
+    id: "net-revenue",
+    parentId: "company",
+    type: "metric",
+    label: "Net Revenue",
+    subtitle: "Collection minus expense",
+    amount: summary.netRevenue,
+    count: counts["net-revenue"] ?? 0,
+    hasChildren: true,
+    tone: "net"
+  }
+].filter((node) => Math.abs(node.amount) > 0.005);
+
 export const PaymentHierarchyPage = () => {
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const [summary, setSummary] = useState<SummaryState>(defaultSummary);
+  const [metricCounts, setMetricCounts] = useState<Record<string, number>>({});
   const [childrenByParent, setChildrenByParent] = useState<Record<string, PaymentHierarchyNode[]>>({});
   const [recordsByDay, setRecordsByDay] = useState<Record<string, PaymentHierarchyRecord[]>>({});
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -97,17 +156,19 @@ export const PaymentHierarchyPage = () => {
   const [customRange, setCustomRange] = useState(() => buildRange("thisMonth"));
 
   const activeRange = useMemo(() => (preset === "custom" ? customRange : buildRange(preset)), [customRange, preset]);
-  const root = rootNode(summary);
+  const root = companyRootNode(summary);
+  const metricNodes = summaryMetricNodes(summary, metricCounts);
   const activeRecords = activeNode?.type === "day" ? recordsByDay[activeNode.id] ?? [] : [];
 
   useEffect(() => {
     setSummary(defaultSummary);
-    setChildrenByParent({});
+    setMetricCounts({});
     setRecordsByDay({});
     setExpanded(new Set());
+    setChildrenByParent({ company: summaryMetricNodes(defaultSummary, {}) });
     setLoaded(new Set());
     setActiveNode(null);
-    void loadChildren(rootNode(defaultSummary), true);
+    void loadSummary();
   }, [activeRange]);
 
   useEffect(() => {
@@ -116,9 +177,41 @@ export const PaymentHierarchyPage = () => {
     return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+  const loadSummary = async () => {
+    try {
+      const response = await getPaymentHierarchyChildren({ ...activeRange, nodeType: "company" });
+      setSummary({
+        companyName: response.companyName,
+        totalReceivable: response.totalReceivable,
+        totalCollected: response.totalCollected,
+        totalOutstanding: response.totalOutstanding,
+        totalExpense: response.totalExpense,
+        netRevenue: response.netRevenue
+      });
+      const nextSummary = {
+        companyName: response.companyName,
+        totalReceivable: response.totalReceivable,
+        totalCollected: response.totalCollected,
+        totalOutstanding: response.totalOutstanding,
+        totalExpense: response.totalExpense,
+        netRevenue: response.netRevenue
+      };
+      const visibleMetrics = summaryMetricNodes(nextSummary, {});
+      const countEntries = await Promise.all(
+        visibleMetrics.map(async (metric) => {
+          const metricResponse = await getPaymentHierarchyChildren({ ...activeRange, nodeType: "metric", nodeId: metric.id });
+          return [metric.id, metricResponse.nodes.length] as const;
+        })
+      );
+      setMetricCounts(Object.fromEntries(countEntries));
+    } catch (error) {
+      notificationService.showError("Unable to load payment hierarchy summary", error);
+    }
+  };
+
   const loadChildren = async (node: PaymentHierarchyNode, force = false) => {
     if (!node.hasChildren || (!force && loaded.has(node.id))) {
-      return;
+      return childrenByParent[node.id]?.length ?? 0;
     }
     setLoadingNode(node.id);
     try {
@@ -136,8 +229,10 @@ export const PaymentHierarchyPage = () => {
         setRecordsByDay((current) => ({ ...current, [node.id]: response.records }));
       }
       setLoaded((current) => new Set(current).add(node.id));
+      return response.nodes.length;
     } catch (error) {
       notificationService.showError("Unable to load payment hierarchy", error);
+      return 0;
     } finally {
       setLoadingNode(null);
     }
@@ -145,6 +240,15 @@ export const PaymentHierarchyPage = () => {
 
   const toggleNode = async (node: PaymentHierarchyNode) => {
     setActiveNode(node);
+    if (node.id === "company") {
+      setChildrenByParent((current) => ({ ...current, company: metricNodes }));
+      if (expanded.has(node.id)) {
+        setExpanded(new Set());
+        return;
+      }
+      setExpanded(new Set(["company"]));
+      return;
+    }
     if (!node.hasChildren) {
       return;
     }
@@ -156,8 +260,16 @@ export const PaymentHierarchyPage = () => {
       });
       return;
     }
-    await loadChildren(node);
-    setExpanded((current) => new Set(current).add(node.id));
+    const childCount = await loadChildren(node);
+    if (childCount === 0) {
+      return;
+    }
+    setExpanded((current) => {
+      if (node.type === "metric") {
+        return new Set(["company", node.id]);
+      }
+      return new Set(current).add(node.id);
+    });
   };
 
   const toggleFullscreen = async () => {
@@ -179,7 +291,7 @@ export const PaymentHierarchyPage = () => {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 border-t pt-4 xl:grid-cols-[minmax(0,1fr)_auto]" style={{ borderColor: "var(--panel-border)" }}>
+        <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--panel-border)" }}>
           <div className="min-w-0">
             <div className="flex flex-wrap gap-2">
             {DATE_PRESET_OPTIONS.map(({ value, label }) => (
@@ -188,12 +300,6 @@ export const PaymentHierarchyPage = () => {
               </Button>
             ))}
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-2 xl:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setZoom((value) => Math.max(0.65, Number((value - 0.1).toFixed(2))))}><ZoomOut size={16} />Zoom Out</Button>
-            <Button type="button" variant="secondary" onClick={() => setZoom((value) => Math.min(1.25, Number((value + 0.1).toFixed(2))))}><ZoomIn size={16} />Zoom In</Button>
-            <Button type="button" variant="secondary" onClick={toggleFullscreen}>{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}Full Screen</Button>
           </div>
         </div>
 
@@ -215,18 +321,37 @@ export const PaymentHierarchyPage = () => {
         ) : null}
       </GlassCard>
 
-      <div ref={surfaceRef} className="rounded-[var(--radius-panel)] border p-4 shadow-[var(--shadow-panel)] md:p-5" style={{ background: "var(--panel-bg)", borderColor: "var(--panel-border)" }}>
-        <div className="overflow-auto rounded-[var(--radius-card)] border p-4" style={{ borderColor: "var(--panel-border)", background: "var(--panel-soft)" }}>
-          <div className="min-w-max origin-top-left transition-transform duration-300" style={{ transform: `scale(${zoom})` }}>
+      <div
+        ref={surfaceRef}
+        className={`${fullscreen ? "h-screen overflow-hidden rounded-none" : "rounded-[var(--radius-panel)]"} flex min-h-0 flex-col gap-4 border p-4 shadow-[var(--shadow-panel)] md:p-5`}
+        style={{ background: "var(--panel-bg)", borderColor: "var(--panel-border)" }}
+      >
+        <div className="sticky top-0 z-10 flex flex-col gap-3 rounded-[var(--radius-card)] border p-3 sm:flex-row sm:items-center sm:justify-between" style={{ background: "var(--panel-bg)", borderColor: "var(--panel-border)" }}>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)" }}>Hierarchy View</p>
+            <p className="mt-1 text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>Zoom {Math.round(zoom * 100)}%</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => setZoom((value) => Math.max(0.1, Number((value - 0.1).toFixed(2))))}><ZoomOut size={16} />Zoom Out</Button>
+            <Button type="button" variant="secondary" onClick={() => setZoom((value) => Math.min(1.4, Number((value + 0.1).toFixed(2))))}><ZoomIn size={16} />Zoom In</Button>
+            <Button type="button" variant="secondary" onClick={toggleFullscreen}>{fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}{fullscreen ? "Exit Full Screen" : "Full Screen"}</Button>
+          </div>
+        </div>
+
+        <div className={`${fullscreen ? "min-h-0" : "max-h-[70vh] min-h-[420px]"} flex-1 overflow-auto overscroll-contain rounded-[var(--radius-card)] border p-4`} style={{ borderColor: "var(--panel-border)", background: "var(--panel-soft)", WebkitOverflowScrolling: "touch" } as CSSProperties}>
+          <div className="flex min-h-max min-w-full justify-center">
+          <div className="inline-block min-h-max min-w-max transition-[zoom] duration-300" style={{ zoom } as CSSProperties}>
             <TreeNode
               node={root}
-              childrenByParent={childrenByParent}
+              childrenByParent={{ ...childrenByParent, company: metricNodes }}
               expanded={expanded}
+              loaded={loaded}
               activeId={activeNode?.id ?? root.id}
               loadingNode={loadingNode}
               onToggle={toggleNode}
               level={0}
             />
+          </div>
           </div>
         </div>
 
@@ -240,6 +365,7 @@ const TreeNode = ({
   node,
   childrenByParent,
   expanded,
+  loaded,
   activeId,
   loadingNode,
   onToggle,
@@ -248,6 +374,7 @@ const TreeNode = ({
   node: PaymentHierarchyNode;
   childrenByParent: Record<string, PaymentHierarchyNode[]>;
   expanded: Set<string>;
+  loaded: Set<string>;
   activeId: string;
   loadingNode: string | null;
   onToggle: (node: PaymentHierarchyNode) => void | Promise<void>;
@@ -255,15 +382,17 @@ const TreeNode = ({
 }) => {
   const children = childrenByParent[node.id] ?? [];
   const isOpen = expanded.has(node.id);
+  const hasLoadedEmpty = loaded.has(node.id) && children.length === 0;
+  const canExpand = node.hasChildren && !hasLoadedEmpty;
   const connectorColor = "color-mix(in srgb, var(--theme-color) 46%, var(--text-secondary))";
   return (
     <div className="flex flex-col items-center">
-      <HierarchyCard node={node} level={level} active={activeId === node.id} expanded={isOpen} loading={loadingNode === node.id} onClick={() => void onToggle(node)} />
+      <HierarchyCard node={node} level={level} active={activeId === node.id} expanded={isOpen} loading={loadingNode === node.id} canExpand={canExpand} childCount={node.id === "company" || loaded.has(node.id) ? children.length : node.count} onClick={() => void onToggle(node)} />
       {isOpen && children.length ? (
         <>
           <div className="h-8 w-0.5 rounded-full" style={{ background: connectorColor }} />
           <div className="relative flex items-start gap-4">
-            <span className="absolute left-8 right-8 top-0 h-0.5 rounded-full" style={{ background: connectorColor }} />
+            {children.length > 1 ? <span className="absolute left-8 right-8 top-0 h-0.5 rounded-full" style={{ background: connectorColor }} /> : null}
             {children.map((child) => (
               <div key={child.id} className="flex flex-col items-center">
                 <div className="h-8 w-0.5 rounded-full" style={{ background: connectorColor }} />
@@ -271,6 +400,7 @@ const TreeNode = ({
                   node={child}
                   childrenByParent={childrenByParent}
                   expanded={expanded}
+                  loaded={loaded}
                   activeId={activeId}
                   loadingNode={loadingNode}
                   onToggle={onToggle}
@@ -285,8 +415,8 @@ const TreeNode = ({
   );
 };
 
-const HierarchyCard = ({ node, level, active, expanded, loading, onClick }: { node: PaymentHierarchyNode; level: number; active: boolean; expanded: boolean; loading: boolean; onClick: () => void }) => {
-  const width = level === 0 ? "w-72" : level === 1 ? "w-64" : "w-52";
+const HierarchyCard = ({ node, level, active, expanded, loading, canExpand, childCount, onClick }: { node: PaymentHierarchyNode; level: number; active: boolean; expanded: boolean; loading: boolean; canExpand: boolean; childCount: number; onClick: () => void }) => {
+  const width = node.type === "invoice" ? "w-64" : level === 0 ? "w-72" : level === 1 ? "w-64" : "w-52";
   const tone = hierarchyTone(node.tone);
   return (
     <button
@@ -303,25 +433,48 @@ const HierarchyCard = ({ node, level, active, expanded, loading, onClick }: { no
       }}
       onClick={onClick}
     >
+      {node.type === "invoice" ? (
+        <div className="space-y-3">
+          <div>
+            <p className="break-words text-sm font-extrabold" style={{ color: "var(--text-primary)" }}>{node.subtitle}</p>
+            <p className="mt-1 break-words text-xs font-bold uppercase tracking-[0.08em]" style={{ color: tone.accent }}>{node.label}</p>
+          </div>
+          <div className="grid gap-2 text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
+            <AmountLine label="Amount" value={node.totalAmount ?? node.amount} />
+            <AmountLine label="Collected" value={node.collectedAmount ?? 0} />
+            <AmountLine label="Outstanding" value={node.outstandingAmount ?? 0} danger />
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-extrabold" style={{ color: "var(--text-primary)" }}>{node.label}</p>
           <p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--text-tertiary)" }}>{node.subtitle}</p>
         </div>
-        <span className="shrink-0 rounded-full px-2 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${tone.accent} 18%, var(--panel-soft))`, color: tone.accent }}>{node.count}</span>
+        <span className="shrink-0 rounded-full px-2 py-1 text-xs font-bold" style={{ background: `color-mix(in srgb, ${tone.accent} 18%, var(--panel-soft))`, color: tone.accent }}>{childCount}</span>
       </div>
       <p className={`${level <= 1 ? "text-xl" : "text-lg"} mt-4 font-black`} style={{ color: "var(--text-primary)" }}>{formatCurrency(node.amount)}</p>
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="text-xs font-bold uppercase tracking-[0.14em]" style={{ color: tone.accent }}>{node.type.replace(/_/g, " ")}</span>
-        {node.hasChildren ? (
+        {canExpand ? (
           <span className="flex h-7 w-7 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${tone.accent} 18%, var(--panel-soft))`, color: tone.accent }}>
             {loading ? <RefreshCcw className="animate-spin" size={14} /> : expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </span>
         ) : null}
       </div>
+      </>
+      )}
     </button>
   );
 };
+
+const AmountLine = ({ label, value, danger = false }: { label: string; value: number; danger?: boolean }) => (
+  <span className="flex items-center justify-between gap-3">
+    <span>{label}:</span>
+    <span className="font-black" style={{ color: danger ? "var(--danger)" : "var(--text-primary)" }}>{formatCurrency(value)}</span>
+  </span>
+);
 
 const hierarchyTone = (tone?: string | null) => {
   const tones: Record<string, { accent: string }> = {
@@ -340,6 +493,9 @@ const hierarchyTone = (tone?: string | null) => {
     year: { accent: "var(--info)" },
     month: { accent: "var(--warning)" },
     day: { accent: "var(--success)" },
+    period: { accent: "var(--success)" },
+    customer: { accent: "var(--theme-color)" },
+    invoice: { accent: "var(--danger)" },
     record: { accent: "var(--danger)" },
     expense: { accent: "var(--warning)" },
     net: { accent: "var(--success)" }
@@ -378,16 +534,13 @@ const RecordsPanel = ({ records, title }: { records: PaymentHierarchyRecord[]; t
 );
 
 const paramsForNode = (node: PaymentHierarchyNode): PaymentHierarchyParams => {
-  if (node.id === "company") return { nodeType: "company" };
-  if (node.id === "collected") return { nodeType: "collected" };
-  if (node.id === "receivable") return { nodeType: "receivable" };
-  if (node.id === "outstanding") return { nodeType: "outstanding" };
-  const [type, mode, year, monthOrDay] = node.id.split(":");
-  if (type === "mode") return { nodeType: "mode", mode };
-  if (type === "year") return { nodeType: "year", mode, year: Number(year) };
-  if (type === "month") return { nodeType: "month", mode, year: Number(year), month: Number(monthOrDay) };
-  if (type === "day") return { nodeType: "day", mode, day: year };
-  return {};
+  if (node.id === "company") {
+    return { nodeType: "company" };
+  }
+  if (node.type === "metric") {
+    return { nodeType: "metric", nodeId: node.id };
+  }
+  return { nodeType: node.type, nodeId: node.id };
 };
 
 const flattenChildren = (nodeId: string, childrenByParent: Record<string, PaymentHierarchyNode[]>): PaymentHierarchyNode[] => {

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, RotateCcw, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getAuditLogs } from "../api/auditLogs";
-import { deleteInvoice, getInvoicesPage, type InvoiceFilterParams } from "../api/invoices";
+import { deleteInvoice, getInvoicesPage, restoreInvoice, type InvoiceFilterParams } from "../api/invoices";
 import { getProductCategories } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -45,6 +45,7 @@ type InvoiceFilters = {
   maxAmount: string;
   categoryId: string;
   createdByRole: string;
+  recordStatus: "ACTIVE" | "DELETED" | "ALL";
 };
 
 const emptyInvoicePage: PageResponse<Invoice> = {
@@ -66,7 +67,8 @@ const emptyFilters: InvoiceFilters = {
   minAmount: "",
   maxAmount: "",
   categoryId: "",
-  createdByRole: ""
+  createdByRole: "",
+  recordStatus: "ACTIVE"
 };
 
 const toIso = (value: Date) => {
@@ -127,6 +129,7 @@ export const InvoiceListPage = () => {
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const [logTarget, setLogTarget] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
   const [activeSummary, setActiveSummary] = useState<SummaryKey | null>(null);
   const [modalPage, setModalPage] = useState(0);
   const [modalSearch, setModalSearch] = useState("");
@@ -226,6 +229,20 @@ export const InvoiceListPage = () => {
     }
   };
 
+  const handleRestore = async (invoice: Invoice) => {
+    try {
+      setRestoringId(invoice.id);
+      await restoreInvoice(invoice.id);
+      await loadInvoices(page);
+      await loadExportRows();
+      notificationService.showSuccess(CommonSuccessMessageUtil.updated("Invoice"));
+    } catch (err: any) {
+      setApiError(err, "Unable to restore invoice");
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
   const exportInvoices = (fileName: string, rows: Invoice[]) => {
     const exportData = rows.length ? [...rows, buildGrandTotal(rows)] : [];
     exportToExcel(fileName, exportData, invoiceExportColumns);
@@ -306,6 +323,11 @@ export const InvoiceListPage = () => {
             { label: "Admin", value: "ADMIN" },
             { label: "User", value: "USER" }
           ]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
+          <Select label="Record Status" value={draftFilters.recordStatus} options={[
+            { label: "Active", value: "ACTIVE" },
+            { label: "Deleted", value: "DELETED" },
+            { label: "All", value: "ALL" }
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, recordStatus: event.target.value as InvoiceFilters["recordStatus"] }))} />
           <div className="flex items-end">
             <Button type="button" className="w-full" onClick={applyFilters}>Apply Filters</Button>
           </div>
@@ -337,7 +359,7 @@ export const InvoiceListPage = () => {
           ) : null}
         </div>
         <div className="flex-1">
-          <InvoiceTable invoices={invoices} logCounts={logCounts} canDelete={can("INVOICES", "DELETE")} canViewLogs={can("INVOICES", "LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <InvoiceTable invoices={invoices} logCounts={logCounts} canDelete={can("INVOICES", "DELETE")} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={(invoice) => void handleRestore(invoice)} onShowLogs={setLogTarget} />
         </div>
         <div className="mt-auto">
           <Pagination
@@ -370,7 +392,7 @@ export const InvoiceListPage = () => {
               Export Excel
             </Button>
           </div>
-          <InvoiceTable invoices={modalInvoices} logCounts={logCounts} canDelete={false} canViewLogs={can("INVOICES", "LOGS")} onDelete={setDeleteTarget} onShowLogs={setLogTarget} />
+          <InvoiceTable invoices={modalInvoices} logCounts={logCounts} canDelete={false} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={(invoice) => void handleRestore(invoice)} onShowLogs={setLogTarget} />
           <Pagination
             page={modalInvoicePage.page}
             size={modalInvoicePage.size}
@@ -387,7 +409,7 @@ export const InvoiceListPage = () => {
   );
 };
 
-const InvoiceTable = ({ invoices, logCounts, canDelete, canViewLogs = false, canAdd = false, onDelete, onShowLogs }: { invoices: Invoice[]; logCounts: Record<number, number>; canDelete: boolean; canViewLogs?: boolean; canAdd?: boolean; onDelete: (invoice: Invoice) => void; onShowLogs?: (invoice: Invoice) => void }) => (
+const InvoiceTable = ({ invoices, logCounts, canDelete, canRestore, canViewLogs = false, canAdd = false, restoringId = null, onDelete, onRestore, onShowLogs }: { invoices: Invoice[]; logCounts: Record<number, number>; canDelete: boolean; canRestore: boolean; canViewLogs?: boolean; canAdd?: boolean; restoringId?: number | null; onDelete: (invoice: Invoice) => void; onRestore: (invoice: Invoice) => void; onShowLogs?: (invoice: Invoice) => void }) => (
   <Table
     data={invoices}
     emptyText="No invoices match the selected filters."
@@ -409,7 +431,7 @@ const InvoiceTable = ({ invoices, logCounts, canDelete, canViewLogs = false, can
       { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.totalAmount)}</span> },
       { key: "paid", header: "Paid Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.paidAmount)}</span> },
       { key: "outstanding", header: "Outstanding", className: "text-right", render: (item) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.balanceAmount)}</span> },
-      { key: "status", header: "Status", render: (item) => <StatusBadge label={item.paymentStatus} /> },
+      { key: "status", header: "Status", render: (item) => <div className="flex flex-wrap gap-2"><StatusBadge label={item.paymentStatus} />{item.deleted ? <StatusBadge label="Deleted" /> : null}</div> },
       { key: "createdBy", header: "Created By", render: (item) => item.createdBy ?? "--" },
       {
         key: "actions",
@@ -420,7 +442,8 @@ const InvoiceTable = ({ invoices, logCounts, canDelete, canViewLogs = false, can
             actions={[
               { label: "View", icon: <Eye size={15} />, to: `/invoices/${item.id}` },
               { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
-              { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !canDelete, onClick: () => onDelete(item) }
+              { label: restoringId === item.id ? "Restoring..." : "Restore", icon: <RotateCcw size={15} />, hidden: !item.deleted || !canRestore, onClick: () => onRestore(item) },
+              { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: item.deleted || !canDelete, onClick: () => onDelete(item) }
             ]}
           />
         )
@@ -449,7 +472,8 @@ const buildParams = (filters: InvoiceFilters): InvoiceFilterParams => {
     minAmount: filters.minAmount || undefined,
     maxAmount: filters.maxAmount || undefined,
     categoryId: filters.categoryId || undefined,
-    createdByRole: filters.createdByRole || undefined
+    createdByRole: filters.createdByRole || undefined,
+    recordStatus: filters.recordStatus
   };
 };
 
@@ -486,6 +510,11 @@ const summarizeInvoiceFilters = (filters: InvoiceFilters, categories: ProductCat
     ADMIN: "Admin",
     USER: "User"
   };
+  const recordStatusLabels: Record<InvoiceFilters["recordStatus"], string> = {
+    ACTIVE: "Active Records",
+    DELETED: "Deleted Records",
+    ALL: "All Records"
+  };
 
   if (filters.search.trim()) summary.push(`Search: ${filters.search.trim()}`);
   if (filters.invoiceStatus) summary.push(invoiceStatusLabels[filters.invoiceStatus] ?? filters.invoiceStatus);
@@ -503,6 +532,7 @@ const summarizeInvoiceFilters = (filters: InvoiceFilters, categories: ProductCat
     summary.push(category?.categoryName ?? "Selected Category");
   }
   if (filters.createdByRole) summary.push(`Created By: ${roleLabels[filters.createdByRole] ?? filters.createdByRole}`);
+  if (filters.recordStatus !== "ACTIVE") summary.push(recordStatusLabels[filters.recordStatus]);
   return summary;
 };
 
@@ -540,5 +570,6 @@ const invoiceExportColumns = [
   { key: "paidAmount", header: "Paid Amount", type: "amount" as const },
   { key: "balanceAmount", header: "Outstanding", type: "amount" as const },
   { key: "paymentStatus", header: "Status" },
+  { key: "deleted", header: "Record Status", value: (row: Invoice | Record<string, unknown>) => (row as Invoice).deleted ? "Deleted" : "Active" },
   { key: "createdBy", header: "Created By" }
 ];

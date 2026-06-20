@@ -112,6 +112,7 @@ export const InvoiceDetailPage = () => {
               {invoice ? <StatusBadge label={invoice.paymentStatus} /> : null}
             </div>
             <p className="mt-2 text-sm font-semibold text-slate-500">Invoice Date: {formatDate(invoice?.invoiceDate)} | Created by {invoice?.createdBy ?? "--"}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Refer By: {invoice?.referByUserName ?? invoice?.referByUsername ?? "--"}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {canRecordPayment ? (
@@ -142,6 +143,8 @@ export const InvoiceDetailPage = () => {
             <p className="font-extrabold text-slate-950">{invoice?.customerName ?? "--"}</p>
             <p>{invoice?.customerMobile ?? "--"}</p>
             <p>{invoice?.customerAddress ?? "--"}</p>
+            <p className="pt-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Refer By</p>
+            <p>{invoice?.referByUserName ?? "--"}</p>
           </InfoPanel>
           <InfoPanel icon={<Wallet size={18} />} title="Payment Summary">
             <SummaryLine label="Total" value={formatCurrency(invoice?.totalAmount)} />
