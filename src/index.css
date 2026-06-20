@@ -597,3 +597,44 @@ select:-webkit-autofill {
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
+
+.landing-page-theme {
+  color-scheme: light;
+  --app-bg: #f6f8fc;
+  --panel-bg: #ffffff;
+  --panel-strong: #ffffff;
+  --panel-soft: #f6f8fc;
+  --panel-border: #e6ebf2;
+  --text-primary: #071330;
+  --text-secondary: #536179;
+  --text-tertiary: #8792a8;
+  --theme-color: #0ea5e9;
+  --theme-light: #7dd3fc;
+  --theme-dark: #075985;
+  --theme-hover: #38bdf8;
+  --theme-border: #bae6fd;
+  --theme-contrast: #ffffff;
+  --theme-light-contrast: #111827;
+  --theme-dark-contrast: #ffffff;
+}
+
+:root.dark .landing-page-theme,
+:root.dark .landing-page-theme :where(.bg-white, .bg-white\/92) {
+  background-color: #ffffff;
+}
+
+:root.dark .landing-page-theme :where(.bg-slate-50, .bg-slate-50\/55, .bg-slate-100) {
+  background-color: #f8fafc;
+}
+
+:root.dark .landing-page-theme :where(.border-slate-100, .border-slate-200, .border-slate-300) {
+  border-color: #e2e8f0;
+}
+
+:root.dark .landing-page-theme :where(.text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700) {
+  color: #020617;
+}
+
+:root.dark .landing-page-theme :where(.text-slate-600, .text-slate-500, .text-slate-400) {
+  color: #64748b;
+}

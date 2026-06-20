@@ -28,7 +28,7 @@ import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { CommunicationSettingsPage, PlatformAdminCommunicationPage } from "./pages/NotificationSettingsPages";
+import { PlatformAdminCommunicationPage } from "./pages/NotificationSettingsPages";
 import { RolePermissionsPage } from "./pages/RolePermissionsPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
 import { ThemeSettingsPage } from "./pages/ThemeSettingsPage";
@@ -62,10 +62,10 @@ function App() {
           <Route path="/setup/about-company" element={<PermissionRoute menuCode="ABOUT_COMPANY"><AboutCompanyPage /></PermissionRoute>} />
           <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
           <Route path="/setup/sms-templates" element={<PermissionRoute menuCode="SMS_TEMPLATES"><SmsTemplatePage /></PermissionRoute>} />
-          <Route path="/setup/communication" element={<PermissionRoute menuCode="COMMUNICATION"><CommunicationSettingsPage /></PermissionRoute>} />
-          <Route path="/setup/email-settings" element={<Navigate replace to="/setup/communication?tab=email" />} />
-          <Route path="/setup/sms-settings" element={<Navigate replace to="/setup/communication?tab=sms" />} />
-          <Route path="/setup/whatsapp-settings" element={<Navigate replace to="/setup/communication?tab=whatsapp" />} />
+          <Route path="/setup/communication" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/email-settings" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/sms-settings" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/whatsapp-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/reports/payment-hierarchy" element={<PermissionRoute menuCode="PAYMENT_HIERARCHY"><PaymentHierarchyPage /></PermissionRoute>} />
           <Route path="/invoices" element={<PermissionRoute menuCode="INVOICES"><InvoiceListPage /></PermissionRoute>} />
           <Route path="/create-invoice" element={<PermissionRoute menuCode="CREATE_INVOICE" actionCode="ADD"><CreateInvoicePage /></PermissionRoute>} />

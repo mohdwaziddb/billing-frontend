@@ -1,6 +1,8 @@
 import { apiClient } from "./apiClient";
 import type { ApiResponse, CompanyUserRequest, PageResponse, Role, UserProfile } from "../types/api";
 
+const companyRoles: Role[] = ["OWNER", "ADMIN", "USER"];
+
 export type UserFilterParams = {
   page?: number;
   size?: number;
@@ -14,8 +16,11 @@ export type UserFilterParams = {
 };
 
 export const getRoles = async () => {
-  const response = await apiClient.get<ApiResponse<Array<"OWNER" | "ADMIN" | "USER">>>("/v1/roles");
-  return response.data.data;
+  const response = await apiClient.get<ApiResponse<string[]>>("/v1/roles");
+  const roles = response.data.data
+    .map((role) => role.trim().toUpperCase())
+    .filter((role): role is Role => companyRoles.includes(role as Role));
+  return roles.length ? roles : companyRoles;
 };
 
 export const getCompanyUsersPage = async (params?: UserFilterParams) => {

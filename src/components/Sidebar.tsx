@@ -234,9 +234,29 @@ const isPlatformAdminMenu = (menu: MenuPermission) => {
   );
 };
 
+const isCompanyCommunicationMenu = (menu: MenuPermission) => {
+  const name = menu.menuName.trim().toLowerCase();
+  const route = menu.menuRoute.trim().toLowerCase();
+  const code = menu.menuCode.trim().toLowerCase();
+  return (
+    code === "communication" ||
+    code === "email_settings" ||
+    code === "sms_settings" ||
+    code === "whatsapp_settings" ||
+    name === "communication" ||
+    name === "email settings" ||
+    name === "sms settings" ||
+    name === "whatsapp settings" ||
+    route === "/setup/communication" ||
+    route === "/setup/email-settings" ||
+    route === "/setup/sms-settings" ||
+    route === "/setup/whatsapp-settings"
+  );
+};
+
 const filterCompanyMenus = (menus: MenuPermission[]): MenuPermission[] =>
   menus
-    .filter((menu) => menu.canView && !isPlatformAdminMenu(menu))
+    .filter((menu) => menu.canView && !isPlatformAdminMenu(menu) && !isCompanyCommunicationMenu(menu))
     .map((menu) => ({
       ...menu,
       children: filterCompanyMenus(menu.children ?? [])
