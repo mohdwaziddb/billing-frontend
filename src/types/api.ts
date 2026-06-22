@@ -364,6 +364,9 @@ export type Product = {
   categoryId: number | null;
   categoryName: string | null;
   category: string | null;
+  subCategoryId: number | null;
+  subCategoryName: string | null;
+  subCategory: string | null;
   brand: string | null;
   sku: string;
   hsnCode: string | null;
@@ -396,9 +399,30 @@ export type ProductCategoryRequest = {
   active: boolean;
 };
 
+export type ProductSubCategory = {
+  id: number;
+  categoryId: number;
+  categoryName: string;
+  subCategoryName: string;
+  description: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+export type ProductSubCategoryRequest = {
+  categoryId: number;
+  subCategoryName: string;
+  description?: string;
+  active: boolean;
+};
+
 export type ProductRequest = {
   name: string;
   categoryId: number;
+  subCategoryId: number;
   brand?: string;
   sku: string;
   hsnCode?: string;
@@ -414,6 +438,7 @@ export type ProductDataPortRow = {
   rowNumber: number;
   productName: string;
   productCategory: string;
+  productSubCategory: string;
   sku: string;
   active: string;
   brand: string | null;
@@ -424,6 +449,7 @@ export type ProductDataPortRow = {
   minimumStockQty: string;
   taxPercent: string;
   productCategoryId: number | null;
+  productSubCategoryId: number | null;
   activeValue: boolean | null;
   valid: boolean;
   validationErrors: Record<string, string>;
@@ -432,6 +458,12 @@ export type ProductDataPortRow = {
 export type ProductDataPortReferenceData = {
   categories: Array<{
     id: number;
+    name: string;
+  }>;
+  subCategories: Array<{
+    id: number;
+    categoryId: number;
+    categoryName: string;
     name: string;
   }>;
   existingSkus: string[];

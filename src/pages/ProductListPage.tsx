@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, History, Pencil, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
+import { getProductCategories } from "../api/productCategories";
+import { getProductSubCategories } from "../api/productSubCategories";
 import { deleteProduct, deleteProductsBulk, getProductsPage } from "../api/products";
 import { BulkDeleteModal } from "../components/BulkDeleteModal";
 import { ActionDropdown } from "../components/ActionDropdown";
@@ -26,7 +28,7 @@ import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { notificationService } from "../services/notificationService";
-import type { PageResponse, Product } from "../types/api";
+import type { PageResponse, Product, ProductCategory, ProductSubCategory } from "../types/api";
 
 const emptyProductPage: PageResponse<Product> = {
   records: [],
@@ -39,8 +41,12 @@ const emptyProductPage: PageResponse<Product> = {
 export const ProductListPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [productPage, setProductPage] = useState<PageResponse<Product>>(emptyProductPage);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [subCategories, setSubCategories] = useState<ProductSubCategory[]>([]);
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [subCategoryFilter, setSubCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [logTarget, setLogTarget] = useState<Product | null>(null);
@@ -54,7 +60,14 @@ export const ProductListPage = () => {
 
   const loadProducts = async (nextPage = page, searchOverride = search) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    const response = await getProductsPage({ search: searchOverride.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
+    const response = await getProductsPage({
+      search: searchOverride.trim() || undefined,
+      active,
+      categoryId: categoryFilter ? Number(categoryFilter) : undefined,
+      subCategoryId: subCategoryFilter ? Number(subCategoryFilter) : undefined,
+      page: nextPage,
+      size: DEFAULT_PAGE_SIZE
+    });
     setProductPage(response);
     setProducts(response.records);
   };
@@ -102,9 +115,27 @@ export const ProductListPage = () => {
   };
 
   useEffect(() => {
+    void getProductCategories({ active: true, size: 1000 })
+      .then((categoryData) => setCategories(categoryData.filter((category) => category.active)))
+      .catch((err: any) => setApiError(err, "Unable to load product categories"));
+  }, [setApiError]);
+
+  useEffect(() => {
+    if (!categoryFilter) {
+      setSubCategories([]);
+      setSubCategoryFilter("");
+      return;
+    }
+    setSubCategoryFilter("");
+    void getProductSubCategories({ active: true, categoryId: Number(categoryFilter), size: 1000 })
+      .then((subCategoryData) => setSubCategories(subCategoryData.filter((subCategory) => subCategory.active)))
+      .catch((err: any) => setApiError(err, "Unable to load product sub categories"));
+  }, [categoryFilter, setApiError]);
+
+  useEffect(() => {
     setPage(0);
     void loadProducts(0);
-  }, [statusFilter]);
+  }, [statusFilter, categoryFilter, subCategoryFilter]);
 
   const productColumns = useMemo(() => [
     {
@@ -119,6 +150,7 @@ export const ProductListPage = () => {
     { key: "sku", header: "SKU", render: (item: Product) => item.sku || "--" },
     { key: "brand", header: "Brand", render: (item: Product) => item.brand ?? "--" },
     { key: "category", header: "Category", render: (item: Product) => item.categoryName ?? item.category ?? "--" },
+    { key: "subCategory", header: "Sub Category", render: (item: Product) => item.subCategoryName ?? item.subCategory ?? "--" },
     { key: "purchasePrice", header: "Purchase Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.purchasePrice)}</span> },
     { key: "price", header: "Selling Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.sellingPrice)}</span> },
     {
@@ -162,6 +194,7 @@ export const ProductListPage = () => {
     { key: "sku", header: "SKU" },
     { key: "brand", header: "Brand", value: (row: Product) => row.brand },
     { key: "category", header: "Category", value: (row: Product) => row.categoryName ?? row.category },
+    { key: "subCategory", header: "Sub Category", value: (row: Product) => row.subCategoryName ?? row.subCategory },
     { key: "purchasePrice", header: "Purchase Price", type: "amount" as const },
     { key: "price", header: "Selling Price", value: (row: Product) => row.sellingPrice, type: "amount" as const },
     { key: "stock", header: "Stock Qty", value: (row: Product) => row.stockQty, type: "number" as const },
@@ -201,10 +234,10 @@ export const ProductListPage = () => {
               </div>
             ) : null}
           </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_180px_160px]">
             <Input
               label="Search Product"
-              placeholder="Enter Product Name or SKU"
+              placeholder="Enter Product, SKU, Category, or Sub Category"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onClear={() => {
@@ -219,6 +252,27 @@ export const ProductListPage = () => {
                   void loadProducts(0);
                 }
               }}
+            />
+            <Select
+              label="Category Filter"
+              placeholder={null}
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              options={[
+                { label: "All Categories", value: "" },
+                ...categories.map((category) => ({ label: category.categoryName, value: String(category.id) }))
+              ]}
+            />
+            <Select
+              label="Sub Category Filter"
+              placeholder={null}
+              value={subCategoryFilter}
+              disabled={!categoryFilter}
+              onChange={(event) => setSubCategoryFilter(event.target.value)}
+              options={[
+                { label: "All Sub Categories", value: "" },
+                ...subCategories.map((subCategory) => ({ label: subCategory.subCategoryName, value: String(subCategory.id) }))
+              ]}
             />
             <Select
               label="Status Filter"

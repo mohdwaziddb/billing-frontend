@@ -24,6 +24,7 @@ import { ExpenseListPage } from "./pages/ExpenseListPage";
 import { ProfitLossReportPage } from "./pages/ProfitLossReportPage";
 import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductCategoryPage } from "./pages/ProductCategoryPage";
+import { ProductSubCategoryPage } from "./pages/ProductSubCategoryPage";
 import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
@@ -56,6 +57,7 @@ function App() {
           <Route path="/data-port/products" element={<PermissionRoute menuCode="PRODUCT_DATAPORT"><ProductDataPortPage /></PermissionRoute>} />
           <Route path="/setup/product-categories" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/product-category" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
+          <Route path="/setup/product-sub-categories" element={<PermissionRoute menuCode="PRODUCT_SUB_CATEGORIES"><ProductSubCategoryPage /></PermissionRoute>} />
           <Route path="/setup/expense-categories" element={<PermissionRoute menuCode="EXPENSE_CATEGORIES"><ExpenseCategoryPage /></PermissionRoute>} />
           <Route path="/setup/payment-modes" element={<PermissionRoute menuCode="PAYMENT_MODES"><PaymentModePage /></PermissionRoute>} />
           <Route path="/setup/theme-settings" element={<PermissionRoute menuCode="THEME_SETTINGS"><ThemeSettingsPage /></PermissionRoute>} />

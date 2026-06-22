@@ -5,17 +5,22 @@ import type { ApiResponse, PageResponse, Product, ProductRequest } from "../type
 const ACTIVE_PRODUCTS_CACHE_KEY = "billing_frontend_active_products";
 let activeProductsPromise: Promise<Product[]> | null = null;
 
-const isActiveLookupRequest = (params?: { search?: string; active?: boolean; page?: number; size?: number }) =>
-  !params?.search && params?.active === true && (params?.page === undefined || params.page === 0) && params?.size === 1000;
+const isActiveLookupRequest = (params?: { search?: string; active?: boolean; categoryId?: number; subCategoryId?: number; page?: number; size?: number }) =>
+  !params?.search
+  && params?.active === true
+  && params?.categoryId === undefined
+  && params?.subCategoryId === undefined
+  && (params?.page === undefined || params.page === 0)
+  && params?.size === 1000;
 
-export const getProductsPage = async (params?: { search?: string; active?: boolean; page?: number; size?: number }) => {
+export const getProductsPage = async (params?: { search?: string; active?: boolean; categoryId?: number; subCategoryId?: number; page?: number; size?: number }) => {
   const response = await apiClient.get<ApiResponse<PageResponse<Product>>>("/v1/products", {
     params
   });
   return response.data.data;
 };
 
-export const getProducts = async (params?: { search?: string; active?: boolean; page?: number; size?: number }) => {
+export const getProducts = async (params?: { search?: string; active?: boolean; categoryId?: number; subCategoryId?: number; page?: number; size?: number }) => {
   if (isActiveLookupRequest(params)) {
     const cached = sessionCache.get<Product[]>(ACTIVE_PRODUCTS_CACHE_KEY);
     if (cached) {

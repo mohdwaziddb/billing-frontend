@@ -20,6 +20,8 @@ import { Button } from "../components/Button";
 import { env } from "../config/env";
 import type { PlatformSettings } from "../types/api";
 
+const HOME_PAGE_TITLE = "Bizfinity Technologies Pvt. Ltd.";
+
 const features = [
   {
     title: "Smart Billing",
@@ -111,6 +113,10 @@ export const LandingPage = () => {
   const platformLogoUrl = platformSettings.platformLogo
     ? (platformSettings.platformLogo.startsWith("http") ? platformSettings.platformLogo : `${apiOrigin}${platformSettings.platformLogo}`)
     : null;
+
+  useEffect(() => {
+    document.title = HOME_PAGE_TITLE;
+  }, []);
 
   return (
     <LandingPageTheme>

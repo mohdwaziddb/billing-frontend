@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
@@ -7,8 +7,10 @@ import { PasswordInput } from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 
+const PUBLIC_APP_TITLE = "Bizfinity Technologies Pvt. Ltd.";
+
 export const PlatformAdminLoginPage = () => {
-  const { loginPlatformAdmin } = useAuth();
+  const { loginPlatformAdmin, platform } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
@@ -16,6 +18,10 @@ export const PlatformAdminLoginPage = () => {
   const { clearMessage, setApiError } = useApiMessage();
   const canSubmit = Boolean(form.username.trim() && form.password.trim());
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/platform-admin/dashboard";
+
+  useEffect(() => {
+    document.title = `Platform Admin Login | ${platform.platformName || PUBLIC_APP_TITLE}`;
+  }, [platform.platformName]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();

@@ -3,6 +3,7 @@ import { type FieldErrors, useForm } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getProductCategories } from "../api/productCategories";
+import { getProductSubCategories } from "../api/productSubCategories";
 import { createProduct, getProduct, updateProduct } from "../api/products";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
@@ -14,11 +15,12 @@ import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { firstFormErrorMessage } from "../lib/formValidation";
 import { notificationService } from "../services/notificationService";
-import type { ProductCategory, ProductRequest } from "../types/api";
+import type { ProductCategory, ProductRequest, ProductSubCategory } from "../types/api";
 
 type FormValues = {
   name: string;
   categoryId: string;
+  subCategoryId: string;
   brand: string;
   sku: string;
   hsnCode: string;
@@ -33,6 +35,7 @@ type FormValues = {
 const defaultValues: FormValues = {
   name: "",
   categoryId: "",
+  subCategoryId: "",
   brand: "",
   sku: "",
   hsnCode: "",
@@ -49,11 +52,13 @@ export const ProductFormPage = () => {
   const { productId } = useParams();
   const editing = Boolean(productId);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [subCategories, setSubCategories] = useState<ProductSubCategory[]>([]);
   const {
     register,
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues
@@ -77,6 +82,7 @@ export const ProductFormPage = () => {
         reset({
           name: product.name,
           categoryId: product.categoryId ? String(product.categoryId) : "",
+          subCategoryId: product.subCategoryId ? String(product.subCategoryId) : "",
           brand: product.brand ?? "",
           sku: product.sku,
           hsnCode: product.hsnCode ?? "",
@@ -93,17 +99,35 @@ export const ProductFormPage = () => {
 
   const watchedPurchasePrice = watch("purchasePrice");
   const watchedValues = watch();
+  const watchedCategoryId = watch("categoryId");
 
   const categoryOptions = useMemo(
     () => categories.map((category) => ({ label: category.categoryName, value: String(category.id) })),
     [categories]
   );
+  const subCategoryOptions = useMemo(
+    () => subCategories.map((subCategory) => ({ label: subCategory.subCategoryName, value: String(subCategory.id) })),
+    [subCategories]
+  );
+
+  useEffect(() => {
+    if (!watchedCategoryId) {
+      setSubCategories([]);
+      setValue("subCategoryId", "");
+      return;
+    }
+    void getProductSubCategories({ active: true, categoryId: Number(watchedCategoryId), size: 1000 })
+      .then((subCategoryData) => setSubCategories(subCategoryData.filter((subCategory) => subCategory.active)))
+      .catch((err: any) => setApiError(err, "Unable to load product sub categories"));
+  }, [setApiError, setValue, watchedCategoryId]);
+
   const purchasePriceValue = Number(watchedValues.purchasePrice);
   const sellingPriceValue = Number(watchedValues.sellingPrice);
   const taxPercentValue = Number(watchedValues.taxPercent);
   const canSaveProduct = Boolean(
     watchedValues.name.trim() &&
     watchedValues.categoryId &&
+    watchedValues.subCategoryId &&
     watchedValues.sku.trim() &&
     watchedValues.purchasePrice !== "" &&
     watchedValues.sellingPrice !== "" &&
@@ -121,6 +145,7 @@ export const ProductFormPage = () => {
     const payload: ProductRequest = {
       name: values.name.trim(),
       categoryId: Number(values.categoryId),
+      subCategoryId: Number(values.subCategoryId),
       brand: values.brand.trim() || undefined,
       sku: values.sku.trim(),
       hsnCode: values.hsnCode.trim() || undefined,
@@ -149,6 +174,9 @@ export const ProductFormPage = () => {
   const onInvalid = (validationErrors: FieldErrors<FormValues>) => {
     notificationService.showError(firstFormErrorMessage(validationErrors, "Please fill all required product fields before saving."));
   };
+
+  const categoryRegister = register("categoryId", { required: "Product category is required" });
+  const subCategoryRegister = register("subCategoryId", { required: "Product sub category is required" });
 
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
@@ -193,7 +221,21 @@ export const ProductFormPage = () => {
                 hint="Only active product categories are available."
                 disabled={!categoryOptions.length}
                 options={categoryOptions}
-                {...register("categoryId", { required: "Product category is required" })}
+                {...categoryRegister}
+                onChange={(event) => {
+                  categoryRegister.onChange(event);
+                  setValue("subCategoryId", "");
+                }}
+              />
+              <Select
+                label="Product Sub Category"
+                requiredMark
+                placeholder={subCategoryOptions.length ? "Select Product Sub Category" : "No active sub categories found"}
+                error={errors.subCategoryId?.message}
+                hint="Sub categories load from the selected category."
+                disabled={!watchedCategoryId || !subCategoryOptions.length}
+                options={subCategoryOptions}
+                {...subCategoryRegister}
               />
               <Input
                 label="SKU"

@@ -25,6 +25,7 @@ import type {
 
 const emptyReferenceData: ProductDataPortReferenceData = {
   categories: [],
+  subCategories: [],
   existingSkus: []
 };
 
@@ -48,6 +49,7 @@ const activeOptions = [
 type EditableField =
   | "productName"
   | "productCategory"
+  | "productSubCategory"
   | "sku"
   | "active"
   | "brand"
@@ -295,6 +297,7 @@ export const ProductDataPortPage = () => {
                     "#",
                     "Product Name",
                     "Product Category",
+                    "Product Sub Category",
                     "SKU",
                     "Active",
                     "Brand",
@@ -316,7 +319,7 @@ export const ProductDataPortPage = () => {
               <tbody>
                 {preview.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="px-6 py-16 text-center text-slate-500">
+                    <td colSpan={15} className="px-6 py-16 text-center text-slate-500">
                       Upload a sample-filled Excel file to preview product data here.
                     </td>
                   </tr>
@@ -326,6 +329,7 @@ export const ProductDataPortPage = () => {
                       <td className="border-b border-slate-100 px-3 py-3 align-top font-semibold text-slate-500">{row.rowNumber}</td>
                       <EditableCell row={row} field="productName" value={row.productName} onChange={updateRow} />
                       <EditableCell row={row} field="productCategory" value={row.productCategory} onChange={updateRow} />
+                      <EditableCell row={row} field="productSubCategory" value={row.productSubCategory} onChange={updateRow} />
                       <EditableCell row={row} field="sku" value={row.sku} onChange={updateRow} />
                       <td className="border-b border-slate-100 px-3 py-3 align-top">
                         <select
@@ -499,6 +503,7 @@ const validateRows = (rows: ProductDataPortRow[], referenceData: ProductDataPort
       ...row,
       productName: row.productName?.trim() ?? "",
       productCategory: row.productCategory?.trim() ?? "",
+      productSubCategory: row.productSubCategory?.trim() ?? "",
       sku: row.sku?.trim() ?? "",
       active: row.active?.trim() ?? "",
       brand: trimToNull(row.brand),
@@ -509,6 +514,7 @@ const validateRows = (rows: ProductDataPortRow[], referenceData: ProductDataPort
       minimumStockQty: row.minimumStockQty?.trim() ?? "",
       taxPercent: row.taxPercent?.trim() ?? "",
       productCategoryId: null,
+      productSubCategoryId: null,
       activeValue: null,
       valid: true,
       validationErrors: {}
@@ -521,6 +527,9 @@ const validateRows = (rows: ProductDataPortRow[], referenceData: ProductDataPort
     }
     if (!nextRow.productCategory) {
       errors.productCategory = "Product category is required";
+    }
+    if (!nextRow.productSubCategory) {
+      errors.productSubCategory = "Product sub category is required";
     }
     if (!nextRow.sku) {
       errors.sku = "SKU is required";
@@ -541,6 +550,17 @@ const validateRows = (rows: ProductDataPortRow[], referenceData: ProductDataPort
         errors.productCategory = "Product category was not found in your company";
       } else {
         nextRow.productCategoryId = category.id;
+      }
+    }
+
+    if (nextRow.productCategoryId && nextRow.productSubCategory) {
+      const subCategory = referenceData.subCategories.find((item) =>
+        item.categoryId === nextRow.productCategoryId && normalizeKey(item.name) === normalizeKey(nextRow.productSubCategory)
+      );
+      if (!subCategory) {
+        errors.productSubCategory = "Product sub category was not found under the selected category in your company";
+      } else {
+        nextRow.productSubCategoryId = subCategory.id;
       }
     }
 

@@ -16,6 +16,9 @@ const menuAlias = (menu: MenuPermission) => {
   if (menu.menuCode === "PRODUCT_CATEGORY") {
     return "Product Categories Categories";
   }
+  if (menu.menuCode === "PRODUCT_SUB_CATEGORIES") {
+    return "Product Sub Categories Subcategories";
+  }
   if (menu.menuCode === "CREATE_INVOICE") {
     return "Create Invoice Invoice Billing";
   }

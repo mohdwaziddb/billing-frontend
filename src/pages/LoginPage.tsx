@@ -8,8 +8,10 @@ import { PasswordInput } from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 
+const PUBLIC_APP_TITLE = "Bizfinity Technologies Pvt. Ltd.";
+
 export const LoginPage = () => {
-  const { auth, sessionType, permissions, firstAccessibleRoute, login } = useAuth();
+  const { auth, sessionType, permissions, firstAccessibleRoute, login, platform } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
@@ -29,6 +31,10 @@ export const LoginPage = () => {
       navigate(firstAccessibleRoute() ?? "/dashboard", { replace: true });
     }
   }, [auth?.accessToken, firstAccessibleRoute, navigate, permissions, sessionType]);
+
+  useEffect(() => {
+    document.title = `Login | ${platform.platformName || PUBLIC_APP_TITLE}`;
+  }, [platform.platformName]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
