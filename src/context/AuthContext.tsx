@@ -4,7 +4,7 @@ import { getCompanyTheme } from "../api/company";
 import { getMyMenus } from "../api/permissions";
 import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
-import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest, registerRequest } from "../api/auth";
+import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest } from "../api/auth";
 import { authStorage } from "../lib/storage";
 import { sessionCache } from "../lib/sessionCache";
 import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
@@ -38,24 +38,12 @@ type AuthContextValue = {
   firstAccessibleRoute: () => string | null;
   login: (payload: { username: string; password: string }) => Promise<string | null>;
   loginPlatformAdmin: (payload: { username: string; password: string }) => Promise<string>;
-  register: (payload: {
-    companyName: string;
-    companyEmail: string;
-    companyPhone: string;
-    companyAddress: string;
-    taxId: string;
-    adminFullName: string;
-    adminUsername: string;
-    adminMobileNumber: string;
-    adminEmail: string;
-    adminPassword: string;
-  }) => Promise<string | null>;
   logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const AUTH_BOOTSTRAP_CACHE_KEY = "billing_frontend_auth_bootstrap";
-const PUBLIC_THEME_ROUTES = new Set(["/", "/login", "/register", "/platform-admin/login"]);
+const PUBLIC_THEME_ROUTES = new Set(["/", "/login", "/platform-admin/login"]);
 
 type AuthBootstrapCache = {
   accessToken: string;
@@ -325,33 +313,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
         ThemeBootstrapService.clear();
         return "/platform-admin/dashboard";
-      },
-      async register(payload) {
-        const nextAuth = await registerRequest(payload);
-        const nextSession: StoredAuthSession = { type: "user", auth: nextAuth };
-        authStorage.set(nextSession);
-        const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
-          getMyMenus(),
-          getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
-          getPlatformSettings().catch(() => defaultPlatformSettings),
-          getMyPreferences().catch(() => ({ darkModeEnabled: false }))
-        ]);
-        setPermissions(nextPermissions);
-        setTheme(nextTheme);
-        setPlatform(nextPlatform);
-        setPreferences(nextPreferences);
-        sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, {
-          accessToken: nextAuth.accessToken,
-          user: nextAuth.user,
-          permissions: nextPermissions,
-          theme: nextTheme,
-          platform: nextPlatform,
-          preferences: nextPreferences
-        });
-        setSession(nextSession);
-        setUser(nextAuth.user);
-        ThemeBootstrapService.remember(nextTheme, nextPreferences);
-        return findFirstRoute(nextPermissions.menus);
       },
       async logout() {
         if (session?.type === "user" && session.auth.refreshToken) {

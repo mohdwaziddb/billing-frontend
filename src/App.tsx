@@ -42,7 +42,6 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
-      <Route path="/register" element={<Navigate replace to="/login" />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>

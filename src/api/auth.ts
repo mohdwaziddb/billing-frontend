@@ -6,22 +6,6 @@ export const loginRequest = async (payload: { username: string; password: string
   return response.data.data;
 };
 
-export const registerRequest = async (payload: {
-  companyName: string;
-  companyEmail: string;
-  companyPhone: string;
-  companyAddress: string;
-  taxId: string;
-  adminFullName: string;
-  adminUsername: string;
-  adminMobileNumber: string;
-  adminEmail: string;
-  adminPassword: string;
-}) => {
-  const response = await apiClient.post<ApiResponse<AuthPayload>>("/v1/auth/register-company", payload);
-  return response.data.data;
-};
-
 export const platformAdminLoginRequest = async (payload: { username: string; password: string }) => {
   const response = await apiClient.post<ApiResponse<PlatformAdminAuthPayload>>("/v1/platform-admin/login", payload);
   return response.data.data;
