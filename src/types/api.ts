@@ -469,6 +469,9 @@ export type Invoice = {
   customerMobile: string;
   customerEmail?: string | null;
   customerAddress: string | null;
+  referByUserId?: number | null;
+  referByUserName?: string | null;
+  referByUsername?: string | null;
   subtotal: number;
   taxAmount: number;
   discountAmount: number;
@@ -477,6 +480,7 @@ export type Invoice = {
   balanceAmount: number;
   paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
   invoiceDate: string;
+  deleted: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy: string | null;
@@ -497,6 +501,7 @@ export type InvoiceRequestItem = {
 export type InvoiceRequest = {
   customerId: number;
   invoiceDate: string;
+  referByUserId?: number | null;
   discountAmount: number;
   paidAmount?: number;
   paymentMode?: string;
@@ -517,6 +522,7 @@ export type Payment = {
   paymentDate: string;
   mode: PaymentMode;
   remarks: string | null;
+  deleted: boolean;
   createdAt: string;
   createdBy: string | null;
 };
@@ -528,7 +534,13 @@ export type PaymentHierarchyNode = {
   label: string;
   subtitle: string | null;
   amount: number;
+  totalAmount?: number | null;
+  collectedAmount?: number | null;
+  outstandingAmount?: number | null;
   count: number;
+  invoiceCount?: number | null;
+  customerCount?: number | null;
+  collectionCount?: number | null;
   hasChildren: boolean;
   tone: string;
 };
@@ -554,6 +566,43 @@ export type PaymentHierarchyResponse = {
   netRevenue: number;
   nodes: PaymentHierarchyNode[];
   records: PaymentHierarchyRecord[];
+};
+
+export type SalesReferralInvoice = {
+  invoiceId: number;
+  invoiceNo: string;
+  customerName: string;
+  referByUserName?: string | null;
+  referByUserMobileNumber?: string | null;
+  invoiceDate: string;
+  amount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+};
+
+export type SalesReferralUserSummary = {
+  userId: number;
+  userName: string;
+  username: string;
+  totalInvoices: number;
+  totalRevenue: number;
+  paidRevenue: number;
+  outstandingRevenue: number;
+  averageInvoiceValue: number;
+  invoices: SalesReferralInvoice[];
+};
+
+export type SalesReferralReport = {
+  startDate: string | null;
+  endDate: string | null;
+  totalReferredInvoices: number;
+  totalReferredRevenue: number;
+  thisMonthReferredRevenue: number;
+  topPerformer: SalesReferralUserSummary | null;
+  users: SalesReferralUserSummary[];
+  topContributors: SalesReferralUserSummary[];
+  referredInvoices: SalesReferralInvoice[];
+  thisMonthInvoices: SalesReferralInvoice[];
 };
 
 export type PaymentRequest = {

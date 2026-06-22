@@ -134,7 +134,7 @@ const detailConfig: Record<DashboardCardKey, { title: string; columns: DetailCol
     defaultSort: "date",
     columns: [
       { key: "date", header: "Date", type: "date", sortable: true },
-      { key: "totalRevenue", header: "Total Revenue", type: "currency", sortable: true },
+      { key: "totalRevenue", header: "Total Collection", type: "currency", sortable: true },
       { key: "totalExpense", header: "Total Expense", type: "currency", sortable: true },
       { key: "netRevenue", header: "Net Revenue", type: "currency", sortable: true }
     ]
@@ -764,7 +764,7 @@ export const DashboardPage = () => {
         <StatCard
           label="Net Revenue"
           value={formatCurrency(summary?.netRevenue)}
-          caption="Revenue minus expense"
+          caption="Collection minus expense"
           icon={<TrendingUp size={18} />}
           analyticsColor="#0d9488"
           onClick={() => openDetails("netRevenue")}

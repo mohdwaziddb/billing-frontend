@@ -11,6 +11,7 @@ export type PaymentFilterParams = {
   mode?: string;
   invoiceLinked?: boolean;
   createdByRole?: string;
+  recordStatus?: "ACTIVE" | "DELETED" | "ALL";
   page?: number;
   size?: number;
 };
@@ -32,4 +33,9 @@ export const createPayment = async (payload: PaymentRequest) => {
 
 export const deletePayment = async (id: number) => {
   await apiClient.delete(`/v1/payments/${id}`);
+};
+
+export const restorePayment = async (id: number) => {
+  const response = await apiClient.post<ApiResponse<Payment>>(`/v1/payments/${id}/restore`);
+  return response.data.data;
 };

@@ -28,9 +28,10 @@ import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { CommunicationSettingsPage, PlatformAdminCommunicationPage } from "./pages/NotificationSettingsPages";
+import { PlatformAdminCommunicationPage } from "./pages/NotificationSettingsPages";
 import { RolePermissionsPage } from "./pages/RolePermissionsPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
+import { SalesReferralsPage } from "./pages/SalesReferralsPage";
 import { ThemeSettingsPage } from "./pages/ThemeSettingsPage";
 import { UserManagementPage } from "./pages/UserManagementPage";
 import { SmsTemplatePage } from "./pages/SmsTemplatePage";
@@ -61,10 +62,10 @@ function App() {
           <Route path="/setup/about-company" element={<PermissionRoute menuCode="ABOUT_COMPANY"><AboutCompanyPage /></PermissionRoute>} />
           <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
           <Route path="/setup/sms-templates" element={<PermissionRoute menuCode="SMS_TEMPLATES"><SmsTemplatePage /></PermissionRoute>} />
-          <Route path="/setup/communication" element={<PermissionRoute menuCode="COMMUNICATION"><CommunicationSettingsPage /></PermissionRoute>} />
-          <Route path="/setup/email-settings" element={<Navigate replace to="/setup/communication?tab=email" />} />
-          <Route path="/setup/sms-settings" element={<Navigate replace to="/setup/communication?tab=sms" />} />
-          <Route path="/setup/whatsapp-settings" element={<Navigate replace to="/setup/communication?tab=whatsapp" />} />
+          <Route path="/setup/communication" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/email-settings" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/sms-settings" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/whatsapp-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/reports/payment-hierarchy" element={<PermissionRoute menuCode="PAYMENT_HIERARCHY"><PaymentHierarchyPage /></PermissionRoute>} />
           <Route path="/invoices" element={<PermissionRoute menuCode="INVOICES"><InvoiceListPage /></PermissionRoute>} />
           <Route path="/create-invoice" element={<PermissionRoute menuCode="CREATE_INVOICE" actionCode="ADD"><CreateInvoicePage /></PermissionRoute>} />
@@ -78,6 +79,7 @@ function App() {
           <Route path="/analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
           <Route path="/sales-analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
           <Route path="/reports/profit-loss" element={<PermissionRoute menuCode="PROFIT_LOSS"><ProfitLossReportPage /></PermissionRoute>} />
+          <Route path="/reports/sales-referrals" element={<PermissionRoute menuCode="SALES_REFERRALS"><SalesReferralsPage /></PermissionRoute>} />
           <Route path="/setup/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/setup/role-permissions" element={<PermissionRoute menuCode="ROLE_PERMISSIONS"><RolePermissionsPage /></PermissionRoute>} />

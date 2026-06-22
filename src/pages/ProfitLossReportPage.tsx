@@ -177,7 +177,7 @@ export const ProfitLossReportPage = () => {
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard label="Revenue" value={formatCurrency(report.revenue)} caption="Invoice revenue in selected period" icon={<TrendingUp size={18} />} onClick={() => openDetail("revenue")} />
         <StatCard label="Expense" value={formatCurrency(report.expense)} caption="Recorded expenses in selected period" icon={<ReceiptIndianRupee size={18} />} onClick={() => openDetail("expense")} />
-        <StatCard label="Net Profit" value={formatCurrency(report.netProfit)} caption="Revenue minus expense" icon={<TrendingDown size={18} />} onClick={() => openDetail("net")} />
+        <StatCard label="Net Profit" value={formatCurrency(report.netProfit)} caption="Collection minus expense" icon={<TrendingDown size={18} />} onClick={() => openDetail("net")} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">

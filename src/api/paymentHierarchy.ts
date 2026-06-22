@@ -3,6 +3,7 @@ import type { ApiResponse, PaymentHierarchyResponse } from "../types/api";
 
 export type PaymentHierarchyParams = {
   nodeType?: string;
+  nodeId?: string;
   mode?: string;
   year?: number;
   month?: number;

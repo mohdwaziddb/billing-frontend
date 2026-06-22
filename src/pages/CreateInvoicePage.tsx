@@ -6,6 +6,7 @@ import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from 
 import { createInvoice } from "../api/invoices";
 import { getPaymentModes } from "../api/paymentModes";
 import { getProducts } from "../api/products";
+import { getActiveReferralUsers } from "../api/users";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonDeleteIconButton } from "../components/CommonDeleteAction";
@@ -24,7 +25,7 @@ import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
 import { InvoiceCalculationService } from "../services/InvoiceCalculationService";
 import { notificationService } from "../services/notificationService";
-import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, PaymentModeMaster, Product } from "../types/api";
+import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, PaymentModeMaster, Product, UserProfile } from "../types/api";
 
 type InvoiceItemForm = {
   productId: string;
@@ -37,6 +38,7 @@ type InvoiceItemForm = {
 type FormValues = {
   customerId: string;
   invoiceDate: string;
+  referByUserId: string;
   invoiceDiscountType: "FIXED" | "PERCENT";
   discountAmount: string;
   paidAmount: string;
@@ -60,6 +62,15 @@ const numberValue = (value: string | number | undefined) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const MOBILE_VALIDATION_MESSAGE = "Enter a 10-digit mobile number.";
+
+const normalizeMobileNumber = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
+};
+
+const isValidMobileNumber = (value: string) => /^\d{10}$/.test(normalizeMobileNumber(value));
 
 const todayIso = () => {
   const today = new Date();
@@ -96,6 +107,7 @@ export const CreateInvoicePage = () => {
   const { can } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
+  const [referralUsers, setReferralUsers] = useState<UserProfile[]>([]);
   const [customerMobile, setCustomerMobile] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
@@ -129,6 +141,7 @@ export const CreateInvoicePage = () => {
     defaultValues: {
       customerId: "",
       invoiceDate: todayIso(),
+      referByUserId: "",
       invoiceDiscountType: "FIXED",
       discountAmount: "0",
       paidAmount: "0",
@@ -140,10 +153,11 @@ export const CreateInvoicePage = () => {
   const { fields, append, remove, update, replace } = useFieldArray({ control, name: "items" });
 
   useEffect(() => {
-    void Promise.all([getProducts({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 })])
-      .then(([productData, modeData]) => {
+    void Promise.all([getProducts({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 }), getActiveReferralUsers()])
+      .then(([productData, modeData, referralData]) => {
         setProducts(productData.filter((item) => item.active));
         setPaymentModes(modeData);
+        setReferralUsers(referralData.filter((item) => item.active));
       })
       .catch((err: any) => setApiError(err, "Unable to load invoice setup data"));
   }, [setApiError]);
@@ -262,7 +276,8 @@ export const CreateInvoicePage = () => {
     (invoiceSummary.paidAmount <= 0 || paymentModeInput)
   );
   const canSaveInvoice = hasRequiredInvoiceFields && !hasClientValidationErrors;
-  const canCreateNewCustomer = Boolean(newCustomer.name.trim() && (customerMobile.trim() || newCustomer.mobile.trim()));
+  const customerMobileError = customerMobile.trim() && !isValidMobileNumber(customerMobile) ? MOBILE_VALIDATION_MESSAGE : undefined;
+  const canCreateNewCustomer = Boolean(newCustomer.name.trim() && isValidMobileNumber(customerMobile.trim() || newCustomer.mobile.trim()));
 
   const resetInvoiceEntry = () => {
     replace([createEmptyItem()]);
@@ -279,11 +294,16 @@ export const CreateInvoicePage = () => {
     setValue("customerId", "");
     resetInvoiceEntry();
 
-    const mobile = customerMobile.trim();
+    const mobile = normalizeMobileNumber(customerMobile.trim());
     if (!mobile) {
       notificationService.showError("Enter mobile number to find customer");
       return;
     }
+    if (!isValidMobileNumber(mobile)) {
+      notificationService.showError(MOBILE_VALIDATION_MESSAGE);
+      return;
+    }
+    setCustomerMobile(mobile);
 
     try {
       const customer = await getCustomerByMobile(mobile);
@@ -322,9 +342,15 @@ export const CreateInvoicePage = () => {
     clearCustomerCreateFeedback();
     setCreatingCustomer(true);
 
+    const mobile = normalizeMobileNumber(customerMobile.trim() || newCustomer.mobile.trim());
+    if (!isValidMobileNumber(mobile)) {
+      notificationService.showError(MOBILE_VALIDATION_MESSAGE);
+      return;
+    }
+
     const payload: CustomerRequest = {
       name: newCustomer.name.trim(),
-      mobile: customerMobile.trim() || newCustomer.mobile.trim(),
+      mobile,
       email: newCustomer.email.trim() || undefined,
       address: newCustomer.address.trim() || undefined,
       gstNo: newCustomer.gstNo.trim() || undefined,
@@ -423,6 +449,7 @@ export const CreateInvoicePage = () => {
     const payload: InvoiceRequest = {
       customerId: Number(values.customerId),
       invoiceDate: values.invoiceDate,
+      referByUserId: values.referByUserId ? Number(values.referByUserId) : null,
       discountAmount: Number(invoiceSummary.invoiceDiscount.toFixed(2)),
       paidAmount: Number(invoiceSummary.paidAmount.toFixed(2)),
       paymentMode: values.paymentMode || undefined,
@@ -484,13 +511,16 @@ export const CreateInvoicePage = () => {
               <h3 className="text-lg font-bold text-slate-950">Customer Details</h3>
             </div>
 
-            <div className="mb-4 grid gap-3 xl:grid-cols-[minmax(220px,360px)_190px_170px] xl:items-start">
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:max-w-[700px] xl:items-start">
               <div className="relative">
                 <Input
                   label="Mobile"
                   requiredMark
                   placeholder="Search mobile"
+                  inputMode="numeric"
+                  maxLength={14}
                   value={customerMobile}
+                  error={customerMobileError}
                   onChange={(event) => setCustomerMobile(event.target.value)}
                   onClear={clearCustomerSelection}
                   onKeyDown={(event) => {
@@ -507,16 +537,30 @@ export const CreateInvoicePage = () => {
                   Find Customer
                 </Button>
               </div>
-              <div>
-                <Input
-                  label="Invoice Date"
-                  requiredMark
-                  type="date"
-                  disabled={!canProceedWithInvoice}
-                  error={errors.invoiceDate?.message}
-                  {...register("invoiceDate", { required: "Invoice date is required" })}
-                />
-              </div>
+            </div>
+
+            <div className="mb-4 grid gap-3 md:grid-cols-2 xl:max-w-[700px]">
+              <Input
+                label="Invoice Date"
+                requiredMark
+                type="date"
+                disabled={!canProceedWithInvoice}
+                error={errors.invoiceDate?.message}
+                {...register("invoiceDate", { required: "Invoice date is required" })}
+              />
+              <Select
+                label="Refer By"
+                disabled={!canProceedWithInvoice}
+                placeholder="No Referral"
+                options={[
+                  { label: "No Referral", value: "" },
+                  ...referralUsers.map((entry) => ({
+                    label: `${entry.fullName} (${entry.mobileNumber || entry.username})`,
+                    value: String(entry.id)
+                  }))
+                ]}
+                {...register("referByUserId")}
+              />
             </div>
 
             <input type="hidden" {...register("customerId", { required: "Customer is required" })} />
@@ -555,7 +599,7 @@ export const CreateInvoicePage = () => {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <Input label="Customer Name" requiredMark error={customerCreateFieldErrors.name} value={newCustomer.name} onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))} />
-                  <Input label="Mobile Number" requiredMark readOnly className="cursor-not-allowed bg-slate-100 text-slate-500" error={customerCreateFieldErrors.mobile} value={newCustomer.mobile} />
+                  <Input label="Mobile Number" requiredMark readOnly className="cursor-not-allowed bg-slate-100 text-slate-500" error={customerCreateFieldErrors.mobile ?? (!isValidMobileNumber(newCustomer.mobile) ? MOBILE_VALIDATION_MESSAGE : undefined)} value={newCustomer.mobile} />
                   <Input label="Email Address" type="email" error={customerCreateFieldErrors.email} value={newCustomer.email} onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))} />
                   <Input label="GST Number" error={customerCreateFieldErrors.gstNo} value={newCustomer.gstNo} onChange={(event) => setNewCustomer((current) => ({ ...current, gstNo: event.target.value }))} />
                   <Input label="Address" className="md:col-span-2 xl:col-span-4" error={customerCreateFieldErrors.address} value={newCustomer.address} onChange={(event) => setNewCustomer((current) => ({ ...current, address: event.target.value }))} />

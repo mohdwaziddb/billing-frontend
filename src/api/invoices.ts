@@ -13,6 +13,7 @@ export type InvoiceFilterParams = {
   maxAmount?: number | string;
   categoryId?: number | string;
   createdByRole?: string;
+  recordStatus?: "ACTIVE" | "DELETED" | "ALL";
   page?: number;
   size?: number;
 };
@@ -46,4 +47,9 @@ export const updateInvoice = async (id: number, payload: InvoiceRequest) => {
 
 export const deleteInvoice = async (id: number) => {
   await apiClient.delete(`/v1/invoices/${id}`);
+};
+
+export const restoreInvoice = async (id: number) => {
+  const response = await apiClient.post<ApiResponse<Invoice>>(`/v1/invoices/${id}/restore`);
+  return response.data.data;
 };
