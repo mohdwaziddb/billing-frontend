@@ -1,9 +1,11 @@
-import { Building2, CheckCircle2, LoaderCircle, Settings, XCircle } from "lucide-react";
+import { Bot, Building2, CheckCircle2, LoaderCircle, Settings, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   activatePlatformAdminCompany,
   createPlatformAdminCompany,
   deactivatePlatformAdminCompany,
+  disablePlatformAdminCompanyChatbot,
+  enablePlatformAdminCompanyChatbot,
   getPlatformAdminCompanies,
   getPlatformAdminCompanyDetails,
   getPlatformAdminDashboard,
@@ -85,6 +87,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [settingsForm, setSettingsForm] = useState(settingsFormInitial);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [statusAction, setStatusAction] = useState<CompanyStatusActionState>(null);
+  const [chatbotTogglingId, setChatbotTogglingId] = useState<number | null>(null);
   const { setApiError } = useApiMessage();
 
   const companyOptions = useMemo(() => [
@@ -268,6 +271,24 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     }
   };
 
+  const toggleCompanyChatbot = async (company: PlatformAdminCompany) => {
+    setChatbotTogglingId(company.id);
+    try {
+      if (company.isChatbotEnabled) {
+        await disablePlatformAdminCompanyChatbot(company.id);
+        notificationService.showSuccess("Company chatbot disabled successfully");
+      } else {
+        await enablePlatformAdminCompanyChatbot(company.id);
+        notificationService.showSuccess("Company chatbot enabled successfully");
+      }
+      void refreshCountsAndLists(companyPage).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
+    } catch (err) {
+      setApiError(err, "Unable to update chatbot access");
+    } finally {
+      setChatbotTogglingId(null);
+    }
+  };
+
   return (
     <div className="space-y-4 pb-6">
       <Header title={pageMeta[mode].title} subtitle={pageMeta[mode].subtitle} />
@@ -320,6 +341,8 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
           <CompanyTable
             companies={companies.records}
             onToggle={confirmToggleCompany}
+            onToggleChatbot={(company) => void toggleCompanyChatbot(company)}
+            chatbotTogglingId={chatbotTogglingId}
             onView={(company) => {
               void loadPreviewDetails(company.id).catch((err) => setApiError(err, "Unable to load company details"));
             }}
@@ -446,15 +469,37 @@ const Toolbar = ({ search, setSearch, active, setActive, onAdd }: { search: stri
   </div>
 );
 
-const CompanyTable = ({ companies, onToggle, onView }: { companies: PlatformAdminCompany[]; onToggle: (company: PlatformAdminCompany) => void; onView: (company: PlatformAdminCompany) => void }) => (
+const CompanyTable = ({
+  companies,
+  onToggle,
+  onToggleChatbot,
+  chatbotTogglingId,
+  onView
+}: {
+  companies: PlatformAdminCompany[];
+  onToggle: (company: PlatformAdminCompany) => void;
+  onToggleChatbot: (company: PlatformAdminCompany) => void;
+  chatbotTogglingId: number | null;
+  onView: (company: PlatformAdminCompany) => void;
+}) => (
   <Table data={companies} emptyText="No companies found." columns={[
     { key: "name", header: "Company Name", render: (item) => <span className="font-semibold text-slate-950">{item.name}</span> },
     { key: "owner", header: "Owner Name", render: (item) => item.ownerName ?? "--" },
     { key: "email", header: "Email", render: (item) => item.email },
     { key: "mobile", header: "Mobile", render: (item) => item.mobile ?? "--" },
     { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
+    { key: "chatbot", header: "AI Assistant", render: (item) => <StatusBadge label={item.isChatbotEnabled ? "ENABLED" : "DISABLED"} /> },
     { key: "created", header: "Created Date", render: (item) => formatDateTime(item.createdAt) },
-    { key: "actions", header: "Actions", render: (item) => <div className="flex gap-2"><Button type="button" variant="secondary" onClick={() => onView(item)}>View</Button><Button type="button" variant={item.active ? "danger" : "secondary"} onClick={() => onToggle(item)}>{item.active ? "Deactivate" : "Activate"}</Button></div> }
+    { key: "actions", header: "Actions", render: (item) => (
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="secondary" onClick={() => onView(item)}>View</Button>
+        <Button type="button" variant="secondary" disabled={chatbotTogglingId === item.id} onClick={() => onToggleChatbot(item)}>
+          {chatbotTogglingId === item.id ? <LoaderCircle className="animate-spin" size={16} /> : <Bot size={16} />}
+          {item.isChatbotEnabled ? "Disable AI" : "Enable AI"}
+        </Button>
+        <Button type="button" variant={item.active ? "danger" : "secondary"} onClick={() => onToggle(item)}>{item.active ? "Deactivate" : "Activate"}</Button>
+      </div>
+    ) }
   ]} />
 );
 
@@ -466,6 +511,7 @@ const CompanyDetailsView = ({ details, hideSummaryLabels = [] }: { details: Plat
       {!hideSummaryLabels.includes("Owners") ? <Info label="Owners" value={details.ownerCount} /> : null}
       {!hideSummaryLabels.includes("Admins") ? <Info label="Admins" value={details.adminCount} /> : null}
       {!hideSummaryLabels.includes("Users") ? <Info label="Users" value={details.userCount} /> : null}
+      {!hideSummaryLabels.includes("AI Assistant") ? <Info label="AI Assistant" value={details.company.isChatbotEnabled ? "Enabled" : "Disabled"} /> : null}
       {!hideSummaryLabels.includes("Audit Logs") ? <Info label="Audit Logs" value={details.auditLogCount} /> : null}
     </div>
     <Table data={details.users} emptyText="No users found." columns={[

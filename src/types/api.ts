@@ -28,6 +28,7 @@ export type CompanySummary = {
   cinNumber?: string | null;
   logoUrl?: string | null;
   websiteUrl?: string | null;
+  isChatbotEnabled: boolean;
 };
 
 export type CompanyTheme = {
@@ -98,6 +99,7 @@ export type PlatformAdminCompany = {
   email: string;
   mobile: string;
   active: boolean;
+  isChatbotEnabled: boolean;
   createdAt: string | null;
   ownerCount: number;
   adminCount: number;

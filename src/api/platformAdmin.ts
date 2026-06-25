@@ -68,6 +68,16 @@ export const deactivatePlatformAdminCompany = async (companyId: number) => {
   return response.data.data;
 };
 
+export const enablePlatformAdminCompanyChatbot = async (companyId: number) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyId}/chatbot/enable`);
+  return response.data.data;
+};
+
+export const disablePlatformAdminCompanyChatbot = async (companyId: number) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyId}/chatbot/disable`);
+  return response.data.data;
+};
+
 export const getPlatformAdminCompanyDetails = async (companyId: number) => {
   const response = await apiClient.get<ApiResponse<PlatformAdminCompanyDetails>>(`/v1/platform-admin/companies/${companyId}`);
   return response.data.data;
