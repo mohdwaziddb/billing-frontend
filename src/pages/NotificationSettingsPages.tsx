@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Edit3, Mail, MessageSquare, Plus, Send } from "lucide-react";
 import {
   createEmailSettings,
   createSmsSettings,
   createWhatsAppSettings,
   getEmailSettings,
+  getSmsProviders,
   getSmsSettings,
+  getWhatsAppProviders,
   getWhatsAppSettings,
   sendTestEmail,
   sendTestSms,
@@ -21,7 +23,9 @@ import {
   createPlatformAdminWhatsAppSettings,
   getPlatformAdminCompanies,
   getPlatformAdminEmailSettings,
+  getPlatformAdminSmsProviders,
   getPlatformAdminSmsSettings,
+  getPlatformAdminWhatsAppProviders,
   getPlatformAdminWhatsAppSettings,
   testPlatformAdminEmailSettings,
   testPlatformAdminSmsSettings,
@@ -41,7 +45,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { notificationService } from "../services/notificationService";
-import type { PlatformAdminCompany, ProviderSettings, ProviderSettingsRequest } from "../types/api";
+import type { PlatformAdminCompany, ProviderSettings, ProviderSettingsRequest, SmsProviderMetadata, WhatsAppProviderMetadata } from "../types/api";
 
 type CommunicationTab = "email" | "sms" | "whatsapp";
 
@@ -64,19 +68,20 @@ const smsDefaults: ProviderSettingsRequest = {
   providerName: "MSG91",
   providerType: "MSG91",
   apiUrl: "https://api.msg91.com/api/v2/sendsms",
-  authKey: "",
-  senderId: "",
-  templateId: "",
+  configValues: {
+    apiUrl: "https://api.msg91.com/api/v2/sendsms",
+    authKey: "",
+    senderId: "",
+    templateId: ""
+  },
   active: true
 };
 
 const whatsAppDefaults: ProviderSettingsRequest = {
-  providerName: "MSG91 WhatsApp",
-  providerType: "MSG91",
-  apiUrl: "https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message",
-  authKey: "",
-  whatsappNumber: "",
-  senderName: "",
+  providerName: "",
+  providerType: "",
+  apiUrl: "",
+  configValues: {},
   active: true
 };
 
@@ -92,8 +97,6 @@ export const PlatformAdminCommunicationPage = () => <CommunicationHubPage platfo
 
 const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [tab, setTab] = useState<CommunicationTab>(normalizeTab(searchParams.get("tab")));
   const [companies, setCompanies] = useState<PlatformAdminCompany[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
@@ -103,21 +106,71 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<number | null>(null);
+  const [testingDraft, setTestingDraft] = useState(false);
   const [testRecipient, setTestRecipient] = useState("");
   const [testMobileNumber, setTestMobileNumber] = useState("");
   const [testMessage, setTestMessage] = useState("This is a test WhatsApp message from your active provider.");
+  const [smsProviders, setSmsProviders] = useState<SmsProviderMetadata[]>([]);
+  const [whatsAppProviders, setWhatsAppProviders] = useState<WhatsAppProviderMetadata[]>([]);
   const { setApiError } = useApiMessage();
 
   useEffect(() => {
-    const nextTab = normalizeTab(searchParams.get("tab"));
-    setTab(nextTab);
+    setTab(normalizeTab(searchParams.get("tab")));
   }, [searchParams]);
 
   useEffect(() => {
-    setForm({ ...tabMeta[tab].defaults });
+    setForm(
+      tab === "sms"
+        ? applySmsProviderDefaults({ ...tabMeta[tab].defaults }, smsProviders[0] ?? null)
+        : tab === "whatsapp"
+          ? applyWhatsAppProviderDefaults({ ...tabMeta[tab].defaults }, whatsAppProviders[0] ?? null)
+          : { ...tabMeta[tab].defaults }
+    );
     setEditing(null);
     setOpen(false);
-  }, [tab]);
+  }, [smsProviders, tab, whatsAppProviders]);
+
+  useEffect(() => {
+    if (tab !== "sms") {
+      return;
+    }
+    if (platformAdmin && !selectedCompanyId) {
+      setSmsProviders([]);
+      return;
+    }
+    const loadProviders = async () => {
+      try {
+        const providers = platformAdmin
+          ? await getPlatformAdminSmsProviders(Number(selectedCompanyId))
+          : await getSmsProviders();
+        setSmsProviders(providers);
+      } catch (error) {
+        setApiError(error, "Unable to load SMS providers");
+      }
+    };
+    void loadProviders();
+  }, [platformAdmin, selectedCompanyId, setApiError, tab]);
+
+  useEffect(() => {
+    if (tab !== "whatsapp") {
+      return;
+    }
+    if (platformAdmin && !selectedCompanyId) {
+      setWhatsAppProviders([]);
+      return;
+    }
+    const loadProviders = async () => {
+      try {
+        const providers = platformAdmin
+          ? await getPlatformAdminWhatsAppProviders(Number(selectedCompanyId))
+          : await getWhatsAppProviders();
+        setWhatsAppProviders(providers);
+      } catch (error) {
+        setApiError(error, "Unable to load WhatsApp providers");
+      }
+    };
+    void loadProviders();
+  }, [platformAdmin, selectedCompanyId, setApiError, tab]);
 
   useEffect(() => {
     if (!platformAdmin) {
@@ -167,34 +220,32 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
       return;
     }
     setEditing(null);
-    setForm({ ...tabMeta[tab].defaults });
+    setForm(
+      tab === "sms"
+        ? applySmsProviderDefaults({ ...tabMeta[tab].defaults }, smsProviders[0] ?? null)
+        : tab === "whatsapp"
+          ? applyWhatsAppProviderDefaults({ ...tabMeta[tab].defaults }, whatsAppProviders[0] ?? null)
+          : { ...tabMeta[tab].defaults }
+    );
     setOpen(true);
   };
 
   const startEdit = (record: ProviderSettings) => {
     setEditing(record);
-    setForm({
-      providerName: record.providerName,
-      senderEmail: record.senderEmail ?? "",
-      smtpHost: record.smtpHost ?? "smtp.gmail.com",
-      smtpPort: record.smtpPort ?? 587,
-      smtpUsername: record.smtpUsername ?? record.senderEmail ?? "",
-      smtpPassword: "",
-      smtpTlsEnabled: record.smtpTlsEnabled ?? true,
-      awsAccessKey: record.awsAccessKey ?? "",
-      awsSecretKey: "",
-      awsRegion: record.awsRegion ?? "",
-      sendgridApiKey: "",
-      apiUrl: record.apiUrl ?? "",
-      providerType: record.providerType ?? "MSG91",
-      authKey: "",
-      senderId: record.senderId ?? "",
-      templateId: record.templateId ?? "",
-      whatsappNumber: record.whatsappNumber ?? "",
-      senderName: record.senderName ?? "",
-      active: record.active
-    });
+    setForm(buildProviderForm(record, smsProviders, whatsAppProviders));
     setOpen(true);
+  };
+
+  const resetForm = () => {
+    setForm(
+      editing
+        ? buildProviderForm(editing, smsProviders, whatsAppProviders)
+        : tab === "sms"
+          ? applySmsProviderDefaults({ ...tabMeta[tab].defaults }, smsProviders[0] ?? null)
+          : tab === "whatsapp"
+            ? applyWhatsAppProviderDefaults({ ...tabMeta[tab].defaults }, whatsAppProviders[0] ?? null)
+            : { ...tabMeta[tab].defaults }
+    );
   };
 
   const save = async () => {
@@ -203,9 +254,9 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
       if (tab === "email") {
         await saveEmailProvider(platformAdmin, selectedCompanyId, editing, form);
       } else if (tab === "sms") {
-        await saveSmsProvider(platformAdmin, selectedCompanyId, editing, form);
+        await saveSmsProvider(platformAdmin, selectedCompanyId, editing, normalizeSmsForm(form));
       } else {
-        await saveWhatsAppProvider(platformAdmin, selectedCompanyId, editing, form);
+        await saveWhatsAppProvider(platformAdmin, selectedCompanyId, editing, normalizeWhatsAppForm(form));
       }
       notificationService.showSuccess(`${tabMeta[tab].label} saved successfully.`);
       setOpen(false);
@@ -229,16 +280,16 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
         notificationService.showSuccess("Test email sent successfully.");
       } else if (tab === "sms") {
         if (platformAdmin) {
-          await testPlatformAdminSmsSettings(Number(selectedCompanyId), testMobileNumber);
+          await testPlatformAdminSmsSettings(Number(selectedCompanyId), { mobileNumber: testMobileNumber });
         } else {
-          await sendTestSms(testMobileNumber);
+          await sendTestSms({ mobileNumber: testMobileNumber });
         }
         notificationService.showSuccess("Test SMS sent successfully.");
       } else {
         if (platformAdmin) {
-          await testPlatformAdminWhatsAppSettings(Number(selectedCompanyId), testMobileNumber, testMessage);
+          await testPlatformAdminWhatsAppSettings(Number(selectedCompanyId), { mobileNumber: testMobileNumber, message: testMessage });
         } else {
-          await sendTestWhatsApp(testMobileNumber, testMessage);
+          await sendTestWhatsApp({ mobileNumber: testMobileNumber, message: testMessage });
         }
         notificationService.showSuccess("WhatsApp message sent successfully.");
       }
@@ -250,6 +301,15 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
   };
 
   const emailProvider = normalizeEmailProvider(form.providerName);
+  const selectedSmsProvider = useMemo(
+    () => smsProviders.find((provider) => provider.providerType === form.providerType) ?? null,
+    [form.providerType, smsProviders]
+  );
+  const selectedWhatsAppProvider = useMemo(
+    () => whatsAppProviders.find((provider) => provider.providerType === form.providerType) ?? null,
+    [form.providerType, whatsAppProviders]
+  );
+
   const canSaveProvider = tab === "email"
     ? emailProvider === "AWS_SES"
       ? Boolean(form.senderEmail?.trim() && form.awsAccessKey?.trim() && (editing || form.awsSecretKey?.trim()) && form.awsRegion?.trim())
@@ -257,8 +317,8 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
         ? Boolean(form.senderEmail?.trim() && (editing || form.sendgridApiKey?.trim()))
         : Boolean(form.senderEmail?.trim() && form.smtpHost?.trim() && form.smtpPort && form.smtpUsername?.trim() && (editing || form.smtpPassword?.trim()))
     : tab === "sms"
-      ? Boolean(form.providerName?.trim() && form.providerType?.trim() && form.apiUrl?.trim() && (editing || form.authKey?.trim()) && form.senderId?.trim() && form.templateId?.trim())
-      : Boolean(form.providerName?.trim() && form.providerType?.trim() && form.apiUrl?.trim() && (editing || form.authKey?.trim()) && form.whatsappNumber?.trim());
+      ? canSaveSmsProvider(form, smsProviders, Boolean(editing))
+      : canSaveWhatsAppProvider(form, whatsAppProviders, Boolean(editing));
 
   const selectedCompanyName = companies.find((company) => String(company.id) === selectedCompanyId)?.name ?? "";
 
@@ -352,7 +412,11 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                 <Input label="Test Mobile Number" value={testMobileNumber} onChange={(event) => setTestMobileNumber(event.target.value)} placeholder="Defaults to company phone" />
                 <label className="block space-y-2">
                   <span className="block text-sm font-semibold text-slate-700">Test Message</span>
-                  <textarea className="min-h-[112px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]" value={testMessage} onChange={(event) => setTestMessage(event.target.value)} />
+                  <textarea
+                    className="min-h-[112px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]"
+                    value={testMessage}
+                    onChange={(event) => setTestMessage(event.target.value)}
+                  />
                 </label>
               </div>
             )}
@@ -377,7 +441,7 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                               ? record.senderEmail ?? "--"
                               : tab === "sms"
                                 ? record.providerType ?? record.senderId ?? "--"
-                                : record.whatsappNumber ?? record.providerType ?? "--"}
+                                : record.providerType ?? record.whatsappNumber ?? "--"}
                           </p>
                         </div>
                       </div>
@@ -391,7 +455,7 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                   {
                     key: "credentials",
                     header: tab === "whatsapp" ? "Sender" : "Credential",
-                    render: (record) => <span className="text-slate-700">{tab === "email" ? emailCredential(record) : tab === "sms" ? record.authKey ?? "--" : record.senderName || record.authKey || "--"}</span>
+                    render: (record) => <span className="text-slate-700">{tab === "email" ? emailCredential(record) : tab === "sms" ? resolveSmsCredential(record) : resolveWhatsAppCredential(record)}</span>
                   },
                   { key: "status", header: "Status", render: (record) => <StatusBadge label={record.active ? "ACTIVE" : "INACTIVE"} /> },
                   {
@@ -431,14 +495,24 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
               ]}
               onChange={(event) => setForm((current) => providerDefaults(event.target.value, current))}
             />
+          ) : tab === "sms" ? (
+            <>
+              <Input label="Provider Name" value={form.providerName ?? ""} onChange={(event) => setForm((current) => ({ ...current, providerName: event.target.value }))} />
+              <Select
+                label="Provider"
+                value={form.providerType ?? ""}
+                options={smsProviders.map((provider) => ({ label: provider.providerName, value: provider.providerType }))}
+                onChange={(event) => setForm((current) => applySmsProviderDefaults(current, smsProviders.find((provider) => provider.providerType === event.target.value) ?? null))}
+              />
+            </>
           ) : (
             <>
               <Input label="Provider Name" value={form.providerName ?? ""} onChange={(event) => setForm((current) => ({ ...current, providerName: event.target.value }))} />
               <Select
                 label="Provider Type"
-                value={form.providerType ?? "MSG91"}
-                options={[{ label: "MSG91", value: "MSG91" }]}
-                onChange={(event) => setForm((current) => ({ ...current, providerType: event.target.value }))}
+                value={form.providerType ?? ""}
+                options={whatsAppProviders.map((provider) => ({ label: provider.providerName, value: provider.providerType }))}
+                onChange={(event) => setForm((current) => applyWhatsAppProviderDefaults(current, whatsAppProviders.find((provider) => provider.providerType === event.target.value) ?? null))}
               />
             </>
           )}
@@ -469,17 +543,55 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
             </>
           ) : tab === "sms" ? (
             <>
-              <Input label="API URL" value={form.apiUrl ?? ""} onChange={(event) => setForm((current) => ({ ...current, apiUrl: event.target.value }))} />
-              <Input label="Auth Key" type="password" placeholder={editing ? "Leave blank to keep existing auth key" : ""} value={form.authKey ?? ""} onChange={(event) => setForm((current) => ({ ...current, authKey: event.target.value }))} />
-              <Input label="Sender ID" value={form.senderId ?? ""} onChange={(event) => setForm((current) => ({ ...current, senderId: event.target.value }))} />
-              <Input label="Template ID" value={form.templateId ?? ""} onChange={(event) => setForm((current) => ({ ...current, templateId: event.target.value }))} />
+              {selectedSmsProvider?.fields.map((field) => (
+                field.type === "boolean" ? (
+                  <label key={field.key} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={String(form.configValues?.[field.key] ?? field.defaultValue ?? "false") === "true"}
+                      onChange={(event) => setForm((current) => ({ ...current, configValues: { ...(current.configValues ?? {}), [field.key]: event.target.checked ? "true" : "false" } }))}
+                    />
+                    {field.label}
+                  </label>
+                ) : (
+                  <Input
+                    key={field.key}
+                    label={field.label}
+                    type={field.sensitive ? "password" : field.type === "url" ? "url" : "text"}
+                    placeholder={field.sensitive && editing ? "Leave blank to keep existing value" : field.placeholder ?? ""}
+                    value={form.configValues?.[field.key] ?? field.defaultValue ?? ""}
+                    onChange={(event) => setForm((current) => ({ ...current, configValues: { ...(current.configValues ?? {}), [field.key]: event.target.value } }))}
+                    hint={field.helpText ?? undefined}
+                    requiredMark={field.required}
+                  />
+                )
+              ))}
             </>
           ) : (
             <>
-              <Input label="WhatsApp Number" value={form.whatsappNumber ?? ""} onChange={(event) => setForm((current) => ({ ...current, whatsappNumber: event.target.value }))} />
-              <Input label="Auth Key" type="password" placeholder={editing ? "Leave blank to keep existing auth key" : ""} value={form.authKey ?? ""} onChange={(event) => setForm((current) => ({ ...current, authKey: event.target.value }))} />
-              <Input label="API URL" value={form.apiUrl ?? ""} onChange={(event) => setForm((current) => ({ ...current, apiUrl: event.target.value }))} />
-              <Input label="Sender Name" value={form.senderName ?? ""} onChange={(event) => setForm((current) => ({ ...current, senderName: event.target.value }))} />
+              {selectedWhatsAppProvider?.fields.map((field) => (
+                field.type === "boolean" ? (
+                  <label key={field.key} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={String(form.configValues?.[field.key] ?? field.defaultValue ?? "false") === "true"}
+                      onChange={(event) => setForm((current) => ({ ...current, configValues: { ...(current.configValues ?? {}), [field.key]: event.target.checked ? "true" : "false" } }))}
+                    />
+                    {field.label}
+                  </label>
+                ) : (
+                  <Input
+                    key={field.key}
+                    label={field.label}
+                    type={field.sensitive ? "password" : field.type === "url" ? "url" : "text"}
+                    placeholder={field.sensitive && editing ? "Leave blank to keep existing value" : field.placeholder ?? ""}
+                    value={form.configValues?.[field.key] ?? field.defaultValue ?? ""}
+                    onChange={(event) => setForm((current) => ({ ...current, configValues: { ...(current.configValues ?? {}), [field.key]: event.target.value } }))}
+                    hint={field.helpText ?? undefined}
+                    requiredMark={field.required}
+                  />
+                )
+              ))}
             </>
           )}
 
@@ -487,8 +599,30 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
             <input type="checkbox" checked={Boolean(form.active)} onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))} />
             Active provider
           </label>
+
           <div className="flex justify-end gap-3 md:col-span-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={resetForm}>Reset</Button>
+            {tab === "sms" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={testingDraft || !testMobileNumber.trim() || !selectedSmsProvider}
+                onClick={() => void testSmsDraft(platformAdmin, selectedCompanyId, normalizeSmsForm(form), testMobileNumber, setTestingDraft, (error, fallbackMessage) => setApiError(error, fallbackMessage ?? "Unable to verify SMS provider connection"))}
+              >
+                {testingDraft ? "Testing..." : "Test Connection"}
+              </Button>
+            ) : null}
+            {tab === "whatsapp" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={testingDraft || !testMobileNumber.trim() || !selectedWhatsAppProvider}
+                onClick={() => void testWhatsAppDraft(platformAdmin, selectedCompanyId, normalizeWhatsAppForm(form), testMobileNumber, testMessage, setTestingDraft, (error, fallbackMessage) => setApiError(error, fallbackMessage ?? "Unable to verify WhatsApp provider connection"))}
+              >
+                {testingDraft ? "Testing..." : "Test Connection"}
+              </Button>
+            ) : null}
             <Button type="button" disabled={saving || !canSaveProvider} onClick={() => void save()}>{saving ? "Saving..." : "Save Provider"}</Button>
           </div>
         </div>
@@ -628,4 +762,266 @@ const saveWhatsAppProvider = async (platformAdmin: boolean, selectedCompanyId: s
     return;
   }
   await createWhatsAppSettings(form);
+};
+
+const buildProviderForm = (record: ProviderSettings, smsProviders: SmsProviderMetadata[], whatsAppProviders: WhatsAppProviderMetadata[]): ProviderSettingsRequest => {
+  if (record.providerType && smsProviders.some((provider) => provider.providerType === record.providerType)) {
+    return applySmsProviderDefaults({
+      providerName: record.providerName,
+      providerType: record.providerType,
+      apiUrl: record.apiUrl ?? "",
+      configValues: mapRecordConfigValues(record.configValues),
+      active: record.active
+    }, smsProviders.find((provider) => provider.providerType === record.providerType) ?? null);
+  }
+  if (record.providerType && whatsAppProviders.some((provider) => provider.providerType === record.providerType)) {
+    return applyWhatsAppProviderDefaults({
+      providerName: record.providerName,
+      providerType: record.providerType,
+      apiUrl: record.apiUrl ?? "",
+      configValues: mapRecordConfigValues(record.configValues),
+      active: record.active
+    }, whatsAppProviders.find((provider) => provider.providerType === record.providerType) ?? null);
+  }
+
+  return {
+    providerName: record.providerName,
+    senderEmail: record.senderEmail ?? "",
+    smtpHost: record.smtpHost ?? "smtp.gmail.com",
+    smtpPort: record.smtpPort ?? 587,
+    smtpUsername: record.smtpUsername ?? record.senderEmail ?? "",
+    smtpPassword: "",
+    smtpTlsEnabled: record.smtpTlsEnabled ?? true,
+    awsAccessKey: record.awsAccessKey ?? "",
+    awsSecretKey: "",
+    awsRegion: record.awsRegion ?? "",
+    sendgridApiKey: "",
+    apiUrl: record.apiUrl ?? "",
+    providerType: record.providerType ?? "MSG91",
+    authKey: "",
+    senderId: record.senderId ?? "",
+    templateId: record.templateId ?? "",
+    whatsappNumber: record.whatsappNumber ?? "",
+    senderName: record.senderName ?? "",
+    configValues: mapRecordConfigValues(record.configValues),
+    active: record.active
+  };
+};
+
+const providerDefaultConfig = <T extends { fields: Array<{ key: string; defaultValue?: string | null }> }>(provider: T | null) => {
+  if (!provider) {
+    return {};
+  }
+  return provider.fields.reduce<Record<string, string>>((accumulator, field) => {
+    accumulator[field.key] = field.defaultValue ?? "";
+    return accumulator;
+  }, {});
+};
+
+const applySmsProviderDefaults = (current: ProviderSettingsRequest, provider: SmsProviderMetadata | null): ProviderSettingsRequest => {
+  if (!provider) {
+    return {
+      ...current,
+      providerName: current.providerName || "",
+      providerType: current.providerType || "",
+      configValues: current.configValues ?? {}
+    };
+  }
+
+  const defaults = providerDefaultConfig(provider);
+  const currentValues = current.providerType === provider.providerType ? current.configValues ?? {} : {};
+  const configValues = { ...defaults, ...currentValues };
+
+  return {
+    ...current,
+    providerName: current.providerType === provider.providerType && current.providerName?.trim() ? current.providerName : provider.providerName,
+    providerType: provider.providerType,
+    apiUrl: configValues.apiUrl ?? current.apiUrl ?? "",
+    configValues
+  };
+};
+
+const mapRecordConfigValues = (values?: Record<string, string | null> | null): Record<string, string> => {
+  if (!values) {
+    return {};
+  }
+  return Object.entries(values).reduce<Record<string, string>>((accumulator, [key, value]) => {
+    accumulator[key] = value ?? "";
+    return accumulator;
+  }, {});
+};
+
+const applyWhatsAppProviderDefaults = (current: ProviderSettingsRequest, provider: WhatsAppProviderMetadata | null): ProviderSettingsRequest => {
+  if (!provider) {
+    return {
+      ...current,
+      providerName: current.providerName || "",
+      providerType: current.providerType || "",
+      configValues: current.configValues ?? {}
+    };
+  }
+
+  const defaults = providerDefaultConfig(provider);
+  const currentValues = current.providerType === provider.providerType ? current.configValues ?? {} : {};
+  const configValues = { ...defaults, ...currentValues };
+
+  return {
+    ...current,
+    providerName: current.providerType === provider.providerType && current.providerName?.trim() ? current.providerName : provider.providerName,
+    providerType: provider.providerType,
+    apiUrl: configValues.apiUrl ?? current.apiUrl ?? "",
+    configValues
+  };
+};
+
+const normalizeSmsForm = (form: ProviderSettingsRequest): ProviderSettingsRequest => {
+  const configValues = mapRecordConfigValues(form.configValues);
+  if (form.apiUrl && !configValues.apiUrl) {
+    configValues.apiUrl = form.apiUrl;
+  }
+  return {
+    ...form,
+    providerName: form.providerName?.trim() || form.providerType || "SMS",
+    apiUrl: configValues.apiUrl ?? form.apiUrl ?? "",
+    configValues
+  };
+};
+
+const canSaveSmsProvider = (form: ProviderSettingsRequest, providers: SmsProviderMetadata[], editing: boolean) => {
+  const provider = providers.find((item) => item.providerType === form.providerType);
+  if (!provider || !form.providerName?.trim()) {
+    return false;
+  }
+  return provider.fields.every((field) => {
+    if (!field.required) {
+      return true;
+    }
+    const rawValue = form.configValues?.[field.key] ?? field.defaultValue ?? "";
+    if (field.sensitive && editing && rawValue === "") {
+      return true;
+    }
+    return String(rawValue).trim().length > 0;
+  });
+};
+
+const resolveSmsCredential = (record: ProviderSettings) => {
+  const configValues = record.configValues ?? {};
+  return configValues.senderId
+    ?? configValues.username
+    ?? record.senderId
+    ?? record.authKey
+    ?? "--";
+};
+
+const buildSmsTestPayload = (form: ProviderSettingsRequest, mobileNumber: string) => {
+  const normalized = normalizeSmsForm(form);
+  return {
+    mobileNumber,
+    providerName: normalized.providerName,
+    providerType: normalized.providerType,
+    apiUrl: normalized.apiUrl,
+    configValues: normalized.configValues ?? {}
+  };
+};
+
+const testSmsDraft = async (
+  platformAdmin: boolean,
+  selectedCompanyId: string,
+  form: ProviderSettingsRequest,
+  testMobileNumber: string,
+  setTestingDraft: (value: boolean) => void,
+  setApiError: (error: unknown, fallbackMessage?: string) => void
+) => {
+  try {
+    setTestingDraft(true);
+    const payload = buildSmsTestPayload(form, testMobileNumber);
+    if (platformAdmin) {
+      await testPlatformAdminSmsSettings(Number(selectedCompanyId), payload);
+    } else {
+      await sendTestSms(payload);
+    }
+    notificationService.showSuccess("SMS provider connection verified successfully.");
+  } catch (error) {
+    setApiError(error, "Unable to verify SMS provider connection");
+  } finally {
+    setTestingDraft(false);
+  }
+};
+
+const normalizeWhatsAppForm = (form: ProviderSettingsRequest): ProviderSettingsRequest => {
+  const configValues = mapRecordConfigValues(form.configValues);
+  if (form.apiUrl && !configValues.apiUrl) {
+    configValues.apiUrl = form.apiUrl;
+  }
+  return {
+    ...form,
+    providerName: form.providerName?.trim() || form.providerType || "WhatsApp",
+    apiUrl: configValues.apiUrl ?? form.apiUrl ?? "",
+    configValues
+  };
+};
+
+const canSaveWhatsAppProvider = (form: ProviderSettingsRequest, providers: WhatsAppProviderMetadata[], editing: boolean) => {
+  const provider = providers.find((item) => item.providerType === form.providerType);
+  if (!provider || !form.providerName?.trim()) {
+    return false;
+  }
+  return provider.fields.every((field) => {
+    if (!field.required) {
+      return true;
+    }
+    const rawValue = form.configValues?.[field.key] ?? field.defaultValue ?? "";
+    if (field.sensitive && editing && rawValue === "") {
+      return true;
+    }
+    return String(rawValue).trim().length > 0;
+  });
+};
+
+const resolveWhatsAppCredential = (record: ProviderSettings) => {
+  const configValues = record.configValues ?? {};
+  return configValues.senderId
+    ?? configValues.businessNumber
+    ?? configValues.whatsappNumber
+    ?? record.senderName
+    ?? record.whatsappNumber
+    ?? record.authKey
+    ?? "--";
+};
+
+const buildWhatsAppTestPayload = (form: ProviderSettingsRequest, mobileNumber: string, message: string) => {
+  const normalized = normalizeWhatsAppForm(form);
+  return {
+    mobileNumber,
+    message,
+    providerName: normalized.providerName,
+    providerType: normalized.providerType,
+    apiUrl: normalized.apiUrl,
+    configValues: normalized.configValues ?? {}
+  };
+};
+
+const testWhatsAppDraft = async (
+  platformAdmin: boolean,
+  selectedCompanyId: string,
+  form: ProviderSettingsRequest,
+  testMobileNumber: string,
+  testMessage: string,
+  setTestingDraft: (value: boolean) => void,
+  setApiError: (error: unknown, fallbackMessage?: string) => void
+) => {
+  try {
+    setTestingDraft(true);
+    const payload = buildWhatsAppTestPayload(form, testMobileNumber, testMessage);
+    if (platformAdmin) {
+      await testPlatformAdminWhatsAppSettings(Number(selectedCompanyId), payload);
+    } else {
+      await sendTestWhatsApp(payload);
+    }
+    notificationService.showSuccess("WhatsApp provider connection verified successfully.");
+  } catch (error) {
+    setApiError(error, "Unable to verify WhatsApp provider connection");
+  } finally {
+    setTestingDraft(false);
+  }
 };

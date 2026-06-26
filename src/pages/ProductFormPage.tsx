@@ -53,6 +53,7 @@ export const ProductFormPage = () => {
   const editing = Boolean(productId);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [subCategories, setSubCategories] = useState<ProductSubCategory[]>([]);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<ProductSubCategory | null>(null);
   const {
     register,
     handleSubmit,
@@ -79,6 +80,20 @@ export const ProductFormPage = () => {
     }
     void getProduct(Number(productId))
       .then((product) => {
+        setSelectedSubCategory(product.subCategoryId
+          ? {
+              id: product.subCategoryId,
+              categoryId: product.categoryId ?? 0,
+              categoryName: product.categoryName ?? product.category ?? "",
+              subCategoryName: product.subCategoryName ?? product.subCategory ?? "",
+              description: null,
+              active: true,
+              createdAt: "",
+              updatedAt: "",
+              createdBy: null,
+              updatedBy: null
+            }
+          : null);
         reset({
           name: product.name,
           categoryId: product.categoryId ? String(product.categoryId) : "",
@@ -100,6 +115,7 @@ export const ProductFormPage = () => {
   const watchedPurchasePrice = watch("purchasePrice");
   const watchedValues = watch();
   const watchedCategoryId = watch("categoryId");
+  const watchedSubCategoryId = watch("subCategoryId");
 
   const categoryOptions = useMemo(
     () => categories.map((category) => ({ label: category.categoryName, value: String(category.id) })),
@@ -117,9 +133,16 @@ export const ProductFormPage = () => {
       return;
     }
     void getProductSubCategories({ active: true, categoryId: Number(watchedCategoryId), size: 1000 })
-      .then((subCategoryData) => setSubCategories(subCategoryData.filter((subCategory) => subCategory.active)))
+      .then((subCategoryData) => {
+        const activeSubCategories = subCategoryData.filter((subCategory) => subCategory.active);
+        const shouldPreserveSelected =
+          selectedSubCategory
+          && String(selectedSubCategory.categoryId) === String(watchedCategoryId)
+          && !activeSubCategories.some((subCategory) => subCategory.id === selectedSubCategory.id);
+        setSubCategories(shouldPreserveSelected ? [...activeSubCategories, selectedSubCategory] : activeSubCategories);
+      })
       .catch((err: any) => setApiError(err, "Unable to load product sub categories"));
-  }, [setApiError, setValue, watchedCategoryId]);
+  }, [selectedSubCategory, setApiError, setValue, watchedCategoryId]);
 
   const purchasePriceValue = Number(watchedValues.purchasePrice);
   const sellingPriceValue = Number(watchedValues.sellingPrice);
@@ -221,9 +244,11 @@ export const ProductFormPage = () => {
                 hint="Only active product categories are available."
                 disabled={!categoryOptions.length}
                 options={categoryOptions}
+                value={watchedCategoryId}
                 {...categoryRegister}
                 onChange={(event) => {
                   categoryRegister.onChange(event);
+                  setSelectedSubCategory(null);
                   setValue("subCategoryId", "");
                 }}
               />
@@ -235,7 +260,11 @@ export const ProductFormPage = () => {
                 hint="Sub categories load from the selected category."
                 disabled={!watchedCategoryId || !subCategoryOptions.length}
                 options={subCategoryOptions}
+                value={watchedSubCategoryId}
                 {...subCategoryRegister}
+                onChange={(event) => {
+                  subCategoryRegister.onChange(event);
+                }}
               />
               <Input
                 label="SKU"

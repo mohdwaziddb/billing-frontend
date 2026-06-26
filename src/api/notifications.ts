@@ -1,5 +1,5 @@
 import { apiClient } from "./apiClient";
-import type { ApiResponse, NotificationLog, NotificationSendRequest, ProviderSettings, ProviderSettingsRequest } from "../types/api";
+import type { ApiResponse, NotificationLog, NotificationSendRequest, ProviderSettings, ProviderSettingsRequest, SmsProviderMetadata, WhatsAppProviderMetadata } from "../types/api";
 
 export const getEmailSettings = async () => {
   const response = await apiClient.get<ApiResponse<ProviderSettings[]>>("/v1/notifications/email-settings");
@@ -26,6 +26,11 @@ export const getSmsSettings = async () => {
   return response.data.data;
 };
 
+export const getSmsProviders = async () => {
+  const response = await apiClient.get<ApiResponse<SmsProviderMetadata[]>>("/v1/notifications/sms-settings/providers");
+  return response.data.data;
+};
+
 export const createSmsSettings = async (payload: ProviderSettingsRequest) => {
   const response = await apiClient.post<ApiResponse<ProviderSettings>>("/v1/notifications/sms-settings", payload);
   return response.data.data;
@@ -36,13 +41,18 @@ export const updateSmsSettings = async (id: number, payload: ProviderSettingsReq
   return response.data.data;
 };
 
-export const sendTestSms = async (mobileNumber: string) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>("/v1/notifications/sms-settings/test", { mobileNumber });
+export const sendTestSms = async (payload: { mobileNumber: string; providerName?: string; providerType?: string; apiUrl?: string; configValues?: Record<string, string> }) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>("/v1/notifications/sms-settings/test", payload);
   return response.data.data;
 };
 
 export const getWhatsAppSettings = async () => {
   const response = await apiClient.get<ApiResponse<ProviderSettings[]>>("/v1/notifications/whatsapp-settings");
+  return response.data.data;
+};
+
+export const getWhatsAppProviders = async () => {
+  const response = await apiClient.get<ApiResponse<WhatsAppProviderMetadata[]>>("/v1/notifications/whatsapp-settings/providers");
   return response.data.data;
 };
 
@@ -56,8 +66,8 @@ export const updateWhatsAppSettings = async (id: number, payload: ProviderSettin
   return response.data.data;
 };
 
-export const sendTestWhatsApp = async (mobileNumber: string, message: string) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>("/v1/notifications/whatsapp-settings/test", { mobileNumber, message });
+export const sendTestWhatsApp = async (payload: { mobileNumber: string; message: string; providerName?: string; providerType?: string; apiUrl?: string; configValues?: Record<string, string> }) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>("/v1/notifications/whatsapp-settings/test", payload);
   return response.data.data;
 };
 

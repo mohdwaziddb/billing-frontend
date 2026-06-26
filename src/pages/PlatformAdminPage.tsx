@@ -303,6 +303,15 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
           <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-right shadow-inner">
             <p className="text-xs font-bold uppercase tracking-wide text-cyan-100">Platform Mode</p>
             <p className="mt-1 text-lg font-extrabold">PLATFORM ADMIN</p>
+            <div className="mt-3 border-t border-white/10 pt-3 text-left">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-100">Ollama</p>
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${dashboard?.ollama?.active ? "bg-emerald-400/18 text-emerald-100" : "bg-rose-400/18 text-rose-100"}`}>
+                  {dashboard?.ollama?.active ? "ACTIVE" : "INACTIVE"}
+                </span>
+              </div>
+              {dashboard?.ollama?.model ? <p className="mt-1 text-[11px] font-medium text-white/72">{dashboard.ollama.model}</p> : null}
+            </div>
           </div>
         </div>
       </div>

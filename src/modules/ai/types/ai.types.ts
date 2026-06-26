@@ -14,7 +14,23 @@ export type AiChatResponse = {
   action: string;
   requiresConfirmation: boolean;
   draft?: AiDraftAction | null;
+  chart?: AiChart | null;
   data?: unknown;
+};
+
+export type AiChartSeries = {
+  key: string;
+  label: string;
+  color?: string | null;
+};
+
+export type AiChart = {
+  type: "LINE" | "BAR" | "PIE" | string;
+  title: string;
+  labelKey: string;
+  valueKey: string;
+  series?: AiChartSeries[] | null;
+  data: Array<Record<string, string | number | null>>;
 };
 
 export type AiChatMessage = {
@@ -23,5 +39,6 @@ export type AiChatMessage = {
   content: string;
   createdAt: string;
   draft?: AiDraftAction | null;
+  chart?: AiChart | null;
   pending?: boolean;
 };

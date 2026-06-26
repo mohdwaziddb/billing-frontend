@@ -21,6 +21,8 @@ export const CommonColumnSelector = ({
   onApply: (columns: string[]) => void;
 }) => {
   const defaultColumns = useMemo(() => availableColumns.map((column) => column.key), [availableColumns]);
+  const lockedColumns = useMemo(() => availableColumns.filter((column) => column.locked).map((column) => column.key), [availableColumns]);
+  const selectableColumns = useMemo(() => availableColumns.filter((column) => !column.locked).map((column) => column.key), [availableColumns]);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>(visibleColumns.length ? visibleColumns : defaultColumns);
   const selectorRef = useRef<HTMLDivElement | null>(null);
@@ -141,8 +143,10 @@ export const CommonColumnSelector = ({
   };
 
   const selectAll = () => updateColumns(defaultColumns);
+  const unselectAll = () => updateColumns(lockedColumns);
 
   const resetDefault = () => updateColumns(defaultColumns);
+  const allSelectableSelected = selectableColumns.length > 0 && selectableColumns.every((key) => draft.includes(key));
 
   return (
     <div ref={selectorRef} className="relative">
@@ -164,9 +168,9 @@ export const CommonColumnSelector = ({
             <button
               type="button"
               className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-              onClick={selectAll}
+              onClick={allSelectableSelected ? unselectAll : selectAll}
             >
-              Select All
+              {allSelectableSelected ? "Unselect All" : "Select All"}
             </button>
             <button
               type="button"

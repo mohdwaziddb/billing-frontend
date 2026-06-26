@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../../../components/Button";
 import { notificationService } from "../../../services/notificationService";
 import { useAiAssistant } from "../hooks/useAiAssistant";
+import { AiChartCard } from "./AiChartCard";
 import { AiDraftCard } from "./AiDraftCard";
 import { MarkdownMessage } from "./MarkdownMessage";
 
@@ -88,6 +89,7 @@ export const AiChatDrawer = ({ embedded = false }: { embedded?: boolean }) => {
                   onCancel={() => void cancelDraft(message.id, message.draft!)}
                 />
               ) : null}
+              {message.chart ? <AiChartCard chart={message.chart} /> : null}
             </div>
           </div>
         ))}

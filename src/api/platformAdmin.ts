@@ -8,7 +8,9 @@ import type {
   PlatformAdminDashboardSummary,
   PlatformAdminSettings,
   ProviderSettings,
-  ProviderSettingsRequest
+  ProviderSettingsRequest,
+  SmsProviderMetadata,
+  WhatsAppProviderMetadata
 } from "../types/api";
 
 export type PlatformAdminCompanyFilters = {
@@ -118,6 +120,11 @@ export const getPlatformAdminSmsSettings = async (companyId: number) => {
   return response.data.data;
 };
 
+export const getPlatformAdminSmsProviders = async (companyId: number) => {
+  const response = await apiClient.get<ApiResponse<SmsProviderMetadata[]>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/providers`);
+  return response.data.data;
+};
+
 export const createPlatformAdminSmsSettings = async (companyId: number, payload: ProviderSettingsRequest) => {
   const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings`, payload);
   return response.data.data;
@@ -128,13 +135,18 @@ export const updatePlatformAdminSmsSettings = async (companyId: number, id: numb
   return response.data.data;
 };
 
-export const testPlatformAdminSmsSettings = async (companyId: number, mobileNumber: string) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/test`, { mobileNumber });
+export const testPlatformAdminSmsSettings = async (companyId: number, payload: { mobileNumber: string; providerName?: string; providerType?: string; apiUrl?: string; configValues?: Record<string, string> }) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/test`, payload);
   return response.data.data;
 };
 
 export const getPlatformAdminWhatsAppSettings = async (companyId: number) => {
   const response = await apiClient.get<ApiResponse<ProviderSettings[]>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings`);
+  return response.data.data;
+};
+
+export const getPlatformAdminWhatsAppProviders = async (companyId: number) => {
+  const response = await apiClient.get<ApiResponse<WhatsAppProviderMetadata[]>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/providers`);
   return response.data.data;
 };
 
@@ -148,7 +160,7 @@ export const updatePlatformAdminWhatsAppSettings = async (companyId: number, id:
   return response.data.data;
 };
 
-export const testPlatformAdminWhatsAppSettings = async (companyId: number, mobileNumber: string, message: string) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/test`, { mobileNumber, message });
+export const testPlatformAdminWhatsAppSettings = async (companyId: number, payload: { mobileNumber: string; message: string; providerName?: string; providerType?: string; apiUrl?: string; configValues?: Record<string, string> }) => {
+  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/test`, payload);
   return response.data.data;
 };

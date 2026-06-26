@@ -30,7 +30,8 @@ export const AiAssistantProvider = ({ children }: { children: ReactNode }) => {
         role: "assistant",
         content: response.message,
         createdAt: new Date().toISOString(),
-        draft: response.draft ?? null
+        draft: response.draft ?? null,
+        chart: response.chart ?? null
       }
     ]);
   };

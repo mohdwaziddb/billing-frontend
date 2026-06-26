@@ -90,6 +90,13 @@ export type PlatformAdminDashboardSummary = {
   totalCompanies: number;
   activeCompanies: number;
   inactiveCompanies: number;
+  ollama: {
+    enabled: boolean;
+    active: boolean;
+    baseUrl: string | null;
+    model: string | null;
+    message: string;
+  };
 };
 
 export type PlatformAdminCompany = {
@@ -813,6 +820,9 @@ export type NotificationLog = {
   recipient: string;
   subject: string | null;
   message: string | null;
+  providerName?: string | null;
+  messageId?: string | null;
+  failureReason?: string | null;
   providerResponse: string | null;
   status: string;
   sentBy: string | null;
@@ -853,6 +863,7 @@ export type ProviderSettings = {
   templateId?: string | null;
   whatsappNumber?: string | null;
   senderName?: string | null;
+  configValues?: Record<string, string | null> | null;
   active: boolean;
 };
 
@@ -875,7 +886,47 @@ export type ProviderSettingsRequest = {
   templateId?: string;
   whatsappNumber?: string;
   senderName?: string;
+  configValues?: Record<string, string>;
   active?: boolean;
+};
+
+export type WhatsAppProviderField = {
+  key: string;
+  label: string;
+  type: string;
+  required: boolean;
+  sensitive: boolean;
+  encrypted: boolean;
+  placeholder?: string | null;
+  helpText?: string | null;
+  defaultValue?: string | null;
+};
+
+export type SmsProviderField = {
+  key: string;
+  label: string;
+  type: string;
+  required: boolean;
+  sensitive: boolean;
+  encrypted: boolean;
+  placeholder?: string | null;
+  helpText?: string | null;
+  defaultValue?: string | null;
+};
+
+export type SmsProviderMetadata = {
+  providerType: string;
+  providerName: string;
+  fields: SmsProviderField[];
+};
+
+export type WhatsAppProviderMetadata = {
+  providerType: string;
+  providerName: string;
+  supportsBalance: boolean;
+  supportsTemplates: boolean;
+  supportsMedia: boolean;
+  fields: WhatsAppProviderField[];
 };
 
 export type NotificationAttachmentPayload = {

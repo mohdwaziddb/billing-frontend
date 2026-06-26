@@ -1,13 +1,45 @@
 import { Bot, Sparkles } from "lucide-react";
+import { useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { useAiAssistant } from "../hooks/useAiAssistant";
 import { AiChatDrawer } from "./AiChatDrawer";
 
 export const AiAssistantWidget = () => {
-  const { user, sessionType } = useAuth();
+  const { user, can, sessionType, refreshPermissions, refreshProfile } = useAuth();
   const { open, setOpen } = useAiAssistant();
+  const chatbotEnabled = Boolean(user?.company?.isChatbotEnabled);
+  const canUseAssistant = can("AI_ASSISTANT", "VIEW");
 
-  if (sessionType !== "user" || !user?.company?.isChatbotEnabled) {
+  useEffect(() => {
+    if (sessionType !== "user") {
+      return;
+    }
+
+    void refreshProfile();
+    void refreshPermissions();
+
+    const refreshAssistantAccess = () => {
+      if (document.visibilityState === "visible") {
+        void refreshProfile();
+        void refreshPermissions();
+      }
+    };
+
+    window.addEventListener("focus", refreshAssistantAccess);
+    document.addEventListener("visibilitychange", refreshAssistantAccess);
+    return () => {
+      window.removeEventListener("focus", refreshAssistantAccess);
+      document.removeEventListener("visibilitychange", refreshAssistantAccess);
+    };
+  }, [sessionType]);
+
+  useEffect(() => {
+    if ((!chatbotEnabled || !canUseAssistant) && open) {
+      setOpen(false);
+    }
+  }, [canUseAssistant, chatbotEnabled, open, setOpen]);
+
+  if (sessionType !== "user" || !chatbotEnabled || !canUseAssistant) {
     return null;
   }
 
