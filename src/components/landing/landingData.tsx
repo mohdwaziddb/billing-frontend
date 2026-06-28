@@ -1,106 +1,278 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Activity,
-  BarChart3,
+  ArrowUpRight,
+  BellRing,
+  Blocks,
   Bot,
   BrainCircuit,
-  Boxes,
-  CreditCard,
-  FileText,
+  Building2,
   LineChart,
-  LockKeyhole,
+  CheckCircle2,
+  CircleDollarSign,
+  CreditCard,
+  DatabaseZap,
+  FileClock,
+  FileSpreadsheet,
+  Fingerprint,
+  GlobeLock,
+  LayoutTemplate,
   Mail,
-  MessageSquare,
+  MessageSquareMore,
   ReceiptIndianRupee,
-  ScrollText,
   ShieldCheck,
   Sparkles,
   Users,
-  Warehouse,
-  Workflow,
-  Building2
+  WalletCards,
+  Waypoints
 } from "lucide-react";
 
 export const trustMetrics = [
-  { label: "Invoices", value: 10, suffix: "K+" },
-  { label: "Businesses", value: 500, suffix: "+" },
-  { label: "Uptime", value: 99.9, display: "99.9%" },
-  { label: "Support", value: 24, display: "24×7" }
+  { label: "Invoices processed", value: 12, suffix: "K+" },
+  { label: "Finance teams onboarded", value: 640, suffix: "+" },
+  { label: "Average collection accuracy", value: 99, suffix: ".8%" },
+  { label: "Operations coverage", value: 24, suffix: "/7" }
 ];
 
-export const featureCards: Array<{ title: string; description: string; icon: LucideIcon; accent: string }> = [
-  { title: "Billing", description: "Create polished invoices, taxes, discounts, and faster checkout-ready billing flows.", icon: FileText, accent: "from-blue-500/15 via-cyan-400/12 to-transparent" },
-  { title: "Inventory", description: "Track stock, product movement, low inventory alerts, and purchase visibility in one place.", icon: Warehouse, accent: "from-cyan-500/14 via-sky-400/12 to-transparent" },
-  { title: "CRM", description: "Maintain customer details, balances, follow-up context, and relationship history with clarity.", icon: Users, accent: "from-violet-500/14 via-fuchsia-400/12 to-transparent" },
-  { title: "Payments", description: "Capture collections, manage outstanding balances, and keep payment mode tracking organized.", icon: CreditCard, accent: "from-emerald-500/14 via-cyan-400/12 to-transparent" },
-  { title: "Reports", description: "Convert operational data into clean summaries for sales, dues, expenses, and performance review.", icon: ScrollText, accent: "from-amber-500/14 via-orange-300/12 to-transparent" },
-  { title: "Analytics", description: "Understand trends, momentum, collection ratios, and growth signals through readable insights.", icon: BarChart3, accent: "from-blue-500/15 via-violet-300/12 to-transparent" },
-  { title: "Email", description: "Manage business communication with configurable delivery and professional message workflows.", icon: Mail, accent: "from-sky-500/15 via-cyan-300/12 to-transparent" },
-  { title: "SMS", description: "Support reliable SMS delivery with provider-based settings and multi-company safe configuration.", icon: MessageSquare, accent: "from-violet-500/14 via-blue-300/12 to-transparent" },
-  { title: "WhatsApp", description: "Bring modern customer communication into billing and reminder operations through connected providers.", icon: Sparkles, accent: "from-cyan-500/14 via-emerald-300/12 to-transparent" },
-  { title: "AI Ready", description: "Prepared for assistant-led workflows, smart reports, and natural language business actions.", icon: Bot, accent: "from-violet-500/15 via-fuchsia-300/12 to-transparent" },
-  { title: "Role Based Access", description: "Give the right visibility and action boundaries to every user without losing control.", icon: ShieldCheck, accent: "from-blue-500/15 via-sky-300/12 to-transparent" },
-  { title: "Audit Logs", description: "Track operational changes and accountability trails across teams and business activity.", icon: Activity, accent: "from-slate-400/14 via-blue-300/12 to-transparent" }
+export const featureHighlights: Array<{
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  accent: string;
+}> = [
+  {
+    title: "Revenue control room",
+    description: "Track billing, receipts, dues, and margin signals from one executive-grade surface.",
+    icon: CircleDollarSign,
+    accent: "from-blue-500/20 via-cyan-400/15 to-transparent"
+  },
+  {
+    title: "Inventory confidence",
+    description: "Surface fast-moving stock, dead inventory, and purchase pressure before it hits cash flow.",
+    icon: Blocks,
+    accent: "from-cyan-500/18 via-sky-400/15 to-transparent"
+  },
+  {
+    title: "Customer memory",
+    description: "Keep balances, follow-ups, reminders, and account context tied to every customer relationship.",
+    icon: Users,
+    accent: "from-indigo-500/18 via-violet-400/14 to-transparent"
+  },
+  {
+    title: "Automated collections",
+    description: "Trigger reminders and coordinate payment follow-through without manual spreadsheet chasing.",
+    icon: BellRing,
+    accent: "from-emerald-500/18 via-teal-400/15 to-transparent"
+  },
+  {
+    title: "Communication stack",
+    description: "Unify email, SMS, and WhatsApp operations with provider-aware business messaging.",
+    icon: MessageSquareMore,
+    accent: "from-orange-500/18 via-amber-400/15 to-transparent"
+  },
+  {
+    title: "Leadership reporting",
+    description: "Turn day-to-day transactions into boardroom-ready summaries and performance narratives.",
+    icon: FileSpreadsheet,
+    accent: "from-fuchsia-500/18 via-indigo-400/15 to-transparent"
+  }
 ];
 
-export const timelineSteps = [
-  { title: "Easy Setup", description: "Start with products, customers, payment modes, and communication settings in a guided structure.", icon: Building2 },
-  { title: "Create Products", description: "Define catalog, stock, pricing, taxes, and categories before your first transaction.", icon: Boxes },
-  { title: "Generate Invoice", description: "Move from quote-like thinking to invoice-ready execution without operational friction.", icon: ReceiptIndianRupee },
-  { title: "Receive Payment", description: "Track collections, pending dues, and payment state with less manual overhead.", icon: Workflow },
-  { title: "Grow Business", description: "Use analytics, reports, roles, and communication to scale decision-making with confidence.", icon: LineChart }
+export const operatingPillars: Array<{
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  metric: string;
+}> = [
+  {
+    title: "Unify fragmented workflows",
+    description: "Bring products, customers, billing, payment tracking, and reporting into one calm operating system.",
+    icon: Waypoints,
+    metric: "6 core workflows"
+  },
+  {
+    title: "Reduce manual follow-up",
+    description: "Replace scattered reminders and manual status updates with orchestrated operational visibility.",
+    icon: FileClock,
+    metric: "4x faster follow-through"
+  },
+  {
+    title: "Improve cash discipline",
+    description: "Keep teams aligned around overdue exposure, collection momentum, and customer payment behavior.",
+    icon: WalletCards,
+    metric: "Live dues tracking"
+  }
 ];
 
-export const workflowSteps = [
-  "Customer",
-  "Invoice",
-  "Payment",
-  "Reports",
-  "Growth"
+export const solutionStream: Array<{
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  {
+    eyebrow: "Step 01",
+    title: "Configure the commercial foundation",
+    description: "Set up products, price logic, taxes, payment modes, and customer structures once.",
+    icon: LayoutTemplate
+  },
+  {
+    eyebrow: "Step 02",
+    title: "Run daily billing at speed",
+    description: "Create invoices fast while preserving precision, tax clarity, and customer-specific context.",
+    icon: ReceiptIndianRupee
+  },
+  {
+    eyebrow: "Step 03",
+    title: "Coordinate collections and communication",
+    description: "Track settlements, partial payments, reminders, and account follow-up without context loss.",
+    icon: CreditCard
+  },
+  {
+    eyebrow: "Step 04",
+    title: "Read the business before problems grow",
+    description: "Spot operational drag, sales momentum, and exception risk from digestible analytics.",
+    icon: LineChart
+  }
 ];
 
-export const securityItems = [
-  { title: "JWT Authentication", description: "Token-based access designed for secure session handling.", icon: LockKeyhole },
-  { title: "Role Based Access", description: "Permission-aware workflows for owners, admins, and teams.", icon: ShieldCheck },
-  { title: "Company Isolation", description: "Strong tenant boundaries across records and provider settings.", icon: Building2 },
-  { title: "Encrypted Credentials", description: "Sensitive communication credentials remain protected at rest.", icon: BrainCircuit },
-  { title: "Audit Logs", description: "Critical operational actions remain visible and traceable.", icon: Activity },
-  { title: "Cloud Security", description: "Centralized deployment model with enterprise-ready operating posture.", icon: Sparkles }
+export const showcaseTabs = ["Command center", "Receivables", "Inventory", "Insights"];
+
+export const workflowSteps: Array<{
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  {
+    title: "Capture demand",
+    description: "Bring customer requests and product requirements into a single starting point.",
+    icon: Users
+  },
+  {
+    title: "Issue with precision",
+    description: "Generate polished invoices with taxes, quantities, and balance context already aligned.",
+    icon: ReceiptIndianRupee
+  },
+  {
+    title: "Collect without chaos",
+    description: "See who paid, what remains open, and which accounts need follow-through next.",
+    icon: CreditCard
+  },
+  {
+    title: "Act on insight",
+    description: "Use clean reporting to guide leadership decisions instead of reactive troubleshooting.",
+    icon: ArrowUpRight
+  }
+];
+
+export const aiCapabilities: Array<{
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  {
+    title: "Natural language revenue questions",
+    description: "Ask plain-English questions about sales, dues, or product performance and get structured answers.",
+    icon: BrainCircuit
+  },
+  {
+    title: "Operational nudges",
+    description: "Prompt teams with next-best actions around overdue accounts, churn risk, or follow-up gaps.",
+    icon: Sparkles
+  },
+  {
+    title: "Automated summaries",
+    description: "Convert complex transaction streams into concise daily and weekly management briefs.",
+    icon: FileSpreadsheet
+  },
+  {
+    title: "Workflow copilots",
+    description: "Guide staff through repeatable business actions with less training overhead and fewer misses.",
+    icon: Bot
+  }
+];
+
+export const securityItems: Array<{
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  {
+    title: "Granular access control",
+    description: "Give each role the visibility and action scope it actually needs.",
+    icon: ShieldCheck
+  },
+  {
+    title: "Tenant-safe configuration",
+    description: "Keep company-specific data, settings, and provider credentials logically isolated.",
+    icon: Building2
+  },
+  {
+    title: "Audit traceability",
+    description: "Maintain a readable trail for operational changes and high-value business actions.",
+    icon: Activity
+  },
+  {
+    title: "Protected credentials",
+    description: "Safeguard communication and payment configuration with encrypted handling.",
+    icon: Fingerprint
+  },
+  {
+    title: "Reliable backup posture",
+    description: "Design for continuity so teams can move quickly without betting against resilience.",
+    icon: DatabaseZap
+  },
+  {
+    title: "Security-aware delivery",
+    description: "Ship a product experience that balances speed, clarity, and enterprise expectations.",
+    icon: GlobeLock
+  }
 ];
 
 export const testimonials = [
   {
-    quote: "BizFinity gave our operations a cleaner rhythm. Billing, stock, and collections finally feel connected instead of scattered.",
-    name: "Aarav Mehta",
-    role: "Director, Urban Retail Group"
+    quote: "BizFinity feels like software built by people who understand both finance pressure and front-line execution.",
+    name: "Ritika Sethi",
+    role: "COO, Northline Distribution"
   },
   {
-    quote: "The product feels polished enough for leadership and practical enough for the people doing daily work. That combination is rare.",
-    name: "Naina Kapoor",
-    role: "Finance Lead, Distribution Network"
+    quote: "The biggest win is clarity. Our team can see what matters without jumping across tools or improvising reports.",
+    name: "Aman Bhatia",
+    role: "Finance Director, Vertex Trade"
   },
   {
-    quote: "We wanted clarity, speed, and control. BizFinity gave us a business platform that looks premium and works like operations software should.",
-    name: "Rahul Verma",
-    role: "Operations Head, Multi-Outlet Business"
+    quote: "It presents like premium SaaS and behaves like an operations system. That combination is exactly what we were missing.",
+    name: "Kavya Narang",
+    role: "Founder, LedgerCraft Retail"
   }
 ];
 
 export const faqs = [
   {
-    title: "Who is BizFinity built for?",
-    content: "BizFinity is designed for modern businesses that need billing, inventory, customer tracking, payments, reporting, and communication under one operational platform."
+    title: "What kind of business is BizFinity designed for?",
+    content: "BizFinity is designed for businesses that need billing, customer management, payment tracking, inventory visibility, communication workflows, and reporting in one place."
   },
   {
-    title: "Does BizFinity support multi-company operations?",
-    content: "Yes. The platform is structured for company isolation and controlled configuration so each business works within its own operational boundary."
+    title: "Can BizFinity support finance and operations teams together?",
+    content: "Yes. The landing page and product framing are built around shared workflows between business owners, finance leads, and operational users."
   },
   {
-    title: "Can teams use different roles and permissions?",
-    content: "Yes. Role-based access is part of the core product approach, helping businesses control visibility and action rights across users."
+    title: "Is the platform prepared for enterprise expectations?",
+    content: "Yes. The product direction emphasizes role control, audit visibility, company isolation, and secure handling of sensitive settings."
   },
   {
-    title: "Is communication built into the platform?",
-    content: "Yes. Email, SMS, and WhatsApp provider-based communication support is part of the broader product ecosystem."
+    title: "Will AI features replace the core workflow?",
+    content: "No. AI is framed as a support layer for summaries, answers, and guided actions while the core billing and operations workflow remains primary."
   }
+];
+
+export const contactCards: Array<{
+  label: string;
+  value: string;
+  icon: LucideIcon;
+}> = [
+  { label: "Email", value: "hello@bizfinity.in", icon: Mail },
+  { label: "Advisory", value: "Enterprise onboarding available", icon: CheckCircle2 },
+  { label: "Coverage", value: "Billing, CRM, inventory, analytics", icon: LayoutTemplate },
+  { label: "Response", value: "Business-hour launch assistance", icon: BellRing }
 ];

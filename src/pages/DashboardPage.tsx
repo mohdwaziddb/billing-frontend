@@ -792,7 +792,11 @@ export const DashboardPage = () => {
             caption={metric.caption}
             icon={metric.icon}
             accentColor={metric.key === "products" ? "#f97316" : "#2563eb"}
-            onClick={() => openDetails(metric.key)}
+            onClick={() => {
+              if (metric.key === "products" || metric.key === "invoices") {
+                openDetails(metric.key);
+              }
+            }}
           />
         ))}
       </div>

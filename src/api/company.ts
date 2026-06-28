@@ -12,12 +12,24 @@ export type CompanySettingsRequest = {
   addressLine2?: string;
   city?: string;
   state?: string;
+  stateId?: number | null;
   country?: string;
   pincode?: string;
-  taxId: string;
+  taxId?: string;
+  gstin?: string;
+  gstRegistered?: boolean;
+  compositionScheme?: boolean;
   panNumber?: string;
   cinNumber?: string;
   websiteUrl?: string;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankIfscCode?: string;
+  bankBranch?: string;
+  upiId?: string;
+  invoiceNotes?: string;
+  invoiceTerms?: string;
   databaseName?: string;
 };
 
@@ -42,6 +54,20 @@ export const uploadCompanyLogo = async (logo: File) => {
 
 export const deleteCompanyLogo = async () => {
   const response = await apiClient.delete<ApiResponse<CompanySummary>>("/v1/company/logo");
+  return response.data.data;
+};
+
+export const uploadCompanySignature = async (signature: File) => {
+  const formData = new FormData();
+  formData.append("signature", signature);
+  const response = await apiClient.put<ApiResponse<CompanySummary>>("/v1/company/signature", formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return response.data.data;
+};
+
+export const deleteCompanySignature = async () => {
+  const response = await apiClient.delete<ApiResponse<CompanySummary>>("/v1/company/signature");
   return response.data.data;
 };
 

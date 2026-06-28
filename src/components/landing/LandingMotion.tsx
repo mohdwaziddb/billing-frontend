@@ -1,12 +1,58 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PropsWithChildren, type ReactNode } from "react";
+import { motion } from "../../lib/framerMotionCompat";
+import { useEffect, useRef, useState, type PropsWithChildren, type ReactNode } from "react";
 
-const useInView = (threshold = 0.18) => {
-  const ref = useRef<HTMLDivElement | null>(null);
+export const Reveal = ({
+  children,
+  className = "",
+  delay = 0,
+  y = 28
+}: PropsWithChildren<{ className?: string; delay?: number; y?: number }>) => (
+  <motion.div
+    className={className}
+    initial={{ opacity: 0, y }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, amount: 0.2 }}
+    transition={{ duration: 0.72, delay }}
+  >
+    {children}
+  </motion.div>
+);
+
+export const Float = ({
+  children,
+  className = "",
+  delay = 0,
+  distance = 10
+}: PropsWithChildren<{ className?: string; delay?: number; distance?: number }>) => (
+  <motion.div
+    className={className}
+    initial={{ y: 0 }}
+    animate={{ y: -distance / 2 }}
+    transition={{ duration: 3.4 + delay, delay, ease: "ease-in-out" }}
+    style={{ animation: `landing-float ${7 + delay}s ease-in-out infinite` }}
+  >
+    {children}
+  </motion.div>
+);
+
+export const Counter = ({
+  value,
+  suffix = "",
+  duration = 1600,
+  className = ""
+}: {
+  value: number;
+  suffix?: string;
+  duration?: number;
+  className?: string;
+}) => {
+  const ref = useRef<HTMLSpanElement | null>(null);
   const [visible, setVisible] = useState(false);
+  const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const element = ref.current;
-    if (!element || visible) {
+    const node = ref.current;
+    if (!node || visible) {
       return;
     }
 
@@ -17,51 +63,12 @@ const useInView = (threshold = 0.18) => {
           observer.disconnect();
         }
       },
-      { threshold }
+      { threshold: 0.4 }
     );
 
-    observer.observe(element);
+    observer.observe(node);
     return () => observer.disconnect();
-  }, [threshold, visible]);
-
-  return { ref, visible };
-};
-
-export const Reveal = ({
-  children,
-  className = "",
-  delay = 0
-}: PropsWithChildren<{ className?: string; delay?: number }>) => {
-  const { ref, visible } = useInView();
-  const style = useMemo<CSSProperties>(
-    () => ({
-      opacity: visible ? 1 : 0,
-      transform: visible ? "translateY(0px)" : "translateY(28px)",
-      transition: `opacity 720ms ease ${delay}ms, transform 720ms cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`
-    }),
-    [delay, visible]
-  );
-
-  return (
-    <div ref={ref} className={className} style={style}>
-      {children}
-    </div>
-  );
-};
-
-export const Counter = ({
-  value,
-  suffix = "",
-  duration = 1800,
-  className = ""
-}: {
-  value: number;
-  suffix?: string;
-  duration?: number;
-  className?: string;
-}) => {
-  const { ref, visible } = useInView(0.45);
-  const [count, setCount] = useState(0);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -92,22 +99,6 @@ export const Counter = ({
   );
 };
 
-export const FloatingOrb = ({
-  className,
-  duration = "8s"
-}: {
-  className: string;
-  duration?: string;
-}) => (
-  <div
-    aria-hidden
-    className={`${className} will-change-transform`}
-    style={{
-      animation: `landing-float ${duration} ease-in-out infinite`
-    }}
-  />
-);
-
 export const AccordionItem = ({
   title,
   content,
@@ -119,28 +110,32 @@ export const AccordionItem = ({
   open: boolean;
   onToggle: () => void;
 }) => (
-  <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80">
+  <motion.div
+    className="overflow-hidden rounded-[28px] border border-white/70 bg-white/88 shadow-[0_22px_64px_rgba(15,23,42,0.08)] backdrop-blur-xl"
+    whileHover={{ y: -2 }}
+    transition={{ duration: 0.22 }}
+  >
     <button
       type="button"
       className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
       onClick={onToggle}
     >
       <span className="text-base font-extrabold tracking-[-0.02em] text-slate-950">{title}</span>
-      <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-50 text-lg font-black text-sky-700 transition duration-300"
-        style={{ transform: open ? "rotate(45deg)" : "rotate(0deg)" }}
+      <motion.span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-lg font-black text-[#2056d6]"
+        animate={{ rotate: open ? 45 : 0 }}
+        transition={{ duration: 0.24 }}
       >
         +
-      </span>
+      </motion.span>
     </button>
-    <div
-      style={{
-        maxHeight: open ? 220 : 0,
-        opacity: open ? 1 : 0,
-        transition: "max-height 360ms ease, opacity 260ms ease"
-      }}
+    <motion.div
+      initial={undefined}
+      animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
+      transition={{ duration: 0.3 }}
+      style={{ overflow: "hidden" }}
     >
       <div className="px-6 pb-6 text-sm leading-7 text-slate-600">{content}</div>
-    </div>
-  </div>
+    </motion.div>
+  </motion.div>
 );

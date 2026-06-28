@@ -21,6 +21,7 @@ import { PaymentListPage } from "./pages/PaymentListPage";
 import { PaymentModePage } from "./pages/PaymentModePage";
 import { ExpenseCategoryPage } from "./pages/ExpenseCategoryPage";
 import { ExpenseListPage } from "./pages/ExpenseListPage";
+import { GstSummaryPage } from "./pages/GstSummaryPage";
 import { ProfitLossReportPage } from "./pages/ProfitLossReportPage";
 import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductCategoryPage } from "./pages/ProductCategoryPage";
@@ -34,9 +35,14 @@ import { RolePermissionsPage } from "./pages/RolePermissionsPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
 import { SalesReferralsPage } from "./pages/SalesReferralsPage";
 import { ThemeSettingsPage } from "./pages/ThemeSettingsPage";
+import { TaxMasterPage } from "./pages/TaxMasterPage";
 import { UserManagementPage } from "./pages/UserManagementPage";
 import { SmsTemplatePage } from "./pages/SmsTemplatePage";
 import { PlatformAdminPage } from "./pages/PlatformAdminPage";
+import { ProductDetailPage } from "./pages/ProductDetailPage";
+import { PurchaseListPage } from "./pages/PurchaseListPage";
+import { StockLedgerPage } from "./pages/StockLedgerPage";
+import { InvoiceTemplatesPage } from "./pages/InvoiceTemplatesPage";
 
 function App() {
   return (
@@ -53,17 +59,22 @@ function App() {
           <Route path="/customers/:customerId/edit" element={<PermissionRoute menuCode="CUSTOMERS" actionCode="EDIT"><CustomerFormPage /></PermissionRoute>} />
           <Route path="/products" element={<PermissionRoute menuCode="PRODUCTS"><ProductListPage /></PermissionRoute>} />
           <Route path="/products/new" element={<PermissionRoute menuCode="PRODUCTS" actionCode="ADD"><ProductFormPage /></PermissionRoute>} />
+          <Route path="/products/:productId" element={<PermissionRoute menuCode="PRODUCTS"><ProductDetailPage /></PermissionRoute>} />
           <Route path="/products/:productId/edit" element={<PermissionRoute menuCode="PRODUCTS" actionCode="EDIT"><ProductFormPage /></PermissionRoute>} />
+          <Route path="/purchases" element={<PermissionRoute menuCode="PURCHASES"><PurchaseListPage /></PermissionRoute>} />
+          <Route path="/inventory/stock-ledger" element={<PermissionRoute menuCode="STOCK_LEDGER"><StockLedgerPage /></PermissionRoute>} />
           <Route path="/data-port/products" element={<PermissionRoute menuCode="PRODUCT_DATAPORT"><ProductDataPortPage /></PermissionRoute>} />
           <Route path="/setup/product-categories" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/product-category" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/product-sub-categories" element={<PermissionRoute menuCode="PRODUCT_SUB_CATEGORIES"><ProductSubCategoryPage /></PermissionRoute>} />
           <Route path="/setup/expense-categories" element={<PermissionRoute menuCode="EXPENSE_CATEGORIES"><ExpenseCategoryPage /></PermissionRoute>} />
           <Route path="/setup/payment-modes" element={<PermissionRoute menuCode="PAYMENT_MODES"><PaymentModePage /></PermissionRoute>} />
+          <Route path="/setup/tax-master" element={<PermissionRoute menuCode="TAX_MASTER"><TaxMasterPage /></PermissionRoute>} />
           <Route path="/setup/theme-settings" element={<PermissionRoute menuCode="THEME_SETTINGS"><ThemeSettingsPage /></PermissionRoute>} />
           <Route path="/setup/about-company" element={<PermissionRoute menuCode="ABOUT_COMPANY"><AboutCompanyPage /></PermissionRoute>} />
           <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
           <Route path="/setup/sms-templates" element={<PermissionRoute menuCode="SMS_TEMPLATES"><SmsTemplatePage /></PermissionRoute>} />
+          <Route path="/setup/invoice-templates" element={<PermissionRoute menuCode="INVOICE_TEMPLATES"><InvoiceTemplatesPage /></PermissionRoute>} />
           <Route path="/setup/communication" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/email-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/sms-settings" element={<Navigate replace to="/dashboard" />} />
@@ -81,6 +92,7 @@ function App() {
           <Route path="/analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
           <Route path="/sales-analytics" element={<PermissionRoute menuCode="ANALYTICS"><SalesAnalyticsPage /></PermissionRoute>} />
           <Route path="/reports/profit-loss" element={<PermissionRoute menuCode="PROFIT_LOSS"><ProfitLossReportPage /></PermissionRoute>} />
+          <Route path="/reports/gst-summary" element={<PermissionRoute menuCode="GST_SUMMARY"><GstSummaryPage /></PermissionRoute>} />
           <Route path="/reports/sales-referrals" element={<PermissionRoute menuCode="SALES_REFERRALS"><SalesReferralsPage /></PermissionRoute>} />
           <Route path="/setup/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />

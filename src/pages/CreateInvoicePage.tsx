@@ -6,6 +6,7 @@ import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from 
 import { createInvoice } from "../api/invoices";
 import { getPaymentModes } from "../api/paymentModes";
 import { getProducts } from "../api/products";
+import { getStates } from "../api/states";
 import { getActiveReferralUsers } from "../api/users";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
@@ -31,7 +32,6 @@ type InvoiceItemForm = {
   productId: string;
   qty: string;
   rate: string;
-  taxPercent: string;
   discountValue: string;
 };
 
@@ -54,7 +54,6 @@ const createEmptyItem = (): InvoiceItemForm => ({
   productId: "",
   qty: "1",
   rate: "0",
-  taxPercent: "0",
   discountValue: "0"
 });
 
@@ -71,6 +70,12 @@ const normalizeMobileNumber = (value: string) => {
 };
 
 const isValidMobileNumber = (value: string) => /^\d{10}$/.test(normalizeMobileNumber(value));
+
+const normalizeStateName = (value?: string | null) => value?.trim().toLowerCase() ?? "";
+const defaultPaymentModeCode = (modes: PaymentModeMaster[]) => {
+  const cashMode = modes.find((mode) => mode.modeCode === "CASH");
+  return cashMode?.modeCode ?? modes[0]?.modeCode ?? "";
+};
 
 const todayIso = () => {
   const today = new Date();
@@ -104,10 +109,11 @@ const getInvoiceValidationMessage = (errors: FieldErrors<FormValues>) => {
 
 export const CreateInvoicePage = () => {
   const navigate = useNavigate();
-  const { can } = useAuth();
+  const { user, can } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
   const [referralUsers, setReferralUsers] = useState<UserProfile[]>([]);
+  const [states, setStates] = useState<Array<{ id: number; stateName: string; countryName: string }>>([]);
   const [customerMobile, setCustomerMobile] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
@@ -127,7 +133,13 @@ export const CreateInvoicePage = () => {
     mobile: "",
     email: "",
     address: "",
+    city: "",
+    stateId: "",
+    state: "",
+    country: "India",
+    pincode: "",
     gstNo: "",
+    gstRegistered: "false",
     active: "true"
   });
 
@@ -153,11 +165,12 @@ export const CreateInvoicePage = () => {
   const { fields, append, remove, update, replace } = useFieldArray({ control, name: "items" });
 
   useEffect(() => {
-    void Promise.all([getProducts({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 }), getActiveReferralUsers()])
-      .then(([productData, modeData, referralData]) => {
+    void Promise.all([getProducts({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 }), getActiveReferralUsers(), getStates()])
+      .then(([productData, modeData, referralData, stateData]) => {
         setProducts(productData.filter((item) => item.active));
         setPaymentModes(modeData);
         setReferralUsers(referralData.filter((item) => item.active));
+        setStates(stateData);
       })
       .catch((err: any) => setApiError(err, "Unable to load invoice setup data"));
   }, [setApiError]);
@@ -176,19 +189,38 @@ export const CreateInvoicePage = () => {
     [products]
   );
 
+  const sameState = useMemo(() => {
+    const companyStateId = user?.company?.stateId ?? null;
+    const customerStateId = selectedCustomer?.stateId ?? null;
+    if (companyStateId && customerStateId) {
+      return companyStateId === customerStateId;
+    }
+    const companyStateName = normalizeStateName(user?.company?.state);
+    const customerStateName = normalizeStateName(selectedCustomer?.state);
+    return Boolean(companyStateName && customerStateName && companyStateName === customerStateName);
+  }, [selectedCustomer?.state, selectedCustomer?.stateId, user?.company?.state, user?.company?.stateId]);
+
   const invoiceSummary = useMemo(() => InvoiceCalculationService.calculate({
+    sameState,
     invoiceDiscountType,
     invoiceDiscountValue: invoiceDiscountInput,
     paidAmount: paidAmountInput,
-    rows: watchedItems.map((item) => ({
-      productId: item.productId,
-      qty: item.qty,
-      rate: item.rate,
-      taxPercent: item.taxPercent,
-      productDiscountType: "FIXED",
-      productDiscountValue: item.discountValue
-    }))
-  }), [invoiceDiscountInput, invoiceDiscountType, paidAmountInput, watchedItems]);
+    rows: watchedItems.map((item) => {
+      const product = productMap.get(item.productId);
+      return {
+        productId: item.productId,
+        qty: item.qty,
+        rate: item.rate,
+        taxPercent: product?.taxPercent ?? 0,
+        taxType: product?.taxType,
+        taxable: product?.taxable ?? true,
+        taxName: product?.taxName,
+        hsnCode: product?.hsnCode,
+        productDiscountType: "FIXED",
+        productDiscountValue: item.discountValue
+      };
+    })
+  }), [invoiceDiscountInput, invoiceDiscountType, paidAmountInput, productMap, sameState, watchedItems]);
 
   useEffect(() => {
     if (previousInvoiceDiscountTypeRef.current === null) {
@@ -217,7 +249,6 @@ export const CreateInvoicePage = () => {
 
     const qty = numberValue(item.qty);
     const rate = numberValue(item.rate);
-    const taxPercent = numberValue(item.taxPercent);
     const lineBase = Math.max(0, qty * Math.max(0, rate));
     const discountValue = Math.max(0, numberValue(item.discountValue));
     const issues: RowIssue[] = [];
@@ -230,9 +261,6 @@ export const CreateInvoicePage = () => {
     }
     if (rate < 0) {
       issues.push({ message: "Rate cannot be negative." });
-    }
-    if (taxPercent < 0) {
-      issues.push({ message: "Tax cannot be negative." });
     }
     if (discountValue > lineBase) {
       issues.push({ message: "Product discount cannot exceed line amount." });
@@ -256,14 +284,33 @@ export const CreateInvoicePage = () => {
     if (numberValue(paidAmountInput) < 0) {
       issues.push("Paid amount cannot be negative.");
     }
+    if (numberValue(paidAmountInput) === 0) {
+      issues.push("Paid amount must be greater than 0.");
+    }
     if (numberValue(paidAmountInput) > invoiceSummary.grandTotal) {
       issues.push("Paid amount cannot exceed grand total.");
     }
     if (numberValue(paidAmountInput) > 0 && !paymentModeInput) {
       issues.push("Select payment mode when paid amount is greater than 0.");
     }
+    const hasTaxableGstLines = watchedItems.some((item) => {
+      const product = productMap.get(item.productId);
+      return Boolean(product?.taxable && (product?.taxPercent ?? 0) > 0);
+    });
+    if (hasTaxableGstLines && !user?.company?.stateId) {
+      const companyStateName = normalizeStateName(user?.company?.state);
+      if (!companyStateName) {
+        issues.push("Select company state in About Company before creating GST invoice.");
+      }
+    }
+    if (hasTaxableGstLines && selectedCustomer && !selectedCustomer.stateId) {
+      const customerStateName = normalizeStateName(selectedCustomer.state);
+      if (!customerStateName) {
+        issues.push("Selected customer is missing state. Update the customer state before creating GST invoice.");
+      }
+    }
     return issues;
-  }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.grandTotal, invoiceSummary.totalBeforeInvoiceDiscount, paidAmountInput, paymentModeInput]);
+  }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.grandTotal, invoiceSummary.totalBeforeInvoiceDiscount, paidAmountInput, paymentModeInput, productMap, selectedCustomer, user?.company?.state, user?.company?.stateId, watchedItems]);
 
   const hasClientValidationErrors = rowIssues.some((issues) => issues.length > 0) || summaryIssues.length > 0;
   const totalWithoutDiscount = invoiceSummary.grandTotal + invoiceSummary.productDiscountTotal + invoiceSummary.invoiceDiscount;
@@ -273,11 +320,28 @@ export const CreateInvoicePage = () => {
     invoiceDateInput &&
     watchedItems.length > 0 &&
     watchedItems.every((item) => item.productId && numberValue(item.qty) >= 1 && numberValue(item.rate) >= 0) &&
-    (invoiceSummary.paidAmount <= 0 || paymentModeInput)
+    invoiceSummary.paidAmount > 0 &&
+    paymentModeInput
   );
   const canSaveInvoice = hasRequiredInvoiceFields && !hasClientValidationErrors;
   const customerMobileError = customerMobile.trim() && !isValidMobileNumber(customerMobile) ? MOBILE_VALIDATION_MESSAGE : undefined;
-  const canCreateNewCustomer = Boolean(newCustomer.name.trim() && isValidMobileNumber(customerMobile.trim() || newCustomer.mobile.trim()));
+  const canCreateNewCustomer = Boolean(
+    newCustomer.name.trim() &&
+    isValidMobileNumber(customerMobile.trim() || newCustomer.mobile.trim()) &&
+    (newCustomer.gstRegistered !== "true" || newCustomer.gstNo.trim())
+  );
+
+  useEffect(() => {
+    if (!canProceedWithInvoice) {
+      return;
+    }
+    if (!paymentModeInput && paymentModes.length > 0) {
+      const nextModeCode = defaultPaymentModeCode(paymentModes);
+      if (nextModeCode) {
+        setValue("paymentMode", nextModeCode, { shouldDirty: true, shouldValidate: true });
+      }
+    }
+  }, [canProceedWithInvoice, paymentModeInput, paymentModes, setValue]);
 
   const resetInvoiceEntry = () => {
     replace([createEmptyItem()]);
@@ -296,7 +360,7 @@ export const CreateInvoicePage = () => {
 
     const mobile = normalizeMobileNumber(customerMobile.trim());
     if (!mobile) {
-      notificationService.showError("Enter mobile number to find customer");
+      notificationService.showError("Enter customer mobile number to find customer");
       return;
     }
     if (!isValidMobileNumber(mobile)) {
@@ -315,7 +379,13 @@ export const CreateInvoicePage = () => {
         mobile: customer.mobile,
         email: customer.email ?? "",
         address: customer.address ?? "",
-        gstNo: customer.gstNo ?? "",
+        city: customer.city ?? "",
+        stateId: customer.stateId ? String(customer.stateId) : "",
+        state: customer.state ?? "",
+        country: customer.country ?? "India",
+        pincode: customer.pincode ?? "",
+        gstNo: customer.gstin ?? customer.gstNo ?? "",
+        gstRegistered: customer.gstRegistered ? "true" : "false",
         active: customer.active ? "true" : "false"
       });
 
@@ -331,10 +401,16 @@ export const CreateInvoicePage = () => {
         mobile,
         email: "",
         address: "",
+        city: "",
+        stateId: "",
+        state: "",
+        country: "India",
+        pincode: "",
         gstNo: "",
+        gstRegistered: "false",
         active: "true"
       });
-      setApiError(err, "Unable to find customer");
+      setApiError(err, "Unable to find active customer");
     }
   };
 
@@ -348,12 +424,21 @@ export const CreateInvoicePage = () => {
       return;
     }
 
+    const selectedState = newCustomer.stateId ? states.find((item) => String(item.id) === newCustomer.stateId) : undefined;
+    const normalizedGst = newCustomer.gstRegistered === "true" ? newCustomer.gstNo.trim() : "";
     const payload: CustomerRequest = {
       name: newCustomer.name.trim(),
       mobile,
       email: newCustomer.email.trim() || undefined,
       address: newCustomer.address.trim() || undefined,
-      gstNo: newCustomer.gstNo.trim() || undefined,
+      gstNo: normalizedGst || undefined,
+      gstin: normalizedGst || undefined,
+      gstRegistered: newCustomer.gstRegistered === "true",
+      city: newCustomer.city.trim() || undefined,
+      state: selectedState?.stateName,
+      stateId: newCustomer.stateId ? Number(newCustomer.stateId) : undefined,
+      country: selectedState?.countryName ?? (newCustomer.country.trim() || undefined),
+      pincode: newCustomer.pincode.trim() || undefined,
       active: newCustomer.active === "true"
     };
 
@@ -411,8 +496,7 @@ export const CreateInvoicePage = () => {
       update(index, {
         ...current,
         productId: "",
-        rate: "0",
-        taxPercent: "0"
+        rate: "0"
       });
       return;
     }
@@ -421,8 +505,7 @@ export const CreateInvoicePage = () => {
       ...current,
       productId,
       qty: currentQty > 0 ? current.qty : "1",
-      rate: String(product.sellingPrice ?? 0),
-      taxPercent: String(product.taxPercent ?? 0)
+      rate: String(product.sellingPrice ?? 0)
     });
   };
 
@@ -457,7 +540,8 @@ export const CreateInvoicePage = () => {
         productId: Number(item.productId),
         qty: Number(item.qty),
         price: Number(item.rate),
-        taxPercent: Number(item.taxPercent),
+        taxMasterId: productMap.get(item.productId)?.taxMasterId ?? null,
+        taxPercent: productMap.get(item.productId)?.taxPercent ?? 0,
         discountType: "FIXED",
         discountValue: Number(item.discountValue || 0),
         discountPercent: (() => {
@@ -601,7 +685,39 @@ export const CreateInvoicePage = () => {
                   <Input label="Customer Name" requiredMark error={customerCreateFieldErrors.name} value={newCustomer.name} onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))} />
                   <Input label="Mobile Number" requiredMark readOnly className="cursor-not-allowed bg-slate-100 text-slate-500" error={customerCreateFieldErrors.mobile ?? (!isValidMobileNumber(newCustomer.mobile) ? MOBILE_VALIDATION_MESSAGE : undefined)} value={newCustomer.mobile} />
                   <Input label="Email Address" type="email" error={customerCreateFieldErrors.email} value={newCustomer.email} onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))} />
-                  <Input label="GST Number" error={customerCreateFieldErrors.gstNo} value={newCustomer.gstNo} onChange={(event) => setNewCustomer((current) => ({ ...current, gstNo: event.target.value }))} />
+                  <Select
+                    label="GST Registered"
+                    placeholder={null}
+                    options={[
+                      { label: "No", value: "false" },
+                      { label: "Yes", value: "true" }
+                    ]}
+                    value={newCustomer.gstRegistered}
+                    onChange={(event) => setNewCustomer((current) => ({
+                      ...current,
+                      gstRegistered: event.target.value,
+                      gstNo: event.target.value === "true" ? current.gstNo : ""
+                    }))}
+                  />
+                  <Input label="GST Number" disabled={newCustomer.gstRegistered !== "true"} error={customerCreateFieldErrors.gstNo} value={newCustomer.gstNo} onChange={(event) => setNewCustomer((current) => ({ ...current, gstNo: event.target.value }))} />
+                  <Input label="City" value={newCustomer.city} onChange={(event) => setNewCustomer((current) => ({ ...current, city: event.target.value }))} />
+                  <Select
+                    label="State"
+                    placeholder={states.length ? "Select State" : "Loading States"}
+                    options={[{ label: "Select State", value: "" }, ...states.map((state) => ({ label: state.stateName, value: String(state.id) }))]}
+                    value={newCustomer.stateId}
+                    onChange={(event) => {
+                      const selected = states.find((item) => String(item.id) === event.target.value);
+                      setNewCustomer((current) => ({
+                        ...current,
+                        stateId: event.target.value,
+                        state: selected?.stateName ?? "",
+                        country: selected?.countryName ?? current.country
+                      }));
+                    }}
+                  />
+                  <Input label="Country" value={newCustomer.country} onChange={(event) => setNewCustomer((current) => ({ ...current, country: event.target.value }))} />
+                  <Input label="Pincode" value={newCustomer.pincode} onChange={(event) => setNewCustomer((current) => ({ ...current, pincode: event.target.value }))} />
                   <Input label="Address" className="md:col-span-2 xl:col-span-4" error={customerCreateFieldErrors.address} value={newCustomer.address} onChange={(event) => setNewCustomer((current) => ({ ...current, address: event.target.value }))} />
                 </div>
                 <div className="mt-3">
@@ -648,7 +764,7 @@ export const CreateInvoicePage = () => {
                   });
 
                   return (
-                    <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm shadow-slate-200/30">
+                    <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-2.5">
                       <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_78px_116px_96px_112px_46px] md:items-center">
                         <div className="md:min-w-0">
                           <label className="sr-only">Product</label>
@@ -730,7 +846,6 @@ export const CreateInvoicePage = () => {
           </GlassCard>
 
         </div>
-
         <aside className="xl:sticky xl:top-24 xl:self-start">
           <GlassCard className={`p-3 md:p-4 ${canProceedWithInvoice ? "" : "opacity-75"}`}>
             <section className="space-y-3">
@@ -754,6 +869,7 @@ export const CreateInvoicePage = () => {
                 />
                 <Input
                   label="Paid Amount"
+                  requiredMark
                   type="number"
                   step="0.01"
                   disabled={!canProceedWithInvoice}
@@ -766,6 +882,7 @@ export const CreateInvoicePage = () => {
                 />
                 <Select
                   label="Payment Mode"
+                  requiredMark
                   disabled={!canProceedWithInvoice || invoiceSummary.paidAmount <= 0}
                   placeholder="No Mode Selected"
                   error={summaryIssues.find((issue) => issue.toLowerCase().includes("payment mode"))}
@@ -781,7 +898,11 @@ export const CreateInvoicePage = () => {
                   <SummaryRow label="Total Without Discount" value={formatCurrency(totalWithoutDiscount)} />
                   <SummaryRow label="Product Discount" value={`-${formatCurrency(invoiceSummary.productDiscountTotal)}`} tone="danger" />
                   <SummaryRow label="Invoice Discount" value={`-${formatCurrency(invoiceSummary.invoiceDiscount)}`} tone="danger" />
-                  <SummaryRow label="Tax" value={formatCurrency(invoiceSummary.taxAmount)} />
+                  <SummaryRow label="Taxable Amount" value={formatCurrency(invoiceSummary.taxableAmount)} />
+                  {invoiceSummary.cgstTotal > 0 ? <SummaryRow label="CGST" value={formatCurrency(invoiceSummary.cgstTotal)} /> : null}
+                  {invoiceSummary.sgstTotal > 0 ? <SummaryRow label="SGST" value={formatCurrency(invoiceSummary.sgstTotal)} /> : null}
+                  {invoiceSummary.igstTotal > 0 ? <SummaryRow label="IGST" value={formatCurrency(invoiceSummary.igstTotal)} /> : null}
+                  <SummaryRow label="Total Tax" value={formatCurrency(invoiceSummary.taxAmount)} />
                   <div className="border-t border-slate-200 pt-2">
                     <SummaryRow label="Grand Total" value={formatCurrency(invoiceSummary.grandTotal)} strong />
                   </div>
@@ -810,11 +931,13 @@ export const CreateInvoicePage = () => {
                 <p className="text-sm text-slate-400">Customer</p>
                 <p className="mt-2 font-semibold text-white">{selectedCustomer.name}</p>
                 <p className="mt-1 text-sm text-slate-400">{selectedCustomer.mobile}</p>
+                <p className="mt-1 text-sm text-slate-400">{selectedCustomer.state ?? "--"}</p>
               </div>
               <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Contact</p>
                 <p className="mt-2 font-semibold text-white">{selectedCustomer.email ?? "--"}</p>
                 <p className="mt-1 text-sm text-slate-400">{selectedCustomer.address ?? "--"}</p>
+                <p className="mt-1 text-sm text-slate-400">GSTIN: {selectedCustomer.gstin ?? selectedCustomer.gstNo ?? "--"}</p>
               </div>
             </div>
 

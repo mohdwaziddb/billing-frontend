@@ -1,135 +1,129 @@
+import { motion } from "../../lib/framerMotionCompat";
 import { LandingSectionFrame } from "./LandingSectionFrame";
 import { Reveal } from "./LandingMotion";
-
-const previewPanels = [
-  "Dashboard",
-  "Invoices",
-  "Inventory",
-  "Analytics"
-];
+import { showcaseTabs } from "./landingData";
 
 export const ProductShowcaseSection = () => (
   <LandingSectionFrame
-    eyebrow="Product Showcase"
-    title="Realistic product previews designed to feel premium and trustworthy"
-    description="The visual system reflects the product experience businesses expect: clean surfaces, meaningful hierarchy, and strong financial readability."
+    id="showcase"
+    eyebrow="Product"
+    title="An original showcase built around dashboard rhythm and premium visual density"
+    description="The mock product surfaces below are intentionally custom to BizFinity while keeping the same quality bar for polish, spacing, and responsive composition."
   >
-    <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-      <Reveal>
-        <div className="rounded-[36px] bg-white p-5 shadow-[0_28px_70px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80">
-          <div className="rounded-[30px] bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96),rgba(239,246,255,0.86))] p-5 ring-1 ring-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Preview</p>
-                <h3 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950">Management Dashboard</h3>
-              </div>
-              <div className="rounded-2xl bg-slate-900 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-white">
-                Snapshot
-              </div>
+    <Reveal>
+      <div className="overflow-hidden rounded-[38px] border border-white/80 bg-white/92 p-5 shadow-[0_36px_90px_rgba(15,23,42,0.08)]">
+        <div className="flex flex-wrap gap-2">
+          {showcaseTabs.map((tab, index) => (
+            <div
+              key={tab}
+              className={`rounded-full px-4 py-2 text-sm font-black ${index === 0 ? "bg-[linear-gradient(135deg,#1f4ed8,#38bdf8)] text-white shadow-[0_14px_28px_rgba(37,99,235,0.22)]" : "border border-slate-200 bg-white text-slate-500"}`}
+            >
+              {tab}
             </div>
+          ))}
+        </div>
 
-            <div className="mt-5 grid gap-4 xl:grid-cols-[1.06fr_0.94fr]">
-              <div className="rounded-[26px] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] ring-1 ring-slate-100">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {[
-                    "Net Sales",
-                    "Pending Dues",
-                    "Inventory Value"
-                  ].map((label, index) => (
-                    <div key={label} className="rounded-[20px] bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
-                      <div className={`mt-3 h-6 rounded-full ${index === 0 ? "bg-sky-500/80" : index === 1 ? "bg-violet-500/70" : "bg-cyan-500/70"}`} />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-5 rounded-[24px] bg-slate-50 p-4 ring-1 ring-slate-100">
-                  <div className="flex h-40 items-end gap-3">
-                    {[42, 72, 58, 92, 78, 108, 84].map((height, index) => (
-                      <div key={index} className="flex-1">
-                        <div
-                          className={`rounded-t-[20px] ${index % 3 === 0 ? "bg-[linear-gradient(180deg,#60A5FA,#2563EB)]" : index % 3 === 1 ? "bg-[linear-gradient(180deg,#67E8F9,#06B6D4)]" : "bg-[linear-gradient(180deg,#C4B5FD,#8B5CF6)]"}`}
-                          style={{ height }}
-                        />
-                      </div>
+        <div className="mt-5 grid gap-5 xl:grid-cols-[1.12fr_0.88fr]">
+          <div className="rounded-[30px] border border-[#d9e6ff] bg-[linear-gradient(180deg,#f8fbff,#f2f7ff)] p-5">
+            <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-[24px] border border-white/90 bg-white p-5 shadow-[0_16px_38px_rgba(15,23,42,0.05)]">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Collections timeline</p>
+                <div className="mt-4 h-40 rounded-[22px] bg-[linear-gradient(180deg,rgba(31,78,216,0.08),rgba(103,232,249,0.12),rgba(255,255,255,0.98))] p-4">
+                  <div className="flex h-full items-end gap-3">
+                    {[32, 48, 60, 44, 72, 92].map((height, index) => (
+                      <motion.div
+                        key={index}
+                        className="flex-1 rounded-t-[16px] bg-[linear-gradient(180deg,#1f4ed8,#60a5fa)]"
+                        initial={{ height: 12 }}
+                        whileInView={{ height }}
+                        viewport={{ once: true, amount: 0.4 }}
+                        transition={{ duration: 0.6, delay: index * 0.05 }}
+                      />
                     ))}
                   </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {["Growth accounts", "Delayed settlements", "Campaign impact"].map((item) => (
+                    <div key={item} className="rounded-[18px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                      <p className="text-sm font-bold text-slate-700">{item}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-[24px] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] ring-1 ring-slate-100">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Recent Invoices</p>
+                <div className="rounded-[24px] border border-white/90 bg-white p-5 shadow-[0_16px_38px_rgba(15,23,42,0.05)]">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Account snapshot</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {[
+                      ["Top customer", "Northline Retail"],
+                      ["Highest pending", "Rs. 2.8L"],
+                      ["Average cycle", "18 days"],
+                      ["Alerts today", "07"]
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-[18px] bg-slate-50 p-4 ring-1 ring-slate-100">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                        <p className="mt-3 text-lg font-black text-slate-950">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-white/90 bg-white p-5 shadow-[0_16px_38px_rgba(15,23,42,0.05)]">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Invoice queue</p>
                   <div className="mt-4 space-y-3">
-                    {["INV-8234", "INV-8235", "INV-8236"].map((invoice, index) => (
-                      <div key={invoice} className="flex items-center justify-between rounded-[18px] bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
-                        <span className="text-sm font-black text-slate-900">{invoice}</span>
-                        <span className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] ${index === 0 ? "bg-emerald-50 text-emerald-700" : index === 1 ? "bg-amber-50 text-amber-700" : "bg-sky-50 text-sky-700"}`}>
-                          {index === 0 ? "Paid" : index === 1 ? "Partial" : "Issued"}
+                    {[
+                      ["INV-9021", "Ready to send"],
+                      ["INV-9022", "Awaiting payment"],
+                      ["INV-9023", "Follow-up scheduled"]
+                    ].map(([name, state]) => (
+                      <div key={name} className="flex items-center justify-between rounded-[18px] bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
+                        <span className="text-sm font-black text-slate-900">{name}</span>
+                        <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#2451d8]">
+                          {state}
                         </span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="rounded-[24px] bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] ring-1 ring-slate-100">
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Collection Mix</p>
-                  <div className="mt-4 flex items-center justify-center gap-4">
-                    <div className="h-28 w-28 rounded-full bg-[conic-gradient(#2563EB_0deg,#2563EB_150deg,#06B6D4_150deg,#06B6D4_270deg,#8B5CF6_270deg,#8B5CF6_360deg)] p-3">
-                      <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-sm font-black text-slate-900">
-                        100%
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      {[
-                        ["Online", "bg-[#2563EB]"],
-                        ["Cash", "bg-[#06B6D4]"],
-                        ["UPI", "bg-[#8B5CF6]"]
-                      ].map(([label, tone]) => (
-                        <div key={label} className="flex items-center gap-3">
-                          <span className={`h-3 w-3 rounded-full ${tone}`} />
-                          <span className="text-sm font-bold text-slate-700">{label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
-        </div>
-      </Reveal>
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
-        {previewPanels.map((panel, index) => (
-          <Reveal key={panel} delay={index * 70}>
-            <div className="rounded-[32px] bg-white p-5 shadow-[0_22px_54px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80">
-              <div className="rounded-[26px] bg-[linear-gradient(160deg,rgba(255,255,255,0.96),rgba(248,250,252,0.94),rgba(239,246,255,0.82))] p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-black tracking-[-0.03em] text-slate-950">{panel}</h3>
-                  <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 ring-1 ring-slate-200">
-                    View
-                  </span>
-                </div>
-                <div className="mt-4 rounded-[22px] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ring-1 ring-slate-100">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[18px] bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <div className="h-3 w-16 rounded-full bg-slate-200" />
-                      <div className="mt-4 h-20 rounded-[16px] bg-[linear-gradient(180deg,rgba(37,99,235,0.12),rgba(6,182,212,0.08),rgba(255,255,255,0.95))]" />
-                    </div>
-                    <div className="space-y-3 rounded-[18px] bg-slate-50 p-4 ring-1 ring-slate-100">
-                      {[0, 1, 2].map((row) => (
-                        <div key={row} className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
-                          <div className="h-2 w-16 rounded-full bg-slate-200" />
-                          <div className="mt-3 h-3 w-20 rounded-full bg-slate-300/70" />
-                        </div>
-                      ))}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            {[
+              "Customer collections cockpit",
+              "Inventory movement intelligence",
+              "Leadership-ready performance digest"
+            ].map((title, index) => (
+              <Reveal key={title} delay={index * 0.06}>
+                <motion.div
+                  className="rounded-[28px] border border-white/80 bg-[linear-gradient(180deg,#ffffff,#f7fbff)] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.07)]"
+                  whileHover={{ y: -4 }}
+                >
+                  <h3 className="text-xl font-black tracking-[-0.03em] text-slate-950">{title}</h3>
+                  <div className="mt-4 rounded-[22px] border border-slate-100 bg-white p-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[16px] bg-slate-50 p-4 ring-1 ring-slate-100">
+                        <div className="h-2 w-20 rounded-full bg-slate-200" />
+                        <div className="mt-4 h-16 rounded-[14px] bg-[linear-gradient(180deg,rgba(31,78,216,0.12),rgba(103,232,249,0.12),rgba(255,255,255,0.98))]" />
+                      </div>
+                      <div className="space-y-3 rounded-[16px] bg-slate-50 p-4 ring-1 ring-slate-100">
+                        {[0, 1, 2].map((row) => (
+                          <div key={row} className="rounded-[14px] bg-white px-3 py-3 ring-1 ring-slate-100">
+                            <div className="h-2 w-14 rounded-full bg-slate-200" />
+                            <div className="mt-3 h-3 w-24 rounded-full bg-slate-300/70" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        ))}
+                </motion.div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
+    </Reveal>
   </LandingSectionFrame>
 );

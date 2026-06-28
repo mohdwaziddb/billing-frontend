@@ -54,9 +54,6 @@ type EditableField =
   | "active"
   | "brand"
   | "hsnCode"
-  | "purchasePrice"
-  | "sellingPrice"
-  | "openingStockQty"
   | "minimumStockQty"
   | "taxPercent";
 
@@ -180,7 +177,7 @@ export const ProductDataPortPage = () => {
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title="DataPort > Product DataPort"
-        subtitle="Upload structured product masters through a reusable import workflow with sample download, preview edits, validation, and controlled import."
+        subtitle="Upload product master data with sample download, preview edits, validation, and controlled import. Inventory batches must be created separately through Purchases."
       />
 
       <GlassCard className="flex flex-col gap-5 p-6 md:p-7">
@@ -290,7 +287,7 @@ export const ProductDataPortPage = () => {
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-            <table className="min-w-[1320px] w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
+            <table className="min-w-[1080px] w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
               <thead className="sticky top-0 bg-slate-50">
                 <tr>
                   {[
@@ -302,9 +299,6 @@ export const ProductDataPortPage = () => {
                     "Active",
                     "Brand",
                     "HSN Code",
-                    "Purchase Price",
-                    "Selling Price",
-                    "Opening Stock Qty",
                     "Minimum Stock Qty",
                     "Tax Percent",
                     "Status",
@@ -319,7 +313,7 @@ export const ProductDataPortPage = () => {
               <tbody>
                 {preview.rows.length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="px-6 py-16 text-center text-slate-500">
+                    <td colSpan={12} className="px-6 py-16 text-center text-slate-500">
                       Upload a sample-filled Excel file to preview product data here.
                     </td>
                   </tr>
@@ -346,9 +340,6 @@ export const ProductDataPortPage = () => {
                       </td>
                       <EditableCell row={row} field="brand" value={row.brand ?? ""} onChange={updateRow} />
                       <EditableCell row={row} field="hsnCode" value={row.hsnCode ?? ""} onChange={updateRow} />
-                      <EditableCell row={row} field="purchasePrice" value={row.purchasePrice} onChange={updateRow} inputMode="decimal" />
-                      <EditableCell row={row} field="sellingPrice" value={row.sellingPrice} onChange={updateRow} inputMode="decimal" />
-                      <EditableCell row={row} field="openingStockQty" value={row.openingStockQty} onChange={updateRow} inputMode="numeric" />
                       <EditableCell row={row} field="minimumStockQty" value={row.minimumStockQty} onChange={updateRow} inputMode="numeric" />
                       <EditableCell row={row} field="taxPercent" value={row.taxPercent} onChange={updateRow} inputMode="decimal" />
                       <td className="border-b border-slate-100 px-3 py-3 align-top">
@@ -508,9 +499,6 @@ const validateRows = (rows: ProductDataPortRow[], referenceData: ProductDataPort
       active: row.active?.trim() ?? "",
       brand: trimToNull(row.brand),
       hsnCode: trimToNull(row.hsnCode),
-      purchasePrice: row.purchasePrice?.trim() ?? "",
-      sellingPrice: row.sellingPrice?.trim() ?? "",
-      openingStockQty: row.openingStockQty?.trim() ?? "",
       minimumStockQty: row.minimumStockQty?.trim() ?? "",
       taxPercent: row.taxPercent?.trim() ?? "",
       productCategoryId: null,
@@ -533,12 +521,6 @@ const validateRows = (rows: ProductDataPortRow[], referenceData: ProductDataPort
     }
     if (!nextRow.sku) {
       errors.sku = "SKU is required";
-    }
-    if (!nextRow.purchasePrice) {
-      errors.purchasePrice = "Purchase price is required";
-    }
-    if (!nextRow.sellingPrice) {
-      errors.sellingPrice = "Selling price is required";
     }
     if (!nextRow.taxPercent) {
       errors.taxPercent = "Tax percent is required";
@@ -571,36 +553,13 @@ const validateRows = (rows: ProductDataPortRow[], referenceData: ProductDataPort
       errors.sku = "SKU is duplicated in the uploaded file";
     }
 
-    const purchasePrice = parseDecimal(nextRow.purchasePrice);
-    const sellingPrice = parseDecimal(nextRow.sellingPrice);
     const taxPercent = parseDecimal(nextRow.taxPercent);
-    const openingStockQty = parseInteger(nextRow.openingStockQty || "0");
     const minimumStockQty = parseInteger(nextRow.minimumStockQty || "0");
-
-    if (nextRow.purchasePrice && purchasePrice === null) {
-      errors.purchasePrice = "Purchase price must be a valid number";
-    } else if (purchasePrice !== null && purchasePrice < 0) {
-      errors.purchasePrice = "Purchase price must be 0 or more";
-    }
-
-    if (nextRow.sellingPrice && sellingPrice === null) {
-      errors.sellingPrice = "Selling price must be a valid number";
-    } else if (sellingPrice !== null && sellingPrice < 0) {
-      errors.sellingPrice = "Selling price must be 0 or more";
-    } else if (purchasePrice !== null && sellingPrice !== null && sellingPrice < purchasePrice) {
-      errors.sellingPrice = "Selling price cannot be less than purchase price";
-    }
 
     if (nextRow.taxPercent && taxPercent === null) {
       errors.taxPercent = "Tax percent must be a valid number";
     } else if (taxPercent !== null && taxPercent < 0) {
       errors.taxPercent = "Tax percent must be 0 or more";
-    }
-
-    if (openingStockQty === null) {
-      errors.openingStockQty = "Opening stock qty must be a whole number";
-    } else if (openingStockQty < 0) {
-      errors.openingStockQty = "Opening stock qty must be 0 or more";
     }
 
     if (minimumStockQty === null) {

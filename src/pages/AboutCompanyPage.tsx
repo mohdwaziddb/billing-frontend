@@ -1,11 +1,13 @@
-import { Building2, Upload } from "lucide-react";
+import { Building2, PenTool, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
-import { deleteCompanyLogo, getCompanySettings, updateCompanySettings, uploadCompanyLogo, type CompanySettingsRequest } from "../api/company";
+import { deleteCompanyLogo, deleteCompanySignature, getCompanySettings, updateCompanySettings, uploadCompanyLogo, uploadCompanySignature, type CompanySettingsRequest } from "../api/company";
+import { getStates } from "../api/states";
 import { Button } from "../components/Button";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
+import { Select } from "../components/Select";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
@@ -25,12 +27,24 @@ const emptyForm: FormState = {
   addressLine2: "",
   city: "",
   state: "",
+  stateId: null,
   country: "",
   pincode: "",
   taxId: "",
+  gstin: "",
+  gstRegistered: false,
+  compositionScheme: false,
   panNumber: "",
   cinNumber: "",
   websiteUrl: "",
+  bankName: "",
+  bankAccountName: "",
+  bankAccountNumber: "",
+  bankIfscCode: "",
+  bankBranch: "",
+  upiId: "",
+  invoiceNotes: "",
+  invoiceTerms: "",
 };
 
 const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
@@ -46,13 +60,17 @@ export const AboutCompanyPage = () => {
   const canEdit = can("ABOUT_COMPANY", "EDIT");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [states, setStates] = useState<Array<{ id: number; stateName: string; countryName: string }>>([]);
+  const [statesLoading, setStatesLoading] = useState(true);
+  const [statesLoadFailed, setStatesLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
   const [deletingLogo, setDeletingLogo] = useState(false);
   const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
-  const canSaveProfile = Boolean(form.name.trim() && form.taxId.trim() && form.phone.trim() && form.email.trim());
+  const canSaveProfile = Boolean(form.name.trim() && form.phone.trim() && form.email.trim() && (!form.gstRegistered || (form.gstin ?? form.taxId ?? "").trim()));
 
   const setField = (key: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -73,14 +91,27 @@ export const AboutCompanyPage = () => {
         addressLine2: company.addressLine2 ?? "",
         city: company.city ?? "",
         state: company.state ?? "",
+        stateId: company.stateId ?? null,
         country: company.country ?? "",
         pincode: company.pincode ?? "",
         taxId: company.taxId ?? "",
+        gstin: company.gstin ?? company.taxId ?? "",
+        gstRegistered: Boolean(company.gstRegistered || company.gstin || company.taxId),
+        compositionScheme: company.compositionScheme ?? false,
         panNumber: company.panNumber ?? "",
         cinNumber: company.cinNumber ?? "",
         websiteUrl: company.websiteUrl ?? "",
+        bankName: company.bankName ?? "",
+        bankAccountName: company.bankAccountName ?? "",
+        bankAccountNumber: company.bankAccountNumber ?? "",
+        bankIfscCode: company.bankIfscCode ?? "",
+        bankBranch: company.bankBranch ?? "",
+        upiId: company.upiId ?? "",
+        invoiceNotes: company.invoiceNotes ?? "",
+        invoiceTerms: company.invoiceTerms ?? "",
       });
       setLogoUrl(company.logoUrl ?? null);
+      setSignatureUrl(company.signatureUrl ?? null);
     } catch (err: any) {
       setApiError(err, "Unable to load company profile");
     } finally {
@@ -92,16 +123,36 @@ export const AboutCompanyPage = () => {
     void loadCompany();
   }, [canEdit]);
 
+  useEffect(() => {
+    setStatesLoading(true);
+    setStatesLoadFailed(false);
+    void getStates()
+      .then((rows) => {
+        setStates(rows);
+        setStatesLoadFailed(false);
+      })
+      .catch((err: any) => {
+        setStates([]);
+        setStatesLoadFailed(true);
+        notificationService.showError("Unable to load states list", err);
+      })
+      .finally(() => setStatesLoading(false));
+  }, []);
+
   const saveProfile = async () => {
     clearMessage();
     setSuccess("");
     setSaving(true);
     try {
+      const normalizedGstin = form.gstRegistered ? (form.gstin ?? form.taxId ?? "").trim() : "";
       const updated = await updateCompanySettings({
         ...form,
+        gstin: normalizedGstin || undefined,
+        taxId: normalizedGstin || undefined,
         address: form.addressLine1 || form.address
       });
       setLogoUrl(updated.logoUrl ?? null);
+      setSignatureUrl(updated.signatureUrl ?? null);
       await refreshProfile();
       const message = CommonSuccessMessageUtil.updated("Company Profile");
       setSuccess(message);
@@ -150,6 +201,35 @@ export const AboutCompanyPage = () => {
     }
   };
 
+  const uploadSignature = async (file?: File) => {
+    if (!file) {
+      return;
+    }
+    clearMessage();
+    setSuccess("");
+    try {
+      const updated = await uploadCompanySignature(file);
+      setSignatureUrl(updated.signatureUrl ?? null);
+      await refreshProfile();
+      notificationService.showSuccess(CommonSuccessMessageUtil.updated("Company Signature"));
+    } catch (err: any) {
+      setApiError(err, "Unable to upload company signature");
+    }
+  };
+
+  const removeSignature = async () => {
+    clearMessage();
+    setSuccess("");
+    try {
+      const updated = await deleteCompanySignature();
+      setSignatureUrl(updated.signatureUrl ?? null);
+      await refreshProfile();
+      notificationService.showSuccess(CommonSuccessMessageUtil.updated("Company Signature"));
+    } catch (err: any) {
+      setApiError(err, "Unable to remove company signature");
+    }
+  };
+
   return (
     <div className="space-y-4 pb-6">
       <Header title="About Company" subtitle="Manage company identity, contact details, branding, and invoice communication settings." />
@@ -184,6 +264,12 @@ export const AboutCompanyPage = () => {
                       Remove logo
                     </Button>
                   ) : null}
+                  <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-white/10 bg-white/8 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/12">
+                    <PenTool size={16} />
+                    Upload signature
+                    <input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadSignature(event.target.files?.[0])} />
+                  </label>
+                  {signatureUrl ? <Button type="button" variant="secondary" onClick={() => void removeSignature()}>Remove signature</Button> : null}
                 </div>
               ) : null}
             </div>
@@ -192,7 +278,40 @@ export const AboutCompanyPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Basic details</p>
               <Input disabled={!canEdit} requiredMark label="Company Name" value={form.name} onChange={(event) => setField("name", event.target.value)} />
               <Input disabled={!canEdit} label="Legal Company Name" value={form.legalName} onChange={(event) => setField("legalName", event.target.value)} />
-              <Input disabled={!canEdit} requiredMark label="GST Number" value={form.taxId} onChange={(event) => setField("taxId", event.target.value)} />
+              <Input disabled={!canEdit || !form.gstRegistered} requiredMark={form.gstRegistered} label="GST Number" value={form.gstin ?? form.taxId} onChange={(event) => {
+                setField("gstin", event.target.value);
+                setField("taxId", event.target.value);
+              }} />
+              <Select
+                disabled={!canEdit}
+                label="GST Registered"
+                placeholder={null}
+                value={form.gstRegistered ? "true" : "false"}
+                onChange={(event) => {
+                  const nextValue = event.target.value === "true";
+                  setForm((current) => ({
+                    ...current,
+                    gstRegistered: nextValue,
+                    gstin: nextValue ? current.gstin : "",
+                    taxId: nextValue ? current.taxId : ""
+                  }));
+                }}
+                options={[
+                  { label: "Yes", value: "true" },
+                  { label: "No", value: "false" }
+                ]}
+              />
+              <Select
+                disabled={!canEdit}
+                label="Composition Scheme"
+                placeholder={null}
+                value={form.compositionScheme ? "true" : "false"}
+                onChange={(event) => setForm((current) => ({ ...current, compositionScheme: event.target.value === "true" }))}
+                options={[
+                  { label: "No", value: "false" },
+                  { label: "Yes", value: "true" }
+                ]}
+              />
               <Input disabled={!canEdit} label="PAN Number" value={form.panNumber} onChange={(event) => setField("panNumber", event.target.value)} />
               <Input disabled={!canEdit} label="CIN Number" value={form.cinNumber} onChange={(event) => setField("cinNumber", event.target.value)} />
             </section>
@@ -206,11 +325,39 @@ export const AboutCompanyPage = () => {
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Banking & Invoice</p>
+              <Input disabled={!canEdit} label="Bank Name" value={form.bankName ?? ""} onChange={(event) => setField("bankName", event.target.value)} />
+              <Input disabled={!canEdit} label="Account Name" value={form.bankAccountName ?? ""} onChange={(event) => setField("bankAccountName", event.target.value)} />
+              <Input disabled={!canEdit} label="Account Number" value={form.bankAccountNumber ?? ""} onChange={(event) => setField("bankAccountNumber", event.target.value)} />
+              <Input disabled={!canEdit} label="IFSC Code" value={form.bankIfscCode ?? ""} onChange={(event) => setField("bankIfscCode", event.target.value)} />
+              <Input disabled={!canEdit} label="Branch" value={form.bankBranch ?? ""} onChange={(event) => setField("bankBranch", event.target.value)} />
+              <Input disabled={!canEdit} label="UPI ID" value={form.upiId ?? ""} onChange={(event) => setField("upiId", event.target.value)} />
+              <Input disabled={!canEdit} label="Invoice Notes" value={form.invoiceNotes ?? ""} onChange={(event) => setField("invoiceNotes", event.target.value)} />
+              <Input disabled={!canEdit} label="Invoice Terms" value={form.invoiceTerms ?? ""} onChange={(event) => setField("invoiceTerms", event.target.value)} />
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2">
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Address</p>
               <Input disabled={!canEdit} label="Address Line 1" value={form.addressLine1} onChange={(event) => setField("addressLine1", event.target.value)} />
               <Input disabled={!canEdit} label="Address Line 2" value={form.addressLine2} onChange={(event) => setField("addressLine2", event.target.value)} />
               <Input disabled={!canEdit} label="City" value={form.city} onChange={(event) => setField("city", event.target.value)} />
-              <Input disabled={!canEdit} label="State" value={form.state} onChange={(event) => setField("state", event.target.value)} />
+              <Select
+                disabled={!canEdit}
+                label="State"
+                placeholder={statesLoading ? "Loading States" : states.length ? "Select State" : "No States Available"}
+                value={form.stateId ? String(form.stateId) : ""}
+                onChange={(event) => {
+                  const selected = states.find((item) => String(item.id) === event.target.value);
+                  setForm((current) => ({
+                    ...current,
+                    stateId: event.target.value ? Number(event.target.value) : null,
+                    state: selected?.stateName ?? "",
+                    country: selected?.countryName ?? current.country
+                  }));
+                }}
+                options={[{ label: "Select State", value: "" }, ...states.map((state) => ({ label: state.stateName, value: String(state.id) }))]}
+                hint={statesLoadFailed ? "State list could not be loaded from the server." : undefined}
+              />
               <Input disabled={!canEdit} label="Country" value={form.country} onChange={(event) => setField("country", event.target.value)} />
               <Input disabled={!canEdit} label="Pincode" value={form.pincode} onChange={(event) => setField("pincode", event.target.value)} />
             </section>

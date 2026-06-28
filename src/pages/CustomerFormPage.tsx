@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { type FieldErrors, useForm } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createCustomer, getCustomer, getCustomers, updateCustomer } from "../api/customers";
+import { getStates } from "../api/states";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
@@ -21,9 +22,12 @@ type FormValues = {
   email: string;
   address: string;
   city: string;
+  stateId: string;
   state: string;
+  country: string;
   pincode: string;
   gstNo: string;
+  gstRegistered: string;
   active: string;
 };
 
@@ -31,10 +35,12 @@ export const CustomerFormPage = () => {
   const navigate = useNavigate();
   const { customerId } = useParams();
   const editing = Boolean(customerId);
+  const [states, setStates] = useState<Array<{ id: number; stateName: string; countryName: string }>>([]);
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     watch,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
@@ -44,15 +50,30 @@ export const CustomerFormPage = () => {
       email: "",
       address: "",
       city: "",
+      stateId: "",
       state: "",
+      country: "India",
       pincode: "",
       gstNo: "",
+      gstRegistered: "false",
       active: "true"
     }
   });
   const { fieldErrors, setFieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
   const watchedValues = watch();
-  const canSaveCustomer = Boolean(watchedValues.name.trim() && watchedValues.mobile.trim());
+  const canSaveCustomer = Boolean(
+    watchedValues.name.trim() &&
+    watchedValues.mobile.trim() &&
+    (watchedValues.gstRegistered !== "true" || watchedValues.gstNo.trim())
+  );
+
+  useEffect(() => {
+    void getStates()
+      .then((rows) => setStates(rows))
+      .catch((err: any) => {
+        notificationService.showError("Unable to load states list", err);
+      });
+  }, []);
 
   useEffect(() => {
     if (!customerId) {
@@ -65,10 +86,13 @@ export const CustomerFormPage = () => {
         mobile: customer.mobile,
         email: customer.email ?? "",
         address: customer.address ?? "",
-        city: "",
-        state: "",
-        pincode: "",
-        gstNo: customer.gstNo ?? "",
+        city: customer.city ?? "",
+        stateId: customer.stateId ? String(customer.stateId) : "",
+        state: customer.state ?? "",
+        country: customer.country ?? "India",
+        pincode: customer.pincode ?? "",
+        gstNo: customer.gstin ?? customer.gstNo ?? "",
+        gstRegistered: customer.gstRegistered ? "true" : "false",
         active: customer.active ? "true" : "false"
       });
     });
@@ -77,12 +101,21 @@ export const CustomerFormPage = () => {
   const onSubmit = async (values: FormValues) => {
     clearFeedback();
 
+    const selectedState = values.stateId ? states.find((item) => String(item.id) === values.stateId) : undefined;
+    const normalizedGst = values.gstRegistered === "true" ? values.gstNo.trim() : "";
     const payload: CustomerRequest = {
       name: values.name.trim(),
       mobile: values.mobile.trim(),
       email: values.email.trim() || undefined,
-      address: [values.address, values.city, values.state, values.pincode].map((value) => value.trim()).filter(Boolean).join(", ") || undefined,
-      gstNo: values.gstNo.trim() || undefined,
+      address: values.address.trim() || undefined,
+      gstNo: normalizedGst || undefined,
+      gstin: normalizedGst || undefined,
+      gstRegistered: values.gstRegistered === "true",
+      city: values.city.trim() || undefined,
+      state: selectedState?.stateName,
+      stateId: values.stateId ? Number(values.stateId) : undefined,
+      country: selectedState?.countryName ?? (values.country.trim() || undefined),
+      pincode: values.pincode.trim() || undefined,
       active: values.active === "true"
     };
 
@@ -176,8 +209,24 @@ export const CustomerFormPage = () => {
               />
               <Input
                 label="GST Number"
+                disabled={watchedValues.gstRegistered !== "true"}
                 error={fieldErrors.gstNo ?? errors.gstNo?.message}
                 {...register("gstNo")}
+              />
+              <Select
+                label="GST Registered"
+                placeholder={null}
+                options={[
+                  { label: "No", value: "false" },
+                  { label: "Yes", value: "true" }
+                ]}
+                {...register("gstRegistered", {
+                  onChange: (event) => {
+                    if (event.target.value !== "true") {
+                      setValue("gstNo", "", { shouldDirty: true, shouldValidate: true });
+                    }
+                  }
+                })}
               />
               <Select
                 label="Status"
@@ -201,7 +250,24 @@ export const CustomerFormPage = () => {
                 {...register("address")}
               />
               <Input label="City" {...register("city")} />
-              <Input label="State" {...register("state")} />
+              <Select
+                label="State"
+                placeholder={states.length ? "Select State" : "Loading States"}
+                options={[{ label: "Select State", value: "" }, ...states.map((state) => ({ label: state.stateName, value: String(state.id) }))]}
+                {...register("stateId", {
+                  onChange: (event) => {
+                    const selected = states.find((item) => String(item.id) === event.target.value);
+                    reset({
+                      ...watch(),
+                      stateId: event.target.value,
+                      state: selected?.stateName ?? "",
+                      country: selected?.countryName ?? watch().country
+                    });
+                  }
+                })}
+              />
+              <input type="hidden" {...register("state")} />
+              <Input label="Country" {...register("country")} />
               <Input label="Pincode" {...register("pincode")} />
             </div>
           </section>

@@ -35,7 +35,7 @@ type ProfitLossFilters = {
   createdByRole: string;
 };
 
-const emptyReport: ProfitLossReport = { startDate: null, endDate: null, revenue: 0, expense: 0, netProfit: 0, expenseByCategory: [], revenueVsExpense: [] };
+const emptyReport: ProfitLossReport = { startDate: null, endDate: null, revenue: 0, costOfGoodsSold: 0, expense: 0, grossProfit: 0, netProfit: 0, expenseByCategory: [], revenueVsExpense: [] };
 const emptyPage = <T,>(): PageResponse<T> => ({ records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 });
 
 const emptyFilters: ProfitLossFilters = {
@@ -174,10 +174,12 @@ export const ProfitLossReportPage = () => {
         </div>
       </CommonAdvancedFilterPanel>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Revenue" value={formatCurrency(report.revenue)} caption="Invoice revenue in selected period" icon={<TrendingUp size={18} />} onClick={() => openDetail("revenue")} />
+        <StatCard label="COGS" value={formatCurrency(report.costOfGoodsSold)} caption="Batch-based cost of goods sold" icon={<ReceiptIndianRupee size={18} />} />
+        <StatCard label="Gross Profit" value={formatCurrency(report.grossProfit)} caption="Revenue minus batch cost" icon={<TrendingUp size={18} />} />
         <StatCard label="Expense" value={formatCurrency(report.expense)} caption="Recorded expenses in selected period" icon={<ReceiptIndianRupee size={18} />} onClick={() => openDetail("expense")} />
-        <StatCard label="Net Profit" value={formatCurrency(report.netProfit)} caption="Collection minus expense" icon={<TrendingDown size={18} />} onClick={() => openDetail("net")} />
+        <StatCard label="Net Profit" value={formatCurrency(report.netProfit)} caption="Gross profit minus expense" icon={<TrendingDown size={18} />} onClick={() => openDetail("net")} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">

@@ -21,14 +21,29 @@ export type CompanySummary = {
   addressLine2?: string | null;
   city?: string | null;
   state?: string | null;
+  stateId?: number | null;
   country?: string | null;
   pincode?: string | null;
   taxId: string;
+  gstin?: string | null;
+  gstRegistered?: boolean;
+  compositionScheme?: boolean;
   panNumber?: string | null;
   cinNumber?: string | null;
   logoUrl?: string | null;
   websiteUrl?: string | null;
+  bankName?: string | null;
+  bankAccountName?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfscCode?: string | null;
+  bankBranch?: string | null;
+  upiId?: string | null;
+  signatureUrl?: string | null;
+  invoiceNotes?: string | null;
+  invoiceTerms?: string | null;
   isChatbotEnabled: boolean;
+  inventoryConsumptionMethod?: "FIFO" | "LIFO" | "WEIGHTED_AVERAGE";
+  inventoryPricingPolicy?: "LATEST_BATCH_SELLING_PRICE" | "PRODUCT_MASTER_SELLING_PRICE" | "MANUAL_PRICE" | "PRICE_LIST";
 };
 
 export type CompanyTheme = {
@@ -166,6 +181,10 @@ export type DashboardSummary = {
   totalExpense: number;
   netRevenue: number;
   outstandingBalance: number;
+  totalGst: number;
+  cgstCollected: number;
+  sgstCollected: number;
+  igstCollected: number;
   totalSalesTrendPercentage: number;
   collectionTrendPercentage: number;
   outstandingTrendPercentage: number;
@@ -299,7 +318,14 @@ export type Customer = {
   mobile: string;
   email: string | null;
   address: string | null;
+  city?: string | null;
+  state?: string | null;
+  stateId?: number | null;
+  country?: string | null;
+  pincode?: string | null;
   gstNo: string | null;
+  gstin?: string | null;
+  gstRegistered?: boolean;
   currentBalance: number;
   totalPurchaseAmount: number;
   totalPaidAmount: number;
@@ -320,6 +346,21 @@ export type CustomerRequest = {
   email?: string;
   address?: string;
   gstNo?: string;
+  gstin?: string;
+  gstRegistered?: boolean;
+  city?: string;
+  state?: string;
+  stateId?: number;
+  country?: string;
+  pincode?: string;
+  active: boolean;
+};
+
+export type StateMaster = {
+  id: number;
+  stateCode: string;
+  stateName: string;
+  countryName: string;
   active: boolean;
 };
 
@@ -379,16 +420,37 @@ export type Product = {
   brand: string | null;
   sku: string;
   hsnCode: string | null;
-  purchasePrice: number;
+  taxMasterId: number | null;
+  taxName: string | null;
+  taxCode: string | null;
+  taxType: string | null;
+  taxable: boolean;
   sellingPrice: number;
   stockQty: number;
+  inventoryValue: number;
   minStockQty: number;
   taxPercent: number;
   active: boolean;
+  batches?: ProductBatchSummary[];
   createdAt: string;
   updatedAt: string;
   createdBy: string | null;
   updatedBy: string | null;
+};
+
+export type ProductBatchSummary = {
+  id: number;
+  batchNo: string;
+  batchDate: string;
+  purchaseQty: number;
+  remainingQty: number;
+  purchaseRate: number;
+  sellingRate: number;
+  stockValue: number;
+  batchStatus: string;
+  sourceType: string;
+  purchaseId?: number | null;
+  purchaseNo?: string | null;
 };
 
 export type ProductCategory = {
@@ -435,11 +497,97 @@ export type ProductRequest = {
   brand?: string;
   sku: string;
   hsnCode?: string;
-  purchasePrice: number;
-  sellingPrice: number;
-  stockQty: number;
+  taxMasterId?: number | null;
+  taxable?: boolean;
   minStockQty: number;
-  taxPercent: number;
+  active: boolean;
+};
+
+export type PurchaseItem = {
+  id: number;
+  productId: number;
+  productName: string;
+  qty: number;
+  purchaseRate: number;
+  sellingRate: number;
+  lineTotal: number;
+  batchId?: number | null;
+  batchNo?: string | null;
+};
+
+export type Purchase = {
+  id: number;
+  purchaseNo: string;
+  purchaseDate: string;
+  supplierName?: string | null;
+  remarks?: string | null;
+  subtotal: number;
+  totalAmount: number;
+  active: boolean;
+  items: PurchaseItem[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  createdByRef?: string | null;
+  updatedBy: string | null;
+};
+
+export type PurchaseRequestItem = {
+  productId: number;
+  qty: number;
+  purchaseRate: number;
+  sellingRate: number;
+};
+
+export type PurchaseRequest = {
+  purchaseDate: string;
+  supplierName?: string;
+  remarks?: string;
+  items: PurchaseRequestItem[];
+};
+
+export type InventoryLedgerEntry = {
+  id: number;
+  entryDate: string;
+  movementType: string;
+  productId: number;
+  productName: string;
+  batchId?: number | null;
+  batchNo?: string | null;
+  qtyIn: number;
+  qtyOut: number;
+  balanceAfter: number;
+  unitCost: number;
+  unitPrice: number;
+  referenceNo?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+  createdBy: string | null;
+};
+
+export type TaxMaster = {
+  id: number;
+  taxName: string;
+  taxCode: string;
+  taxType: string;
+  rate: number;
+  description: string | null;
+  defaultTax: boolean;
+  active: boolean;
+  deleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  updatedBy: string | null;
+};
+
+export type TaxMasterRequest = {
+  taxName: string;
+  taxCode: string;
+  taxType: string;
+  rate: number;
+  description?: string;
+  defaultTax: boolean;
   active: boolean;
 };
 
@@ -452,9 +600,6 @@ export type ProductDataPortRow = {
   active: string;
   brand: string | null;
   hsnCode: string | null;
-  purchasePrice: string;
-  sellingPrice: string;
-  openingStockQty: string;
   minimumStockQty: string;
   taxPercent: string;
   productCategoryId: number | null;
@@ -498,7 +643,21 @@ export type InvoiceItem = {
   qty: number;
   price: number;
   discountPercent: number;
+  discountAmount?: number;
+  taxMasterId?: number | null;
+  taxName?: string | null;
+  taxRate?: number;
+  hsnCode?: string | null;
+  taxableAmount?: number;
+  cgstRate?: number;
+  cgstAmount?: number;
+  sgstRate?: number;
+  sgstAmount?: number;
+  igstRate?: number;
+  igstAmount?: number;
   taxPercent: number;
+  netAmount?: number;
+  grandAmount?: number;
   lineTotal: number;
 };
 
@@ -510,12 +669,21 @@ export type Invoice = {
   customerMobile: string;
   customerEmail?: string | null;
   customerAddress: string | null;
+  customerState?: string | null;
+  customerStateId?: number | null;
+  customerGstin?: string | null;
   referByUserId?: number | null;
   referByUserName?: string | null;
   referByUsername?: string | null;
   subtotal: number;
+  taxableAmount?: number;
+  cgstTotal?: number;
+  sgstTotal?: number;
+  igstTotal?: number;
   taxAmount: number;
   discountAmount: number;
+  roundOff?: number;
+  grandTotal?: number;
   totalAmount: number;
   paidAmount: number;
   balanceAmount: number;
@@ -529,11 +697,88 @@ export type Invoice = {
   items: InvoiceItem[];
 };
 
+export type InvoiceTemplateMetadata = {
+  templateId: string;
+  templateName: string;
+  version: string;
+  description: string;
+  author: string;
+  previewImage?: string | null;
+  supportsWatermark: boolean;
+  supportsQr: boolean;
+  supportsSignature: boolean;
+  supportsBankDetails: boolean;
+  supportsTerms: boolean;
+  supportsNotes: boolean;
+  supportsGst: boolean;
+  supportsMultiPage: boolean;
+  supportedPaperSizes: string[];
+  defaultColors: Record<string, string>;
+  defaultTemplate: boolean;
+};
+
+export type CompanyInvoiceSettings = {
+  defaultTemplateId: string;
+  showWatermark: boolean;
+  watermarkText?: string | null;
+  showSignature: boolean;
+  signatureLabel?: string | null;
+  signatureHeading?: string | null;
+  showQr: boolean;
+  showBankDetails: boolean;
+  showTerms: boolean;
+  showNotes: boolean;
+  noteText?: string | null;
+  termsText?: string | null;
+  footerCredit?: string | null;
+};
+
+export type CompanyInvoiceSettingsRequest = {
+  defaultTemplateId: string;
+  showWatermark?: boolean;
+  watermarkText?: string;
+  showSignature?: boolean;
+  signatureLabel?: string;
+  signatureHeading?: string;
+  showQr?: boolean;
+  showBankDetails?: boolean;
+  showTerms?: boolean;
+  showNotes?: boolean;
+  noteText?: string;
+  termsText?: string;
+  footerCredit?: string;
+};
+
+export type InvoiceTemplatePreviewRequest = {
+  invoiceId?: number;
+  showWatermark?: boolean;
+  watermarkText?: string;
+  showSignature?: boolean;
+  signatureLabel?: string;
+  signatureHeading?: string;
+  showQr?: boolean;
+  showBankDetails?: boolean;
+  showTerms?: boolean;
+  showNotes?: boolean;
+  noteText?: string;
+  termsText?: string;
+  footerCredit?: string;
+};
+
+export type InvoiceRenderResponse = {
+  invoiceId?: number | null;
+  invoiceNo: string;
+  templateId: string;
+  templateName: string;
+  html: string;
+};
+
 export type InvoiceRequestItem = {
   productId: number;
   qty: number;
   price?: number;
   taxPercent?: number;
+  taxMasterId?: number | null;
   discountPercent: number;
   discountType?: "FIXED" | "PERCENT";
   discountValue?: number;
@@ -726,7 +971,9 @@ export type Profitability = {
   referenceId: number;
   referenceName: string;
   revenue: number;
+  costOfGoodsSold: number;
   expense: number;
+  grossProfit: number;
   netRevenue: number;
 };
 
@@ -742,10 +989,98 @@ export type ProfitLossReport = {
   startDate: string | null;
   endDate: string | null;
   revenue: number;
+  costOfGoodsSold: number;
   expense: number;
+  grossProfit: number;
   netProfit: number;
   expenseByCategory: ProfitLossPoint[];
   revenueVsExpense: ProfitLossPoint[];
+};
+
+export type GstInvoiceWiseRow = {
+  invoiceId: number;
+  invoiceNo: string;
+  invoiceDate: string;
+  customerId: number;
+  customerName: string;
+  customerState?: string | null;
+  customerStateId?: number | null;
+  customerGstin?: string | null;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalTaxAmount: number;
+  grandTotal: number;
+};
+
+export type GstCustomerWiseRow = {
+  customerId: number;
+  customerName: string;
+  customerGstin?: string | null;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalTaxAmount: number;
+  grandTotal: number;
+  invoiceCount: number;
+};
+
+export type GstMonthWiseRow = {
+  monthKey: string;
+  monthLabel: string;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalTaxAmount: number;
+  grandTotal: number;
+  invoiceCount: number;
+};
+
+export type GstTaxWiseRow = {
+  taxMasterId?: number | null;
+  taxName?: string | null;
+  taxCode?: string | null;
+  taxType?: string | null;
+  taxRate: number;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalTaxAmount: number;
+  grandAmount: number;
+  lineCount: number;
+};
+
+export type GstHsnSummaryRow = {
+  hsnCode: string;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalTaxAmount: number;
+  grandAmount: number;
+  totalQuantity: number;
+  lineCount: number;
+};
+
+export type GstReport = {
+  startDate: string | null;
+  endDate: string | null;
+  totalInvoices: number;
+  taxableAmount: number;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalTaxAmount: number;
+  grandTotal: number;
+  invoiceWise: GstInvoiceWiseRow[];
+  customerWise: GstCustomerWiseRow[];
+  monthWise: GstMonthWiseRow[];
+  taxWise: GstTaxWiseRow[];
+  hsnSummary: GstHsnSummaryRow[];
 };
 
 export type AuditLog = {

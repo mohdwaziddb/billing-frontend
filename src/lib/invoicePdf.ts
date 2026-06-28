@@ -101,7 +101,7 @@ const buildInvoicePdfDocument = async (invoice: Invoice, company: CompanySummary
   doc.setFontSize(10);
   doc.setTextColor(71, 85, 105);
   doc.text(doc.splitTextToSize(companyAddress(company), 280), 112, 78);
-  doc.text(`Phone: ${company?.phone ?? "--"}   GST: ${company?.taxId ?? "--"}`, 112, 108);
+  doc.text(`Phone: ${company?.phone ?? "--"}   GSTIN: ${company?.gstin ?? company?.taxId ?? "--"}`, 112, 108);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(24);
@@ -125,9 +125,10 @@ const buildInvoicePdfDocument = async (invoice: Invoice, company: CompanySummary
   doc.text(invoice.customerName, 40, 172);
   doc.text(`Mobile: ${invoice.customerMobile}`, 40, 188);
   doc.text(invoice.customerAddress ?? "Address not available", 40, 204);
+  doc.text(`State: ${invoice.customerState ?? "--"}   GSTIN: ${invoice.customerGstin ?? "--"}`, 40, 220);
 
   autoTable(doc, {
-    startY: 232,
+    startY: 248,
     theme: "grid",
     styles: {
       fontSize: 10,
@@ -143,11 +144,16 @@ const buildInvoicePdfDocument = async (invoice: Invoice, company: CompanySummary
     bodyStyles: {
       fillColor: [255, 255, 255]
     },
-    head: [["Product Name", "Quantity", "Rate", "Amount"]],
+    head: [["Product Name", "HSN", "Quantity", "Rate", "Taxable", "GST", "Amount"]],
     body: invoice.items.map((item) => [
       item.productName,
+      item.hsnCode ?? "--",
       String(item.qty),
       formatAmount(item.price),
+      formatAmount(item.taxableAmount ?? 0),
+      (item.igstAmount ?? 0) > 0
+        ? `IGST ${item.igstRate ?? 0}% ${formatAmount(item.igstAmount ?? 0)}`
+        : `CGST ${item.cgstRate ?? 0}% ${formatAmount(item.cgstAmount ?? 0)} / SGST ${item.sgstRate ?? 0}% ${formatAmount(item.sgstAmount ?? 0)}`,
       formatAmount(item.lineTotal)
     ])
   });
@@ -159,7 +165,10 @@ const buildInvoicePdfDocument = async (invoice: Invoice, company: CompanySummary
   const summaryRows: Array<[string, string]> = [
     ["Subtotal", formatAmount(invoice.subtotal)],
     ["Discount", formatAmount(invoice.discountAmount)],
-    ["Tax", formatAmount(invoice.taxAmount)],
+    ["Taxable Amount", formatAmount(invoice.taxableAmount ?? invoice.subtotal)],
+    ...((invoice.igstTotal ?? 0) > 0
+      ? [["IGST", formatAmount(invoice.igstTotal ?? 0)]]
+      : [["CGST", formatAmount(invoice.cgstTotal ?? 0)], ["SGST", formatAmount(invoice.sgstTotal ?? 0)]]) as Array<[string, string]>,
     ["Grand Total", formatAmount(invoice.totalAmount)],
     ["Paid Amount", formatAmount(invoice.paidAmount)],
     ["Remaining Balance", formatAmount(invoice.balanceAmount)]

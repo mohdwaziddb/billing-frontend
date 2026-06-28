@@ -9,12 +9,12 @@ export const FaqSection = () => {
   return (
     <LandingSectionFrame
       eyebrow="FAQ"
-      title="Answers that reduce uncertainty before the first login"
-      description="Clear, practical questions around fit, access, company setup, and communication capabilities."
+      title="Answers shaped for decision-makers evaluating a serious operating platform"
+      description="The FAQ keeps the page practical and conversion-friendly without cluttering the main visual flow."
     >
       <div className="mx-auto grid max-w-4xl gap-4">
         {faqs.map((faq, index) => (
-          <Reveal key={faq.title} delay={index * 40}>
+          <Reveal key={faq.title} delay={index * 0.04} y={20}>
             <AccordionItem
               title={faq.title}
               content={faq.content}

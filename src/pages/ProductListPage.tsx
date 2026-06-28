@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, History, Pencil, Upload } from "lucide-react";
+import { Download, Eye, History, Pencil, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getProductCategories } from "../api/productCategories";
 import { getProductSubCategories } from "../api/productSubCategories";
@@ -143,7 +143,7 @@ export const ProductListPage = () => {
       header: "Product Name",
       render: (item: Product) => (
         <div className="min-w-[180px]">
-          <p className="font-semibold text-white">{item.name}</p>
+          <Link to={`/products/${item.id}`} className="font-semibold text-white transition hover:text-[var(--theme-color)]">{item.name}</Link>
         </div>
       )
     },
@@ -151,11 +151,10 @@ export const ProductListPage = () => {
     { key: "brand", header: "Brand", render: (item: Product) => item.brand ?? "--" },
     { key: "category", header: "Category", render: (item: Product) => item.categoryName ?? item.category ?? "--" },
     { key: "subCategory", header: "Sub Category", render: (item: Product) => item.subCategoryName ?? item.subCategory ?? "--" },
-    { key: "purchasePrice", header: "Purchase Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.purchasePrice)}</span> },
-    { key: "price", header: "Selling Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.sellingPrice)}</span> },
+    { key: "price", header: "Default Selling Price", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.sellingPrice)}</span> },
     {
       key: "stock",
-      header: "Stock Qty",
+      header: "Current Stock",
       className: "text-right",
       render: (item: Product) => {
         const stockTone = item.stockQty <= 0 ? "amount-danger" : item.stockQty <= item.minStockQty ? "amount-warning" : "amount-success";
@@ -168,8 +167,18 @@ export const ProductListPage = () => {
         );
       }
     },
+    { key: "inventoryValue", header: "Inventory Value", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{formatCurrency(item.inventoryValue)}</span> },
     { key: "minStockQty", header: "Minimum Stock Qty", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{item.minStockQty}</span> },
-    { key: "taxPercent", header: "Tax Percent", className: "text-right", render: (item: Product) => <span className="block text-right font-semibold text-white">{item.taxPercent}%</span> },
+    {
+      key: "taxMaster",
+      header: "Tax Master",
+      render: (item: Product) => (
+        <div className="min-w-[140px]">
+          <p className="font-semibold text-white">{item.taxable ? (item.taxName ?? `${item.taxPercent}%`) : "Non Taxable"}</p>
+          <p className="mt-1 text-xs text-slate-400">{item.taxable ? (item.hsnCode ? `HSN ${item.hsnCode}` : item.taxCode ?? "--") : "GST exempt / non-taxable"}</p>
+        </div>
+      )
+    },
     { key: "status", header: "Status", render: (item: Product) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
   ], []);
 
@@ -180,6 +189,7 @@ export const ProductListPage = () => {
     render: (item: Product) => (
       <ActionDropdown
         actions={[
+          { label: "View Details", icon: <Eye size={15} />, to: `/products/${item.id}`, hidden: !can("PRODUCTS", "VIEW") },
           { label: "Edit", icon: <Pencil size={15} />, to: `/products/${item.id}/edit`, hidden: !can("PRODUCTS", "EDIT") },
           { label: "Show Logs", icon: <History size={15} />, hidden: !can("PRODUCTS", "LOGS"), onClick: () => setLogTarget(item) },
           { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("PRODUCTS", "DELETE"), onClick: () => setDeleteTarget(item) }
@@ -195,11 +205,11 @@ export const ProductListPage = () => {
     { key: "brand", header: "Brand", value: (row: Product) => row.brand },
     { key: "category", header: "Category", value: (row: Product) => row.categoryName ?? row.category },
     { key: "subCategory", header: "Sub Category", value: (row: Product) => row.subCategoryName ?? row.subCategory },
-    { key: "purchasePrice", header: "Purchase Price", type: "amount" as const },
-    { key: "price", header: "Selling Price", value: (row: Product) => row.sellingPrice, type: "amount" as const },
-    { key: "stock", header: "Stock Qty", value: (row: Product) => row.stockQty, type: "number" as const },
+    { key: "price", header: "Default Selling Price", value: (row: Product) => row.sellingPrice, type: "amount" as const },
+    { key: "stock", header: "Current Stock", value: (row: Product) => row.stockQty, type: "number" as const },
+    { key: "inventoryValue", header: "Inventory Value", value: (row: Product) => row.inventoryValue, type: "amount" as const },
     { key: "minStockQty", header: "Minimum Stock Qty", type: "number" as const },
-    { key: "taxPercent", header: "Tax Percent", type: "number" as const },
+    { key: "taxMaster", header: "Tax Master", value: (row: Product) => row.taxable ? row.taxName ?? `${row.taxPercent}%` : "Non Taxable" },
     { key: "status", header: "Status", value: (row: Product) => row.active ? "Active" : "Inactive" }
   ], visibleColumns), [visibleColumns]);
 
@@ -207,7 +217,7 @@ export const ProductListPage = () => {
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
         title="Products"
-        subtitle="Manage pricing, stock depth, tax settings, and product availability from a structured catalog view."
+        subtitle="Manage product master data while viewing batch-derived stock, inventory value, and default selling price."
       />
       <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4">

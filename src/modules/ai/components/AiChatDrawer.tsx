@@ -19,6 +19,21 @@ export const AiChatDrawer = ({ embedded = false }: { embedded?: boolean }) => {
     }
   }, [messages, loading, visible]);
 
+  useEffect(() => {
+    if (embedded || !open) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [embedded, open, setOpen]);
+
   if (!visible) {
     return null;
   }

@@ -1,186 +1,195 @@
-import { ArrowRight, BarChart3, CreditCard, PlayCircle, ReceiptIndianRupee, Sparkles } from "lucide-react";
+import { ArrowRight, BadgeCheck, PlayCircle, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
-import { FloatingOrb, Reveal } from "./LandingMotion";
+import { motion } from "../../lib/framerMotionCompat";
+import { Float, Reveal } from "./LandingMotion";
+
+const heroStats = [
+  { label: "Cash in pipeline", value: "Rs. 42.8L", change: "+12.4%" },
+  { label: "Invoices this month", value: "1,284", change: "+8.1%" },
+  { label: "Collection efficiency", value: "96.2%", change: "+3.2%" }
+];
+
+const ledgerRows = [
+  { name: "Northline Retail", amount: "Rs. 4.8L", state: "Paid" },
+  { name: "Atlas Trade", amount: "Rs. 2.1L", state: "Due" },
+  { name: "Zenico Wholesale", amount: "Rs. 3.4L", state: "Partial" }
+];
 
 export const HeroSection = () => (
-  <section className="relative mx-auto grid min-h-[calc(100vh-88px)] w-full max-w-7xl gap-14 px-4 pb-16 pt-16 md:px-6 lg:grid-cols-[0.94fr_1.06fr] lg:items-center lg:pb-24">
-    <Reveal className="relative z-10">
-      <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-[#2563EB] shadow-[0_18px_40px_rgba(15,23,42,0.07)] ring-1 ring-slate-200/80">
-        <Sparkles size={14} />
-        Intelligent Operating Layer For Modern Businesses
-      </div>
+  <section className="relative mx-auto grid min-h-[calc(100vh-88px)] w-full max-w-7xl gap-14 px-4 pb-16 pt-14 md:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:pb-24">
+    <div className="relative z-10">
+      <Reveal>
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#c8d8ff] bg-white/88 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-[#2451d8] shadow-[0_18px_40px_rgba(15,23,42,0.06)]">
+          <Sparkles size={14} />
+          Premium finance orchestration for growth-stage businesses
+        </div>
 
-      <h1 className="mt-8 max-w-4xl text-5xl font-black leading-[0.92] tracking-[-0.06em] text-slate-950 md:text-6xl lg:text-[4.9rem]">
-        Smart Billing.
-        <br />
-        Smarter Business.
-      </h1>
+        <h1 className="mt-8 max-w-4xl text-5xl font-black leading-[0.9] tracking-[-0.075em] text-slate-950 md:text-6xl lg:text-[5.3rem]">
+          Finance operations,
+          <br />
+          <span className="bg-[linear-gradient(135deg,#1f4ed8,#2563eb,#38bdf8)] bg-clip-text text-transparent">
+            orchestrated.
+          </span>
+        </h1>
 
-      <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-600">
-        Manage Billing, Inventory, Customers, Sales, Payments, Reports, Communication and Business Growth from one intelligent platform.
-      </p>
+        <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-600 md:text-xl">
+          BizFinity brings billing, receivables, customers, inventory, communication, and leadership reporting into one polished command layer.
+        </p>
 
-      <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-        <Link to="/login" className="inline-flex">
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#2563EB,#06B6D4)] px-7 py-4 text-sm font-black text-white shadow-[0_24px_48px_rgba(37,99,235,0.24)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_30px_60px_rgba(37,99,235,0.28)]"
+        <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+          <Link
+            to="/login"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#1f4ed8,#2563eb,#38bdf8)] px-7 py-4 text-sm font-black text-white shadow-[0_26px_56px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5"
           >
-            Login
+            Enter BizFinity
             <ArrowRight size={16} />
-          </button>
-        </Link>
-        <button
-          type="button"
-          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-7 py-4 text-sm font-black text-slate-700 shadow-[0_18px_36px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80 transition duration-300 hover:-translate-y-0.5 hover:text-slate-950"
-        >
-          <PlayCircle size={18} />
-          Watch Demo
-        </button>
-      </div>
-    </Reveal>
+          </Link>
+          <a
+            href="#showcase"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/92 px-7 py-4 text-sm font-black text-slate-700 shadow-[0_18px_36px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:text-slate-950"
+          >
+            <PlayCircle size={18} />
+            Explore product
+          </a>
+        </div>
+      </Reveal>
 
-    <Reveal className="relative" delay={120}>
-      <FloatingOrb className="absolute -left-8 top-8 h-36 w-36 rounded-full bg-sky-200/60 blur-3xl" duration="8s" />
-      <FloatingOrb className="absolute -right-6 top-16 h-32 w-32 rounded-full bg-cyan-200/70 blur-3xl" duration="10s" />
-      <FloatingOrb className="absolute bottom-6 left-20 h-24 w-24 rounded-full bg-violet-200/70 blur-3xl" duration="7s" />
+      <Reveal className="mt-10 grid gap-3 sm:grid-cols-3" delay={0.08}>
+        {heroStats.map((stat) => (
+          <motion.div
+            key={stat.label}
+            className="rounded-[26px] border border-white/80 bg-white/84 p-5 shadow-[0_22px_52px_rgba(15,23,42,0.08)] backdrop-blur-xl"
+            whileHover={{ y: -4 }}
+            transition={{ duration: 0.22 }}
+          >
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">{stat.label}</p>
+            <p className="mt-3 text-2xl font-black tracking-[-0.04em] text-slate-950">{stat.value}</p>
+            <p className="mt-2 inline-flex items-center gap-2 text-sm font-bold text-emerald-600">
+              <BadgeCheck size={14} />
+              {stat.change}
+            </p>
+          </motion.div>
+        ))}
+      </Reveal>
+    </div>
 
-      <div
-        className="relative rounded-[40px] bg-white/82 p-4 shadow-[0_42px_110px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/80 backdrop-blur-2xl"
-        style={{ animation: "landing-float 9s ease-in-out infinite" }}
-      >
-        <div className="rounded-[32px] bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(248,250,252,0.96),rgba(239,246,255,0.88))] p-5 ring-1 ring-white">
-          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-[28px] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] ring-1 ring-slate-100">
-              <div className="flex items-center justify-between">
+    <Reveal className="relative" delay={0.12}>
+      <Float className="absolute -left-8 top-10 hidden md:block">
+        <div className="h-28 w-28 rounded-full bg-cyan-200/55 blur-3xl" />
+      </Float>
+      <Float className="absolute right-0 top-24 hidden md:block" delay={0.5}>
+        <div className="h-32 w-32 rounded-full bg-blue-200/60 blur-3xl" />
+      </Float>
+
+      <div className="relative overflow-hidden rounded-[38px] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(244,248,255,0.92))] p-4 shadow-[0_48px_110px_rgba(15,23,42,0.12)] backdrop-blur-2xl">
+        <div className="rounded-[32px] border border-[#dbe6ff] bg-[#f5f8ff] p-4 md:p-5">
+          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-[28px] border border-white/90 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-400">Overview</p>
-                  <h3 className="mt-2 text-2xl font-black tracking-[-0.03em] text-slate-950">Executive Dashboard</h3>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Executive cockpit</p>
+                  <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-950">Revenue health overview</h3>
                 </div>
-                <div className="rounded-2xl bg-[linear-gradient(135deg,#2563EB,#06B6D4)] px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-white">
-                  Live
+                <div className="rounded-full bg-[linear-gradient(135deg,#1f4ed8,#38bdf8)] px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-white">
+                  Live sync
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
                 {[
-                  { label: "Revenue", value: "Rs. 8.4L" },
-                  { label: "Invoices", value: "1,284" },
-                  { label: "Collection", value: "Rs. 3.6L" }
-                ].map((stat) => (
-                  <div key={stat.label} className="rounded-[22px] bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
-                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">{stat.label}</p>
-                    <p className="mt-3 text-2xl font-black tracking-[-0.03em] text-slate-950">{stat.value}</p>
+                  ["Net billed", "Rs. 84.2L"],
+                  ["Open dues", "Rs. 9.8L"],
+                  ["Collected", "Rs. 74.4L"]
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-[22px] bg-slate-50 p-4 ring-1 ring-slate-100">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                    <p className="mt-3 text-2xl font-black tracking-[-0.04em] text-slate-950">{value}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-5 rounded-[24px] bg-slate-50 p-4 ring-1 ring-slate-100">
+              <div className="mt-5 rounded-[26px] bg-[linear-gradient(180deg,#08152f,#122957)] p-5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <div className="flex items-end gap-2">
-                  {[38, 52, 46, 70, 64, 84, 72].map((height, index) => (
+                  {[34, 48, 44, 66, 58, 82, 94, 76].map((height, index) => (
                     <div key={index} className="flex-1">
-                      <div
-                        className="rounded-t-2xl bg-[linear-gradient(180deg,rgba(6,182,212,0.72),rgba(37,99,235,0.98))] shadow-[0_12px_26px_rgba(37,99,235,0.18)]"
-                        style={{ height }}
+                      <motion.div
+                        className="rounded-t-[18px] bg-[linear-gradient(180deg,#6ee7ff,#3b82f6)]"
+                        initial={{ height: 16, opacity: 0.3 }}
+                        whileInView={{ height, opacity: 1 }}
+                        viewport={{ once: true, amount: 0.4 }}
+                        transition={{ duration: 0.6, delay: index * 0.04 }}
                       />
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                  <span>Mon</span>
-                  <span>Tue</span>
-                  <span>Wed</span>
-                  <span>Thu</span>
-                  <span>Fri</span>
-                  <span>Sat</span>
-                  <span>Sun</span>
+                <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-[0.18em] text-slate-300">
+                  {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"].map((month) => (
+                    <span key={month}>{month}</span>
+                  ))}
                 </div>
               </div>
             </div>
 
             <div className="space-y-4">
-              <FloatingCard
-                icon={ReceiptIndianRupee}
-                title="Collection Pulse"
-                lines={[
-                  ["Received", "Rs. 3.6L", "w-[85%]", "bg-emerald-500"],
-                  ["Pending", "Rs. 92K", "w-[44%]", "bg-amber-500"],
-                  ["Overdue", "Rs. 31K", "w-[22%]", "bg-rose-500"]
-                ]}
-              />
-              <FloatingCard
-                icon={CreditCard}
-                title="Invoice Stream"
-                simple
-                lines={[
-                  ["INV-2841", "Paid"],
-                  ["INV-2842", "Partial"],
-                  ["INV-2843", "Due"]
-                ]}
-              />
+              <motion.div
+                className="rounded-[28px] border border-white/90 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+                whileHover={{ y: -3 }}
+              >
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Receivables radar</p>
+                <div className="mt-4 space-y-4">
+                  {[
+                    ["Collected", "78%", "bg-emerald-500"],
+                    ["At risk", "14%", "bg-amber-500"],
+                    ["Overdue", "8%", "bg-rose-500"]
+                  ].map(([label, value, tone]) => (
+                    <div key={label} className="rounded-[20px] bg-slate-50 p-4 ring-1 ring-slate-100">
+                      <div className="flex items-center justify-between text-sm font-bold text-slate-700">
+                        <span>{label}</span>
+                        <span className="font-black text-slate-950">{value}</span>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                        <div className={`h-full rounded-full ${tone}`} style={{ width: value }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              <motion.div
+                className="rounded-[28px] border border-white/90 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+                whileHover={{ y: -3 }}
+              >
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Key accounts</p>
+                <div className="mt-4 space-y-3">
+                  {ledgerRows.map((row, index) => (
+                    <div key={row.name} className="flex items-center justify-between rounded-[18px] bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
+                      <div>
+                        <p className="text-sm font-black text-slate-900">{row.name}</p>
+                        <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Invoice cluster {index + 1}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-slate-950">{row.amount}</p>
+                        <p className="mt-1 text-xs font-black uppercase tracking-[0.18em] text-[#2451d8]">{row.state}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
             </div>
           </div>
         </div>
 
-        <div className="pointer-events-none absolute -left-8 top-12 hidden rounded-[24px] bg-white px-4 py-4 shadow-[0_18px_36px_rgba(15,23,42,0.10)] ring-1 ring-slate-200/80 md:block">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-[#2563EB]">
-              <BarChart3 size={20} />
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Sales Growth</p>
-              <p className="mt-1 text-lg font-black text-slate-950">+18.4%</p>
-            </div>
-          </div>
-        </div>
+        <motion.div
+          className="absolute -left-2 bottom-8 hidden rounded-[22px] border border-white/90 bg-white/94 px-4 py-4 shadow-[0_20px_50px_rgba(15,23,42,0.10)] md:block"
+          initial={{ opacity: 0, x: -24 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Overdue risk</p>
+          <p className="mt-2 text-xl font-black tracking-[-0.03em] text-slate-950">7 accounts need action</p>
+        </motion.div>
       </div>
     </Reveal>
   </section>
-);
-
-const FloatingCard = ({
-  title,
-  icon: Icon,
-  lines,
-  simple = false
-}: {
-  title: string;
-  icon: typeof ReceiptIndianRupee;
-  lines: string[][];
-  simple?: boolean;
-}) => (
-  <div className="rounded-[28px] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] ring-1 ring-slate-100">
-    <div className="flex items-center gap-3">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(37,99,235,0.12),rgba(6,182,212,0.16),rgba(139,92,246,0.12))] text-[#2563EB]">
-        <Icon size={22} />
-      </div>
-      <div>
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Live Module</p>
-        <h4 className="mt-1 text-lg font-black text-slate-950">{title}</h4>
-      </div>
-    </div>
-
-    <div className="mt-5 space-y-3">
-      {simple
-        ? lines.map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between rounded-[18px] bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
-              <span className="text-sm font-bold text-slate-700">{label}</span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-slate-700 ring-1 ring-slate-200">
-                {value}
-              </span>
-            </div>
-          ))
-        : lines.map(([label, value, widthClass, tone]) => (
-            <div key={label} className="rounded-[18px] bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-700">{label}</span>
-                <span className="text-sm font-black text-slate-950">{value}</span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-                <div className={`h-full rounded-full ${tone} ${widthClass}`} />
-              </div>
-            </div>
-          ))}
-    </div>
-  </div>
 );

@@ -1,33 +1,34 @@
+import { motion } from "../../lib/framerMotionCompat";
 import { LandingSectionFrame } from "./LandingSectionFrame";
-import { Reveal } from "./LandingMotion";
 import { workflowSteps } from "./landingData";
 
 export const WorkflowSection = () => (
   <LandingSectionFrame
     eyebrow="Workflow"
-    title="A clean process from transaction to growth"
-    description="Customer relationships, invoicing, payments, and reporting move in one continuous operational path."
+    title="The workflow is paced like a revenue engine, not a disconnected checklist"
+    description="BizFinity’s public experience now mirrors the way teams actually move from demand to billing to collections to management visibility."
   >
-    <Reveal>
-      <div className="rounded-[36px] bg-white px-6 py-8 shadow-[0_24px_60px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80">
-        <div className="grid gap-5 lg:grid-cols-5">
-          {workflowSteps.map((step, index) => (
-            <div key={step} className="relative">
-              <div className="rounded-[28px] bg-slate-50 px-5 py-6 text-center ring-1 ring-slate-100">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#DBEAFE,#CFFAFE,#EDE9FE)] text-sm font-black text-[#2563EB]">
-                  {index + 1}
-                </div>
-                <h3 className="mt-4 text-xl font-black tracking-[-0.03em] text-slate-950">{step}</h3>
-              </div>
-              {index < workflowSteps.length - 1 ? (
-                <div className="hidden lg:absolute lg:right-[-18px] lg:top-1/2 lg:block lg:-translate-y-1/2">
-                  <div className="h-[2px] w-9 bg-[linear-gradient(90deg,#2563EB,#06B6D4,#8B5CF6)]" />
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
-    </Reveal>
+    <div className="grid gap-5 lg:grid-cols-4">
+      {workflowSteps.map(({ title, description, icon: Icon }, index) => (
+        <motion.div
+          key={title}
+          className="relative rounded-[30px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_24px_60px_rgba(15,23,42,0.07)]"
+          initial={{ opacity: 0, y: 22 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.55, delay: index * 0.06 }}
+          whileHover={{ y: -4 }}
+        >
+          <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-[linear-gradient(135deg,rgba(31,78,216,0.12),rgba(56,189,248,0.16),rgba(125,211,252,0.14))] text-[#2451d8]">
+            <Icon size={24} />
+          </div>
+          <div className="mt-5 inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+            Phase {index + 1}
+          </div>
+          <h3 className="mt-4 text-2xl font-black tracking-[-0.04em] text-slate-950">{title}</h3>
+          <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+        </motion.div>
+      ))}
+    </div>
   </LandingSectionFrame>
 );
