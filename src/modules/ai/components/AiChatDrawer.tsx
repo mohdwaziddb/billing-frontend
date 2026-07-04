@@ -4,6 +4,7 @@ import { Button } from "../../../components/Button";
 import { notificationService } from "../../../services/notificationService";
 import { useAiAssistant } from "../hooks/useAiAssistant";
 import { AiChartCard } from "./AiChartCard";
+import { AiDataTable } from "./AiDataTable";
 import { AiDraftCard } from "./AiDraftCard";
 import { MarkdownMessage } from "./MarkdownMessage";
 
@@ -105,6 +106,7 @@ export const AiChatDrawer = ({ embedded = false }: { embedded?: boolean }) => {
                 />
               ) : null}
               {message.chart ? <AiChartCard chart={message.chart} /> : null}
+              {message.role === "assistant" && message.data ? <AiDataTable intent={message.intent} data={message.data} /> : null}
             </div>
           </div>
         ))}

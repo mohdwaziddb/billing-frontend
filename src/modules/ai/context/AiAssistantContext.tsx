@@ -31,7 +31,9 @@ export const AiAssistantProvider = ({ children }: { children: ReactNode }) => {
         content: response.message,
         createdAt: new Date().toISOString(),
         draft: response.draft ?? null,
-        chart: response.chart ?? null
+        chart: response.chart ?? null,
+        intent: response.intent,
+        data: response.data
       }
     ]);
   };

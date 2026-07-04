@@ -40,5 +40,7 @@ export type AiChatMessage = {
   createdAt: string;
   draft?: AiDraftAction | null;
   chart?: AiChart | null;
+  intent?: string;
+  data?: unknown;
   pending?: boolean;
 };
