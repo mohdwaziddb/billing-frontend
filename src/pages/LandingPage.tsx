@@ -7,7 +7,7 @@ import { env } from "../config/env";
 import type { PlatformSettings } from "../types/api";
 
 const FeatureSection = lazy(async () => import("../components/landing/FeatureSection").then((module) => ({ default: module.FeatureSection })));
-const WhyBizFinitySection = lazy(async () => import("../components/landing/WhyBizFinitySection").then((module) => ({ default: module.WhyBizFinitySection })));
+const WhyBizioSection = lazy(async () => import("../components/landing/WhyBizioSection").then((module) => ({ default: module.WhyBizioSection })));
 const ProductShowcaseSection = lazy(async () => import("../components/landing/ProductShowcaseSection").then((module) => ({ default: module.ProductShowcaseSection })));
 const WorkflowSection = lazy(async () => import("../components/landing/WorkflowSection").then((module) => ({ default: module.WorkflowSection })));
 const AISection = lazy(async () => import("../components/landing/AISection").then((module) => ({ default: module.AISection })));
@@ -17,7 +17,7 @@ const FaqSection = lazy(async () => import("../components/landing/FaqSection").t
 const ContactSection = lazy(async () => import("../components/landing/ContactSection").then((module) => ({ default: module.ContactSection })));
 const LandingFooter = lazy(async () => import("../components/landing/LandingFooter").then((module) => ({ default: module.LandingFooter })));
 
-const HOME_PAGE_TITLE = "BizFinity Technologies Pvt. Ltd.";
+const HOME_PAGE_TITLE = "Bizio Technologies Pvt. Ltd.";
 
 export const LandingPage = () => {
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(defaultPlatformSettings);
@@ -32,7 +32,7 @@ export const LandingPage = () => {
     document.title = HOME_PAGE_TITLE;
   }, []);
 
-  const productName = platformSettings.platformName?.trim() || "BizFinity";
+  const productName = platformSettings.platformName?.trim() || "Bizio";
   const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
   const platformLogoUrl = platformSettings.platformLogo
     ? (platformSettings.platformLogo.startsWith("http") ? platformSettings.platformLogo : `${apiOrigin}${platformSettings.platformLogo}`)
@@ -67,7 +67,7 @@ export const LandingPage = () => {
 
         <Suspense fallback={<LandingSectionFallback />}>
           <FeatureSection />
-          <WhyBizFinitySection />
+          <WhyBizioSection />
           <PricingSoonSection />
           <ProductShowcaseSection />
           <WorkflowSection />
@@ -92,7 +92,7 @@ const PricingSoonSection = () => (
           <div>
             <h2 className="text-4xl font-black tracking-[-0.05em] text-slate-950 md:text-5xl">Pricing plans are being shaped for serious business usage</h2>
             <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600">
-              BizFinity pricing is planned to align with operational scale, business needs, and premium product value. Public pricing will be announced soon.
+              Bizio pricing is planned to align with operational scale, business needs, and premium product value. Public pricing will be announced soon.
             </p>
           </div>
           <div className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-white">

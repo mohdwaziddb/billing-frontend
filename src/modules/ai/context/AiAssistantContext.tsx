@@ -46,6 +46,7 @@ export const AiAssistantProvider = ({ children }: { children: ReactNode }) => {
       if (!trimmed || loading) {
         return;
       }
+      const history = messages;
       setMessages((current) => [
         ...current,
         {
@@ -57,7 +58,7 @@ export const AiAssistantProvider = ({ children }: { children: ReactNode }) => {
       ]);
       setLoading(true);
       try {
-        appendAssistantResponse(await sendAiMessage(trimmed));
+        appendAssistantResponse(await sendAiMessage(trimmed, history));
       } catch (error) {
         const messageText = getApiErrorMessage(error, "Unable to reach AI assistant");
         notificationService.showError(messageText, error);

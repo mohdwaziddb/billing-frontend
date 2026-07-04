@@ -33,7 +33,7 @@ export const HeroSection = () => (
         </h1>
 
         <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-600 md:text-xl">
-          BizFinity brings billing, receivables, customers, inventory, communication, and leadership reporting into one polished command layer.
+          Bizio brings billing, receivables, customers, inventory, communication, and leadership reporting into one polished command layer.
         </p>
 
         <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -41,7 +41,7 @@ export const HeroSection = () => (
             to="/login"
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#1f4ed8,#2563eb,#38bdf8)] px-7 py-4 text-sm font-black text-white shadow-[0_26px_56px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5"
           >
-            Enter BizFinity
+            Enter Bizio
             <ArrowRight size={16} />
           </Link>
           <a

@@ -21,14 +21,14 @@ export const ContactSection = () => (
             </div>
             <h3 className="mt-6 text-3xl font-black tracking-[-0.05em] text-slate-950">Bring modern finance execution to the front of your business.</h3>
             <p className="mt-4 max-w-xl text-base leading-8 text-slate-600">
-              BizFinity is now presented as a premium SaaS destination with stronger visual hierarchy, cleaner responsiveness, and a more enterprise-ready conversion journey.
+              Bizio is now presented as a premium SaaS destination with stronger visual hierarchy, cleaner responsiveness, and a more enterprise-ready conversion journey.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/login"
                 className="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#1f4ed8,#2563eb,#38bdf8)] px-6 py-3.5 text-sm font-black text-white shadow-[0_20px_40px_rgba(37,99,235,0.22)]"
               >
-                Login to BizFinity
+                Login to Bizio
               </Link>
               <a
                 href="mailto:hello@bizfinity.in"

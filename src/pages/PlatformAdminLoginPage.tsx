@@ -7,7 +7,7 @@ import { PasswordInput } from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 
-const PUBLIC_APP_TITLE = "Bizfinity Technologies Pvt. Ltd.";
+const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
 
 export const PlatformAdminLoginPage = () => {
   const { loginPlatformAdmin, platform } = useAuth();

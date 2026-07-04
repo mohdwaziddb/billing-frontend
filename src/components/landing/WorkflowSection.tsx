@@ -6,7 +6,7 @@ export const WorkflowSection = () => (
   <LandingSectionFrame
     eyebrow="Workflow"
     title="The workflow is paced like a revenue engine, not a disconnected checklist"
-    description="BizFinity’s public experience now mirrors the way teams actually move from demand to billing to collections to management visibility."
+    description="Bizio’s public experience now mirrors the way teams actually move from demand to billing to collections to management visibility."
   >
     <div className="grid gap-5 lg:grid-cols-4">
       {workflowSteps.map(({ title, description, icon: Icon }, index) => (

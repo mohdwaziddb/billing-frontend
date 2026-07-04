@@ -3,12 +3,12 @@ import { LandingSectionFrame } from "./LandingSectionFrame";
 import { Reveal } from "./LandingMotion";
 import { operatingPillars, solutionStream } from "./landingData";
 
-export const WhyBizFinitySection = () => (
+export const WhyBizioSection = () => (
   <LandingSectionFrame
     id="solutions"
     eyebrow="Solutions"
     title="A landing page narrative shaped around business momentum, not generic feature dumping"
-    description="Each section frames BizFinity as a premium operating environment with strong hierarchy, clearer commercial intent, and enterprise-grade trust cues."
+    description="Each section frames Bizio as a premium operating environment with strong hierarchy, clearer commercial intent, and enterprise-grade trust cues."
     align="left"
   >
     <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">

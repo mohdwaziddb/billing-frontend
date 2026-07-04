@@ -231,7 +231,7 @@ export const securityItems: Array<{
 
 export const testimonials = [
   {
-    quote: "BizFinity feels like software built by people who understand both finance pressure and front-line execution.",
+    quote: "Bizio feels like software built by people who understand both finance pressure and front-line execution.",
     name: "Ritika Sethi",
     role: "COO, Northline Distribution"
   },
@@ -249,11 +249,11 @@ export const testimonials = [
 
 export const faqs = [
   {
-    title: "What kind of business is BizFinity designed for?",
-    content: "BizFinity is designed for businesses that need billing, customer management, payment tracking, inventory visibility, communication workflows, and reporting in one place."
+    title: "What kind of business is Bizio designed for?",
+    content: "Bizio is designed for businesses that need billing, customer management, payment tracking, inventory visibility, communication workflows, and reporting in one place."
   },
   {
-    title: "Can BizFinity support finance and operations teams together?",
+    title: "Can Bizio support finance and operations teams together?",
     content: "Yes. The landing page and product framing are built around shared workflows between business owners, finance leads, and operational users."
   },
   {

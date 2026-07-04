@@ -4,7 +4,7 @@ export const LandingFooter = () => (
   <footer className="border-t border-white/70 bg-white/84 backdrop-blur-2xl">
     <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-10 md:px-6 lg:grid-cols-[1.1fr_0.8fr_1fr]">
       <div>
-        <p className="text-xl font-black tracking-[-0.04em] text-slate-950">BizFinity</p>
+        <p className="text-xl font-black tracking-[-0.04em] text-slate-950">Bizio</p>
         <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
           A premium billing and finance operations experience for teams that want structure, speed, and a stronger commercial command layer.
         </p>
@@ -36,7 +36,7 @@ export const LandingFooter = () => (
 
     <div className="border-t border-slate-100">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-5 text-sm text-slate-500 md:flex-row md:items-center md:justify-between md:px-6">
-        <p>&copy; 2026 BizFinity. All rights reserved.</p>
+        <p>&copy; 2026 Bizio. All rights reserved.</p>
         <p>Landing page redesign with preserved `/login` access.</p>
       </div>
     </div>

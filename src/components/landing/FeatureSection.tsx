@@ -8,7 +8,7 @@ export const FeatureSection = () => (
     id="features"
     eyebrow="Platform"
     title="The operational layer between transaction volume and leadership clarity"
-    description="This is not a collection of disconnected utilities. BizFinity is framed as one original system for commercial teams that need speed, polish, and control."
+    description="This is not a collection of disconnected utilities. Bizio is framed as one original system for commercial teams that need speed, polish, and control."
   >
     <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
       <Reveal>
@@ -42,7 +42,7 @@ export const FeatureSection = () => (
             <p className="text-[11px] font-black uppercase tracking-[0.28em] text-cyan-200">Operating model</p>
             <h3 className="mt-4 text-3xl font-black tracking-[-0.05em]">Built for the people carrying daily revenue pressure</h3>
             <p className="mt-4 text-sm leading-7 text-slate-300">
-              BizFinity keeps finance leadership, collections workflows, and customer-facing operations in one visual rhythm.
+              Bizio keeps finance leadership, collections workflows, and customer-facing operations in one visual rhythm.
             </p>
             <div className="mt-6 space-y-3">
               {[

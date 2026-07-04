@@ -56,7 +56,7 @@ export const AiChatDrawer = ({ embedded = false }: { embedded?: boolean }) => {
             <Bot size={20} />
           </span>
           <div>
-            <h2 className="text-base font-bold text-slate-950">BizFinity Assistant</h2>
+            <h2 className="text-base font-bold text-slate-950">Bizio Assistant</h2>
             <p className="text-xs font-medium text-slate-500">Company-scoped AI workspace</p>
           </div>
         </div>

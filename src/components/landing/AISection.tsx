@@ -16,7 +16,7 @@ export const AISection = () => (
               </div>
               <h2 className="mt-6 text-4xl font-black tracking-[-0.06em] md:text-5xl">An intelligent support layer for finance-heavy workflows</h2>
               <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300">
-                The AI section is now original to BizFinity: positioned as an executive co-pilot for summaries, guidance, and operational prompts rather than a copied visual gimmick.
+                The AI section is now original to Bizio: positioned as an executive co-pilot for summaries, guidance, and operational prompts rather than a copied visual gimmick.
               </p>
               <div className="mt-6 inline-flex rounded-full border border-white/12 bg-white/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.22em] text-cyan-100">
                 Planned capability set

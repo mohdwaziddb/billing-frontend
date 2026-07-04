@@ -90,7 +90,7 @@ export const InvoiceDetailPage = () => {
     });
     setEmailForm({
       to: invoice.customerEmail ?? user?.company?.email ?? "",
-      subject: `Invoice ${invoice.invoiceNo} from ${user?.company?.name ?? "BizFinity"}`,
+      subject: `Invoice ${invoice.invoiceNo} from ${user?.company?.name ?? "Bizio"}`,
       includePdf: true
     });
   }, [invoice]);

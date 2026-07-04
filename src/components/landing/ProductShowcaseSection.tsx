@@ -8,7 +8,7 @@ export const ProductShowcaseSection = () => (
     id="showcase"
     eyebrow="Product"
     title="An original showcase built around dashboard rhythm and premium visual density"
-    description="The mock product surfaces below are intentionally custom to BizFinity while keeping the same quality bar for polish, spacing, and responsive composition."
+    description="The mock product surfaces below are intentionally custom to Bizio while keeping the same quality bar for polish, spacing, and responsive composition."
   >
     <Reveal>
       <div className="overflow-hidden rounded-[38px] border border-white/80 bg-white/92 p-5 shadow-[0_36px_90px_rgba(15,23,42,0.08)]">

@@ -148,7 +148,7 @@ export const AiAssistantWidget = () => {
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          title="Open BizFinity Assistant"
+          title="Open Bizio Assistant"
         >
           <Bot size={24} />
           <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow">
