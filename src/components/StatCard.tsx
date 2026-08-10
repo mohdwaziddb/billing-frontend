@@ -24,6 +24,10 @@ export const StatCard = ({
     "--stat-accent": analyticsColor ?? "var(--theme-color)"
   } as CSSProperties;
 
+  const displayTrend = trend && trend.length > 0 ? trend : [24, 30, 26, 38, 34, 46, 42, 58];
+  const maxTrend = Math.max(1, ...displayTrend.map((value) => Math.max(0, value)));
+  const normalizedTrend = displayTrend.map((value) => (Math.max(0, value) / maxTrend) * 40);
+
   const content = (
     <div className="relative overflow-hidden" style={accentStyle}>
       <div className="absolute right-0 top-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--stat-accent)_12%,white)] text-[var(--stat-accent)] shadow-[0_10px_22px_color-mix(in_srgb,var(--stat-accent)_12%,transparent)]">
@@ -36,7 +40,7 @@ export const StatCard = ({
         <p className="stat-card-value block max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-extrabold leading-tight text-slate-950">{value}</p>
       </div>
       <div className="mt-4 flex items-center justify-between gap-3">
-        <p className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-500">{caption}</p>
+        <p title={caption} className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-500">{caption}</p>
         {growth ? <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600">{growth}</span> : null}
       </div>
       <svg className="mt-4 h-10 w-full" viewBox="0 0 180 42" preserveAspectRatio="none" aria-hidden="true">
@@ -47,11 +51,11 @@ export const StatCard = ({
           </linearGradient>
         </defs>
         <path
-          d={`M0 42 ${trend.map((point, index) => `L${(index / Math.max(1, trend.length - 1)) * 180} ${42 - Math.min(40, point)}`).join(" ")} L180 42 Z`}
+          d={`M0 42 ${normalizedTrend.map((point, index) => `L${(index / Math.max(1, normalizedTrend.length - 1)) * 180} ${42 - point}`).join(" ")} L180 42 Z`}
           fill={`url(#trend-${label.replace(/\W/g, "")})`}
         />
         <polyline
-          points={trend.map((point, index) => `${(index / Math.max(1, trend.length - 1)) * 180},${42 - Math.min(40, point)}`).join(" ")}
+          points={normalizedTrend.map((point, index) => `${(index / Math.max(1, normalizedTrend.length - 1)) * 180},${42 - point}`).join(" ")}
           fill="none"
           stroke="var(--stat-accent)"
           strokeWidth="3"

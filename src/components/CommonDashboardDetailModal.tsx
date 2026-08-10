@@ -31,6 +31,7 @@ type CommonDashboardDetailModalProps<T> = {
   onSearchChange: (value: string) => void;
   onPageChange: (page: number) => void;
   onExport: () => void;
+  paginationPosition?: "top" | "bottom";
 };
 
 export const CommonDashboardDetailModal = <T,>({
@@ -49,7 +50,8 @@ export const CommonDashboardDetailModal = <T,>({
   onClose,
   onSearchChange,
   onPageChange,
-  onExport
+  onExport,
+  paginationPosition = "bottom"
 }: CommonDashboardDetailModalProps<T>) => (
   <Modal open={open} title={title} onClose={onClose}>
     <div className="space-y-5">
@@ -70,10 +72,23 @@ export const CommonDashboardDetailModal = <T,>({
             onChange={(event) => onSearchChange(event.target.value)}
           />
         </label>
-        <Button type="button" variant="secondary" disabled={!rows.length || loading} onClick={onExport}>
-          <Download size={17} />
-          Export Excel
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button type="button" variant="secondary" disabled={!rows.length || loading} onClick={onExport}>
+            <Download size={17} />
+            Export Excel
+          </Button>
+          {paginationPosition === "top" ? (
+            <Pagination
+              page={page}
+              size={DEFAULT_PAGE_SIZE}
+              totalRecords={totalRecords}
+              totalPages={totalPages}
+              disabled={loading}
+              onPageChange={onPageChange}
+              layout="inline"
+            />
+          ) : null}
+        </div>
       </div>
 
       <div className="scrollbar-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white">
@@ -111,14 +126,16 @@ export const CommonDashboardDetailModal = <T,>({
         </table>
       </div>
 
-      <Pagination
-        page={page}
-        size={DEFAULT_PAGE_SIZE}
-        totalRecords={totalRecords}
-        totalPages={totalPages}
-        disabled={loading}
-        onPageChange={onPageChange}
-      />
+      {!paginationPosition || paginationPosition === "bottom" ? (
+        <Pagination
+          page={page}
+          size={DEFAULT_PAGE_SIZE}
+          totalRecords={totalRecords}
+          totalPages={totalPages}
+          disabled={loading}
+          onPageChange={onPageChange}
+        />
+      ) : null}
     </div>
   </Modal>
 );

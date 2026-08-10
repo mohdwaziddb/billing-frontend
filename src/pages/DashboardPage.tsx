@@ -29,7 +29,7 @@ import { useAuth } from "../context/AuthContext";
 import { formatAmount, formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
-import type { CustomerDue, DashboardCardKey, DashboardDetail, DashboardDetailRow, DashboardSummary, Invoice, MetricPoint, PageResponse, SalesByCategory, TopSellingProduct } from "../types/api";
+import type { CustomerDue, DashboardCardKey, DashboardDetail, DashboardDetailRow, DashboardSummary, Invoice, MetricPoint, OwnerAnalytics, PageResponse, SalesByCategory, TopSellingProduct } from "../types/api";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 type DashboardListKey = "recentInvoices" | "topCustomers" | "topProducts" | "salesByCategory" | "outstandingCustomers";
@@ -296,6 +296,18 @@ const formatTrend = (value?: number | null) => {
   return `${safeValue > 0 ? "+" : ""}${safeValue.toFixed(2)}%`;
 };
 
+const computeTrendPercentage = (trend?: MetricPoint[]) => {
+  if (!trend || trend.length < 2) {
+    return 0;
+  }
+  const latest = Number(trend[trend.length - 1]?.value ?? 0);
+  const previous = Number(trend[trend.length - 2]?.value ?? 0);
+  if (previous === 0) {
+    return latest === 0 ? 0 : latest > 0 ? 100 : -100;
+  }
+  return ((latest - previous) / Math.abs(previous)) * 100;
+};
+
 type DashboardListRow = Invoice | DashboardDetailRow | TopSellingProduct | SalesByCategory | CustomerDue;
 
 const dashboardListConfig: Record<DashboardListKey, {
@@ -433,12 +445,7 @@ export const DashboardPage = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [recentInvoicesPage, setRecentInvoicesPage] = useState<PageResponse<Invoice>>(emptyPage<Invoice>());
   const [salesTrendData, setSalesTrendData] = useState<MetricPoint[]>([]);
-  const [ownerAnalytics, setOwnerAnalytics] = useState<{
-    salesTrend: MetricPoint[];
-    collectionTrend: MetricPoint[];
-    outstandingTrend: MetricPoint[];
-    monthlyRevenue: MetricPoint[];
-  } | null>(null);
+  const [ownerAnalytics, setOwnerAnalytics] = useState<OwnerAnalytics | null>(null);
   const [topProducts, setTopProducts] = useState<TopSellingProduct[]>([]);
   const [topProductsPage, setTopProductsPage] = useState<PageResponse<TopSellingProduct>>(emptyPage<TopSellingProduct>());
   const [salesByCategory, setSalesByCategory] = useState<SalesByCategory[]>([]);
@@ -494,7 +501,8 @@ export const DashboardPage = () => {
           caption: "In selected period",
           icon: <TrendingUp size={18} />,
           growth: formatTrend(summary?.totalSalesTrendPercentage),
-          analyticsColor: CHART_COLORS.sales
+          analyticsColor: CHART_COLORS.sales,
+          trend: ownerAnalytics?.salesTrend.map((point) => point.value)
         },
         {
           key: "collections" as const,
@@ -503,7 +511,8 @@ export const DashboardPage = () => {
           caption: "Recorded payments",
           icon: <CreditCard size={18} />,
           growth: formatTrend(summary?.collectionTrendPercentage),
-          analyticsColor: CHART_COLORS.collection
+          analyticsColor: CHART_COLORS.collection,
+          trend: ownerAnalytics?.collectionTrend.map((point) => point.value)
         },
         {
           key: "outstanding" as const,
@@ -512,10 +521,11 @@ export const DashboardPage = () => {
           caption: "Pending balance",
           icon: <Wallet size={18} />,
           growth: formatTrend(summary?.outstandingTrendPercentage),
-          analyticsColor: CHART_COLORS.outstanding
+          analyticsColor: CHART_COLORS.outstanding,
+          trend: ownerAnalytics?.outstandingTrend?.length ? ownerAnalytics.outstandingTrend.map((point) => point.value) : [0, 0, 0, 0, 0, 0, 0, 0]
         },
       ],
-    [summary]
+    [summary, ownerAnalytics]
   );
   const compactMetrics = useMemo(
     () => [
@@ -547,12 +557,7 @@ export const DashboardPage = () => {
       getCustomerDueList({ page: 0, size: DASHBOARD_ROW_LIMIT }).catch(() => emptyPage<CustomerDue>())
     ]).then(([summaryData, invoicesData, ownerData, productData, categoryPageData, outstandingData]) => {
       setSummary(summaryData);
-      setOwnerAnalytics(ownerData ? {
-        salesTrend: ownerData.salesTrend,
-        collectionTrend: ownerData.collectionTrend,
-        outstandingTrend: ownerData.outstandingTrend,
-        monthlyRevenue: ownerData.monthlyRevenue
-      } : null);
+      setOwnerAnalytics(ownerData ?? null);
       setTopProducts(productData.records);
       setTopProductsPage(productData);
       setSalesByCategory(categoryPageData.records);
@@ -750,6 +755,7 @@ export const DashboardPage = () => {
             icon={card.icon}
             growth={card.growth}
             analyticsColor={card.analyticsColor}
+            trend={card.trend}
             onClick={card.key ? () => openDetails(card.key) : undefined}
           />
         ))}
@@ -759,6 +765,8 @@ export const DashboardPage = () => {
           caption="Recorded business spend"
           icon={<Banknote size={18} />}
           analyticsColor="#f97316"
+          growth={formatTrend(computeTrendPercentage(ownerAnalytics?.expenseTrend))}
+          trend={ownerAnalytics?.expenseTrend?.length ? ownerAnalytics.expenseTrend.map((point) => point.value) : [0, 0, 0, 0, 0, 0, 0, 0]}
           onClick={() => openDetails("totalExpense")}
         />
         <StatCard
@@ -767,6 +775,8 @@ export const DashboardPage = () => {
           caption="Collection minus expense"
           icon={<TrendingUp size={18} />}
           analyticsColor="#0d9488"
+          growth={formatTrend(computeTrendPercentage(ownerAnalytics?.netProfitTrend))}
+          trend={ownerAnalytics?.netProfitTrend?.length ? ownerAnalytics.netProfitTrend.map((point) => point.value) : [0, 0, 0, 0, 0, 0, 0, 0]}
           onClick={() => openDetails("netRevenue")}
         />
       </div>
@@ -1123,6 +1133,7 @@ export const DashboardPage = () => {
         activeFilters={listModalFilters}
         grandTotal={activeListGrandTotal}
         emptyText={activeListConfig?.emptyText}
+        paginationPosition="top"
         onClose={() => setActiveList(null)}
         onSearchChange={(value) => {
           setListPage(0);

@@ -96,12 +96,15 @@ export const ExpenseCategoryPage = () => {
             <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
             <Select label="Status" value={active} options={[{ label: "All", value: "" }, { label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => setActive(event.target.value)} />
           </div>
-          {can("EXPENSE_CATEGORIES", "ADD") ? (
-            <Button type="button" onClick={() => openForm()}>
-              <Plus size={16} />
-              Add Category
-            </Button>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {can("EXPENSE_CATEGORIES", "ADD") ? (
+              <Button type="button" onClick={() => openForm()}>
+                <Plus size={16} />
+                Add Category
+              </Button>
+            ) : null}
+            <Pagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} layout="inline" onPageChange={(page) => void load(page)} />
+          </div>
         </div>
         <Table
           data={pageData.records}
@@ -124,7 +127,6 @@ export const ExpenseCategoryPage = () => {
             }
           ]}
         />
-        <Pagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} onPageChange={(page) => void load(page)} />
       </GlassCard>
 
       <Modal open={formOpen} title={editing ? "Edit Expense Category" : "Add Expense Category"} onClose={() => { setFormOpen(false); setEditing(null); setForm({ categoryName: "", description: "", active: "true" }); }}>

@@ -172,8 +172,9 @@ export const CustomerListPage = () => {
             <div>
               <CommonBreadcrumb items={[{ label: "Customers" }]} />
             </div>
-            {can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
+                <>
                 <CommonColumnSelector tableName="CUSTOMERS" availableColumns={customerColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
                 {can("CUSTOMERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!customers.length} onClick={() => exportToExcel("customers.xlsx", customers, customerExportColumns)}>
                   <Download size={16} />
@@ -182,8 +183,20 @@ export const CustomerListPage = () => {
                 {can("CUSTOMERS", "ADD") ? <Link to="/customers/new">
                   <Button>Add customer</Button>
                 </Link> : null}
-              </div>
-            ) : null}
+                </>
+              ) : null}
+              <Pagination
+                page={customerPage.page}
+                size={customerPage.size}
+                totalRecords={customerPage.totalRecords}
+                totalPages={customerPage.totalPages}
+                layout="inline"
+                onPageChange={(nextPage) => {
+                  setPage(nextPage);
+                  void loadCustomers(nextPage);
+                }}
+              />
+            </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
             <Input
@@ -229,18 +242,6 @@ export const CustomerListPage = () => {
             emptyText="No customers match the current filters."
             emptyAction={can("CUSTOMERS", "ADD") ? <Link to="/customers/new"><Button>Add customer</Button></Link> : null}
             columns={[...visibleCustomerColumns, customerActionColumn]}
-          />
-        </div>
-        <div className="mt-auto">
-          <Pagination
-          page={customerPage.page}
-          size={customerPage.size}
-          totalRecords={customerPage.totalRecords}
-          totalPages={customerPage.totalPages}
-          onPageChange={(nextPage) => {
-            setPage(nextPage);
-            void loadCustomers(nextPage);
-          }}
           />
         </div>
       </GlassCard>

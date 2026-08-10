@@ -64,10 +64,23 @@ export const StockLedgerPage = () => {
       <GlassCard className="space-y-4 p-6 md:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CommonBreadcrumb items={[{ label: "Inventory" }, { label: "Stock Ledger" }]} />
-          <Button type="button" variant="secondary" disabled={!ledgerPage.records.length} onClick={() => exportToExcel("stock-ledger.xlsx", ledgerPage.records, ledgerExportColumns)}>
-            <Download size={16} />
-            Export Excel
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="secondary" disabled={!ledgerPage.records.length} onClick={() => exportToExcel("stock-ledger.xlsx", ledgerPage.records, ledgerExportColumns)}>
+              <Download size={16} />
+              Export Excel
+            </Button>
+            <Pagination
+              page={ledgerPage.page}
+              size={ledgerPage.size}
+              totalRecords={ledgerPage.totalRecords}
+              totalPages={ledgerPage.totalPages}
+              layout="inline"
+              onPageChange={(nextPage) => {
+                setPage(nextPage);
+                void loadPage(nextPage);
+              }}
+            />
+          </div>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_260px_180px_180px_140px]">
           <Input label="Search Ledger" placeholder="Product, reference no, remarks, or date" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => {
@@ -105,10 +118,6 @@ export const StockLedgerPage = () => {
             { key: "unitCost", header: "Unit Cost", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.unitCost)}</span> }
           ]}
         />
-        <Pagination page={ledgerPage.page} size={ledgerPage.size} totalRecords={ledgerPage.totalRecords} totalPages={ledgerPage.totalPages} onPageChange={(nextPage) => {
-          setPage(nextPage);
-          void loadPage(nextPage);
-        }} />
       </GlassCard>
     </div>
   );

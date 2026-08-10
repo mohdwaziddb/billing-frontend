@@ -405,17 +405,17 @@ export const ExpenseListPage = () => {
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <CommonBreadcrumb items={[{ label: "Expenses" }]} />
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <CommonColumnSelector tableName="EXPENSES" availableColumns={expenseColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
             {can("EXPENSES", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportToExcel("expenses.xlsx", exportRows, visibleExpenseExportColumns)}><Download size={16} />Export</Button> : null}
             {can("EXPENSES", "ADD") ? <Button type="button" onClick={() => openForm()}><Plus size={16} />Add Expense</Button> : null}
+            <Pagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} layout="inline" onPageChange={(page) => void load(page)} />
           </div>
         </div>
         <Table
           data={pageData.records}
           columns={[...visibleExpenseColumns, expenseActionColumn]}
         />
-        <Pagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} onPageChange={(page) => void load(page)} />
       </GlassCard>
 
       <Modal open={formOpen} title={editing ? "Edit Expense" : "Add Expense"} onClose={() => setFormOpen(false)}>

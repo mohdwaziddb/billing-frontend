@@ -290,12 +290,15 @@ export const OutstandingCustomersReminderPage = () => {
             <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Reminder candidates</p>
             <h2 className="mt-2 text-2xl font-bold text-white">Overdue Customer List</h2>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
           <CommonColumnSelector
             tableName="OUTSTANDING_CUSTOMERS"
             availableColumns={overdueCustomerColumns.map(({ key, header }) => ({ key, header }))}
             visibleColumns={visibleColumns}
             onApply={setVisibleColumns}
           />
+          <Pagination page={customerPage.page} size={customerPage.size} totalRecords={customerPage.totalRecords} totalPages={customerPage.totalPages} disabled={loading} layout="inline" onPageChange={(nextPage) => void loadCustomers(filters, nextPage)} />
+          </div>
         </div>
 
         {loading ? (
@@ -309,14 +312,6 @@ export const OutstandingCustomersReminderPage = () => {
             columns={[...visibleOverdueCustomerColumns, overdueCustomerActionColumn]}
           />
         )}
-        <Pagination
-          page={customerPage.page}
-          size={customerPage.size}
-          totalRecords={customerPage.totalRecords}
-          totalPages={customerPage.totalPages}
-          disabled={loading}
-          onPageChange={(nextPage) => void loadCustomers(filters, nextPage)}
-        />
       </GlassCard>
 
       <ReminderHistoryModal

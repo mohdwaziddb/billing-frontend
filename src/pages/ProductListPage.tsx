@@ -225,8 +225,9 @@ export const ProductListPage = () => {
             <div>
               <CommonBreadcrumb items={[{ label: "Products" }]} />
             </div>
-            {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") || can("PRODUCT_DATAPORT", "VIEW") ? (
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") || can("PRODUCT_DATAPORT", "VIEW") ? (
+                <>
                 <CommonColumnSelector tableName="PRODUCTS" availableColumns={productColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
                 {can("PRODUCTS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!products.length} onClick={() => exportToExcel("products.xlsx", products, productExportColumns)}>
                   <Download size={16} />
@@ -241,8 +242,20 @@ export const ProductListPage = () => {
                 {can("PRODUCTS", "ADD") ? <Link to="/products/new">
                   <Button>Add product</Button>
                 </Link> : null}
-              </div>
-            ) : null}
+                </>
+              ) : null}
+              <Pagination
+                page={productPage.page}
+                size={productPage.size}
+                totalRecords={productPage.totalRecords}
+                totalPages={productPage.totalPages}
+                layout="inline"
+                onPageChange={(nextPage) => {
+                  setPage(nextPage);
+                  void loadProducts(nextPage);
+                }}
+              />
+            </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_180px_160px]">
             <Input
@@ -322,18 +335,6 @@ export const ProductListPage = () => {
               getRowId: (item: Product) => item.id
             } : undefined}
             columns={[...visibleProductColumns, productActionColumn]}
-          />
-        </div>
-        <div className="mt-auto">
-          <Pagination
-          page={productPage.page}
-          size={productPage.size}
-          totalRecords={productPage.totalRecords}
-          totalPages={productPage.totalPages}
-          onPageChange={(nextPage) => {
-            setPage(nextPage);
-            void loadProducts(nextPage);
-          }}
           />
         </div>
       </GlassCard>

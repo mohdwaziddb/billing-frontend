@@ -178,7 +178,7 @@ export const ProductSubCategoryPage = () => {
             <div>
               <CommonBreadcrumb items={[{ label: "Product Categories", to: "/setup/product-categories" }, { label: "Product Sub Categories" }]} />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {canExport ? <Button type="button" variant="secondary" disabled={!subCategories.length} onClick={() => exportToExcel("product-sub-categories.xlsx", subCategories, [
                 { key: "categoryName", header: "Category Name" },
                 { key: "subCategoryName", header: "Sub Category Name" },
@@ -193,6 +193,7 @@ export const ProductSubCategoryPage = () => {
                 Export Excel
               </Button> : null}
               {canAdd ? <Button onClick={openCreate}>Add Sub Category</Button> : null}
+              <Pagination page={subCategoryPage.page} size={subCategoryPage.size} totalRecords={subCategoryPage.totalRecords} totalPages={subCategoryPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadSubCategories(nextPage); }} />
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_160px]">
@@ -285,18 +286,6 @@ export const ProductSubCategoryPage = () => {
                 )
               }
             ]}
-          />
-        </div>
-        <div className="mt-auto">
-          <Pagination
-            page={subCategoryPage.page}
-            size={subCategoryPage.size}
-            totalRecords={subCategoryPage.totalRecords}
-            totalPages={subCategoryPage.totalPages}
-            onPageChange={(nextPage) => {
-              setPage(nextPage);
-              void loadSubCategories(nextPage);
-            }}
           />
         </div>
       </GlassCard>

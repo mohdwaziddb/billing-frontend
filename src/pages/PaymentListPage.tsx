@@ -378,8 +378,9 @@ export const PaymentListPage = () => {
           <div>
             <CommonBreadcrumb items={[{ label: "Payments" }]} />
           </div>
-          {can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
+              <>
               <CommonColumnSelector tableName="PAYMENTS" availableColumns={paymentColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
               {can("PAYMENTS", "EXPORT") ? (
                 <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportPayments("payments.xlsx", exportRows)}>
@@ -392,8 +393,10 @@ export const PaymentListPage = () => {
                   <Button>Add Payment</Button>
                 </Link>
               ) : null}
-            </div>
-          ) : null}
+              </>
+            ) : null}
+            <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadPayments(nextPage); }} />
+          </div>
         </div>
         <div className="flex-1">
           <PaymentTable
@@ -413,12 +416,6 @@ export const PaymentListPage = () => {
             onShowLogs={setLogTarget}
             onSendReminder={openReminder}
           />
-        </div>
-        <div className="mt-auto">
-          <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => {
-          setPage(nextPage);
-          void loadPayments(nextPage);
-          }} />
         </div>
       </GlassCard>
 

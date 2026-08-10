@@ -86,7 +86,7 @@ export const SmsTemplatePage = () => {
       <GlassCard className="flex min-h-[640px] flex-1 flex-col p-6 md:p-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <CommonBreadcrumb items={[{ label: "SMS Templates" }]} />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               aria-label="Search SMS templates"
               placeholder="Search templates"
@@ -100,6 +100,7 @@ export const SmsTemplatePage = () => {
             />
             <Button variant="secondary" onClick={() => void loadTemplates(0)}>Search</Button>
             {can("SMS_TEMPLATES", "ADD") ? <Button onClick={openCreate}><FilePlus2 size={16} /> New Template</Button> : null}
+            <Pagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} layout="inline" onPageChange={(nextPage) => void loadTemplates(nextPage)} />
           </div>
         </div>
         <div className="mt-5 flex min-h-0 flex-1 flex-col">
@@ -125,7 +126,6 @@ export const SmsTemplatePage = () => {
               }
             ]}
           />
-          <Pagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} onPageChange={(nextPage) => void loadTemplates(nextPage)} />
         </div>
       </GlassCard>
 

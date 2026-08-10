@@ -156,6 +156,17 @@ export const PurchaseListPage = () => {
               <Plus size={16} />
               New Purchase
             </Button>
+            <Pagination
+              page={purchasePage.page}
+              size={purchasePage.size}
+              totalRecords={purchasePage.totalRecords}
+              totalPages={purchasePage.totalPages}
+              layout="inline"
+              onPageChange={(nextPage) => {
+                setPage(nextPage);
+                void loadPage(nextPage);
+              }}
+            />
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_180px_180px_140px]">
@@ -208,10 +219,6 @@ export const PurchaseListPage = () => {
             }
           ]}
         />
-        <Pagination page={purchasePage.page} size={purchasePage.size} totalRecords={purchasePage.totalRecords} totalPages={purchasePage.totalPages} onPageChange={(nextPage) => {
-          setPage(nextPage);
-          void loadPage(nextPage);
-        }} />
       </GlassCard>
 
       <Modal open={open} title="New Purchase" onClose={() => !submitting && setOpen(false)} maxWidthClass="max-w-4xl">

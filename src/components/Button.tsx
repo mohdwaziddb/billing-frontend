@@ -4,13 +4,15 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost" | "danger";
+  size?: "default" | "icon-sm";
 };
 
-export const Button = ({ children, className, variant = "primary", ...props }: ButtonProps) => {
+export const Button = ({ children, className, variant = "primary", size = "default", ...props }: ButtonProps) => {
   return (
     <button
       className={clsx(
-        "relative inline-flex min-h-10 items-center justify-center gap-2 overflow-hidden rounded-[var(--radius-control)] border px-4 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--theme-color)_35%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60",
+        "relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-[var(--radius-control)] border text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--theme-color)_35%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60",
+        size === "default" ? "min-h-10 px-4 py-2.5" : "h-8 w-8 p-0",
         variant === "primary" &&
           "border-transparent bg-[var(--theme-color)] text-[var(--theme-contrast)] shadow-[0_10px_24px_color-mix(in_srgb,var(--theme-color)_24%,transparent)] hover:-translate-y-0.5 hover:bg-[var(--theme-hover)]",
         variant === "secondary" &&

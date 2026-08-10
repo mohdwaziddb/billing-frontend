@@ -126,13 +126,14 @@ export const PaymentModePage = () => {
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <CommonBreadcrumb items={[{ label: "Setup" }, { label: "Payment Modes" }]} />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {can("PAYMENT_MODES", "ADD") ? (
                 <Button type="button" onClick={openCreate}>
                   <Plus size={16} />
                   Add Payment Mode
                 </Button>
               ) : null}
+              <Pagination page={modePage.page} size={modePage.size} totalRecords={modePage.totalRecords} totalPages={modePage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadModes(nextPage); }} />
             </div>
           </div>
 
@@ -182,12 +183,6 @@ export const PaymentModePage = () => {
           ]}
         />
 
-        <div className="mt-auto pt-4">
-          <Pagination page={modePage.page} size={modePage.size} totalRecords={modePage.totalRecords} totalPages={modePage.totalPages} onPageChange={(nextPage) => {
-            setPage(nextPage);
-            void loadModes(nextPage);
-          }} />
-        </div>
       </GlassCard>
 
       <Modal open={formOpen} title={editing ? "Edit Payment Mode" : "Add Payment Mode"} onClose={() => setFormOpen(false)} maxWidthClass="max-w-2xl">

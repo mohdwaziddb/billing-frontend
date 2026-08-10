@@ -310,7 +310,7 @@ export const UserManagementPage = () => {
             <CommonBreadcrumb items={[{ label: "Users" }]} />
           </div>
           {can("USERS", "EXPORT") || can("USERS", "ADD") ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {can("USERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length && !users.length} onClick={() => exportUsers("users.xlsx", exportRows.length ? exportRows : users)}>
                 <Download size={16} />
                 Export Excel
@@ -319,6 +319,7 @@ export const UserManagementPage = () => {
                 <Plus size={16} />
                 Add user
               </Button> : null}
+              <Pagination page={userPage.page} size={userPage.size} totalRecords={userPage.totalRecords} totalPages={userPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadUsers(nextPage); }} />
             </div>
           ) : null}
         </div>
@@ -430,18 +431,6 @@ export const UserManagementPage = () => {
               )
             }
             ]}
-          />
-        </div>
-        <div className="mt-auto">
-          <Pagination
-          page={userPage.page}
-          size={userPage.size}
-          totalRecords={userPage.totalRecords}
-          totalPages={userPage.totalPages}
-          onPageChange={(nextPage) => {
-            setPage(nextPage);
-            void loadUsers(nextPage);
-          }}
           />
         </div>
       </GlassCard>

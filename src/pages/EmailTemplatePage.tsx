@@ -173,7 +173,7 @@ export const EmailTemplatePage = () => {
           <div>
             <CommonBreadcrumb items={[{ label: "Email Templates" }]} />
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Input
               aria-label="Search email templates"
               placeholder="Search templates"
@@ -193,6 +193,7 @@ export const EmailTemplatePage = () => {
             {can("EMAIL_TEMPLATES", "ADD") ? (
               <Button onClick={openCreate}><FilePlus2 size={16} /> New Template</Button>
             ) : null}
+            <Pagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} disabled={loading} layout="inline" onPageChange={(nextPage) => void loadTemplates(nextPage)} />
           </div>
         </div>
 
@@ -230,14 +231,6 @@ export const EmailTemplatePage = () => {
                 )
               }
             ]}
-          />
-          <Pagination
-            page={templatePage.page}
-            size={templatePage.size}
-            totalRecords={templatePage.totalRecords}
-            totalPages={templatePage.totalPages}
-            disabled={loading}
-            onPageChange={(nextPage) => void loadTemplates(nextPage)}
           />
         </div>
       </GlassCard>

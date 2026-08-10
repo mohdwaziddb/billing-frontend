@@ -154,7 +154,7 @@ export const ProductCategoryPage = () => {
             <div>
               <CommonBreadcrumb items={[{ label: "Product Categories" }]} />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {canExport ? <Button type="button" variant="secondary" disabled={!categories.length} onClick={() => exportToExcel("product-categories.xlsx", categories, [
                 { key: "categoryName", header: "Category Name" },
                 { key: "description", header: "Description" },
@@ -168,6 +168,7 @@ export const ProductCategoryPage = () => {
                 Export Excel
               </Button> : null}
               {canAdd ? <Button onClick={openCreate}>Add Category</Button> : null}
+              <Pagination page={categoryPage.page} size={categoryPage.size} totalRecords={categoryPage.totalRecords} totalPages={categoryPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadCategories(nextPage); }} />
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
@@ -249,18 +250,6 @@ export const ProductCategoryPage = () => {
               )
             }
             ]}
-          />
-        </div>
-        <div className="mt-auto">
-          <Pagination
-          page={categoryPage.page}
-          size={categoryPage.size}
-          totalRecords={categoryPage.totalRecords}
-          totalPages={categoryPage.totalPages}
-          onPageChange={(nextPage) => {
-            setPage(nextPage);
-            void loadCategories(nextPage);
-          }}
           />
         </div>
       </GlassCard>

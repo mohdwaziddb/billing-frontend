@@ -78,6 +78,73 @@ const toIso = (value: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const isSameDay = (left: Date, right: Date) =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate();
+
+const buildInvoiceDateRange = (rows: Invoice[]) => {
+  const timestamps = rows
+    .map((invoice) => new Date(invoice.invoiceDate).getTime())
+    .filter((time) => !Number.isNaN(time));
+
+  if (!timestamps.length) {
+    return { startDate: "", endDate: "" };
+  }
+
+  const start = new Date(Math.min(...timestamps));
+  const end = new Date(Math.max(...timestamps));
+  return { startDate: toIso(start), endDate: toIso(end) };
+};
+
+const buildInvoiceTrend = (
+  rows: Invoice[],
+  startDate: string,
+  endDate: string,
+  valueAccessor: (invoice: Invoice) => number = () => 1
+) => {
+  if (!rows.length) {
+    return Array(8).fill(0);
+  }
+
+  let rangeStart = new Date(startDate).getTime();
+  let rangeEnd = new Date(endDate).getTime();
+
+  if (Number.isNaN(rangeStart) || Number.isNaN(rangeEnd) || !startDate || !endDate) {
+    const range = buildInvoiceDateRange(rows);
+    rangeStart = new Date(range.startDate).getTime();
+    rangeEnd = new Date(range.endDate).getTime();
+  }
+
+  if (Number.isNaN(rangeStart) || Number.isNaN(rangeEnd)) {
+    return Array(8).fill(0);
+  }
+
+  if (rangeEnd < rangeStart) {
+    rangeEnd = rangeStart;
+  }
+
+  const bucketCount = 8;
+  const totalMs = rangeEnd - rangeStart;
+  const bucketMs = totalMs > 0 ? totalMs / bucketCount : 0;
+  const values = Array(bucketCount).fill(0);
+
+  rows.forEach((invoice) => {
+    const invoiceTime = new Date(invoice.invoiceDate).getTime();
+    if (Number.isNaN(invoiceTime) || invoiceTime < rangeStart || invoiceTime > rangeEnd) {
+      return;
+    }
+
+    const bucketIndex = bucketMs === 0
+      ? 0
+      : Math.min(bucketCount - 1, Math.floor((invoiceTime - rangeStart) / bucketMs));
+
+    values[bucketIndex] += valueAccessor(invoice);
+  });
+
+  return values;
+};
+
 const dateRangeForPreset = (preset: DatePreset) => {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -141,6 +208,63 @@ export const InvoiceListPage = () => {
 
   const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
   const activeFilterSummary = useMemo(() => summarizeInvoiceFilters(appliedFilters, categories), [appliedFilters, categories]);
+
+  const currentTrendRange = useMemo(() => {
+    const presetRange = appliedFilters.datePreset === "custom"
+      ? { startDate: appliedFilters.startDate, endDate: appliedFilters.endDate }
+      : dateRangeForPreset(appliedFilters.datePreset);
+
+    if (presetRange.startDate && presetRange.endDate) {
+      return presetRange;
+    }
+
+    return buildInvoiceDateRange(exportRows);
+  }, [appliedFilters, exportRows]);
+
+  const computeTrendGrowth = (trend: number[]) => {
+    if (trend.length < 2) {
+      return undefined;
+    }
+
+    const latest = trend[trend.length - 1];
+    const previous = trend[trend.length - 2];
+    if (latest === previous) {
+      return "0%";
+    }
+    if (previous === 0) {
+      return latest === 0 ? "0%" : "+100%";
+    }
+
+    const change = ((latest - previous) / Math.abs(previous)) * 100;
+    const sign = change >= 0 ? "+" : "";
+    return `${sign}${change.toFixed(0)}%`;
+  };
+
+  const totalInvoiceTrend = useMemo(
+    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate),
+    [exportRows, currentTrendRange]
+  );
+
+  const paidInvoiceTrend = useMemo(
+    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => invoice.paymentStatus === "PAID" ? 1 : 0),
+    [exportRows, currentTrendRange]
+  );
+
+  const pendingInvoiceTrend = useMemo(
+    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => invoice.paymentStatus === "UNPAID" ? 1 : 0),
+    [exportRows, currentTrendRange]
+  );
+
+  const partialInvoiceTrend = useMemo(
+    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => invoice.paymentStatus === "PARTIAL" ? 1 : 0),
+    [exportRows, currentTrendRange]
+  );
+
+  const outstandingTrend = useMemo(
+    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => Number(invoice.balanceAmount ?? 0)),
+    [exportRows, currentTrendRange]
+  );
+
   const summary = useMemo(() => ({
     total: exportRows.length,
     paid: exportRows.filter((item) => item.paymentStatus === "PAID").length,
@@ -259,11 +383,51 @@ export const InvoiceListPage = () => {
       <Header title="Invoices" subtitle="Search, filter, analyze, and export invoices from one billing ledger." />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total Invoices" value={String(summary.total)} caption="Current filtered invoices" icon={<FileText size={18} />} onClick={() => openSummary("total")} />
-        <StatCard label="Paid Invoices" value={String(summary.paid)} caption="Fully paid invoices" icon={<CheckCircle size={18} />} onClick={() => openSummary("paid")} />
-        <StatCard label="Pending Invoices" value={String(summary.pending)} caption="Unpaid invoices" icon={<Clock size={18} />} onClick={() => openSummary("pending")} />
-        <StatCard label="Partial Invoices" value={String(summary.partial)} caption="Partially paid invoices" icon={<AlertCircle size={18} />} onClick={() => openSummary("partial")} />
-        <StatCard label="Outstanding Amount" value={formatCurrency(summary.outstandingAmount)} caption="Current filtered balance" icon={<Wallet size={18} />} onClick={() => openSummary("outstanding")} />
+        <StatCard
+          label="Total Invoices"
+          value={String(summary.total)}
+          caption="Current filtered invoices"
+          icon={<FileText size={18} />}
+          growth={computeTrendGrowth(totalInvoiceTrend)}
+          trend={totalInvoiceTrend}
+          onClick={() => openSummary("total")}
+        />
+        <StatCard
+          label="Paid Invoices"
+          value={String(summary.paid)}
+          caption="Fully paid invoices"
+          icon={<CheckCircle size={18} />}
+          growth={computeTrendGrowth(paidInvoiceTrend)}
+          trend={paidInvoiceTrend}
+          onClick={() => openSummary("paid")}
+        />
+        <StatCard
+          label="Pending Invoices"
+          value={String(summary.pending)}
+          caption="Unpaid invoices"
+          icon={<Clock size={18} />}
+          growth={computeTrendGrowth(pendingInvoiceTrend)}
+          trend={pendingInvoiceTrend}
+          onClick={() => openSummary("pending")}
+        />
+        <StatCard
+          label="Partial Invoices"
+          value={String(summary.partial)}
+          caption="Partially paid invoices"
+          icon={<AlertCircle size={18} />}
+          growth={computeTrendGrowth(partialInvoiceTrend)}
+          trend={partialInvoiceTrend}
+          onClick={() => openSummary("partial")}
+        />
+        <StatCard
+          label="Outstanding Amount"
+          value={formatCurrency(summary.outstandingAmount)}
+          caption="Current filtered balance"
+          icon={<Wallet size={18} />}
+          growth={computeTrendGrowth(outstandingTrend)}
+          trend={outstandingTrend}
+          onClick={() => openSummary("outstanding")}
+        />
       </div>
 
       <CommonAdvancedFilterPanel
@@ -342,8 +506,9 @@ export const InvoiceListPage = () => {
           <div>
             <CommonBreadcrumb items={[{ label: "Invoices" }]} />
           </div>
-          {can("INVOICES", "EXPORT") || can("CREATE_INVOICE", "ADD") ? (
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {can("INVOICES", "EXPORT") || can("CREATE_INVOICE", "ADD") ? (
+              <>
               {can("INVOICES", "EXPORT") ? (
                 <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportInvoices("invoices.xlsx", exportRows)}>
                   <Download size={16} />
@@ -355,23 +520,13 @@ export const InvoiceListPage = () => {
                   <Button>Create Invoice</Button>
                 </Link>
               ) : null}
-            </div>
-          ) : null}
+              </>
+            ) : null}
+            <Pagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadInvoices(nextPage); }} />
+          </div>
         </div>
         <div className="flex-1">
           <InvoiceTable invoices={invoices} logCounts={logCounts} canDelete={can("INVOICES", "DELETE")} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={(invoice) => void handleRestore(invoice)} onShowLogs={setLogTarget} />
-        </div>
-        <div className="mt-auto">
-          <Pagination
-          page={invoicePage.page}
-          size={invoicePage.size}
-          totalRecords={invoicePage.totalRecords}
-          totalPages={invoicePage.totalPages}
-          onPageChange={(nextPage) => {
-            setPage(nextPage);
-            void loadInvoices(nextPage);
-          }}
-          />
         </div>
       </GlassCard>
 

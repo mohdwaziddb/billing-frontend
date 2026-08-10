@@ -167,7 +167,7 @@ export const TaxMasterPage = () => {
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <CommonBreadcrumb items={[{ label: "Setup" }, { label: "Tax Master" }]} />
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {canExport ? (
                 <Button
                   type="button"
@@ -191,6 +191,7 @@ export const TaxMasterPage = () => {
                 </Button>
               ) : null}
               {canAdd ? <Button onClick={openCreate}>Add Tax</Button> : null}
+              <Pagination page={taxPage.page} size={taxPage.size} totalRecords={taxPage.totalRecords} totalPages={taxPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadTaxes(nextPage); }} />
             </div>
           </div>
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px_160px]">
@@ -271,18 +272,6 @@ export const TaxMasterPage = () => {
                 )
               }
             ]}
-          />
-        </div>
-        <div className="mt-auto">
-          <Pagination
-            page={taxPage.page}
-            size={taxPage.size}
-            totalRecords={taxPage.totalRecords}
-            totalPages={taxPage.totalPages}
-            onPageChange={(nextPage) => {
-              setPage(nextPage);
-              void loadTaxes(nextPage);
-            }}
           />
         </div>
       </GlassCard>
