@@ -313,6 +313,7 @@ export const CreateInvoicePage = () => {
   }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.grandTotal, invoiceSummary.totalBeforeInvoiceDiscount, paidAmountInput, paymentModeInput, productMap, selectedCustomer, user?.company?.state, user?.company?.stateId, watchedItems]);
 
   const hasClientValidationErrors = rowIssues.some((issues) => issues.length > 0) || summaryIssues.length > 0;
+  const validationMessage = rowIssues.flat()[0]?.message ?? summaryIssues[0];
   const totalWithoutDiscount = invoiceSummary.grandTotal + invoiceSummary.productDiscountTotal + invoiceSummary.invoiceDiscount;
   const canProceedWithInvoice = Boolean(selectedCustomer?.active);
   const hasRequiredInvoiceFields = Boolean(
@@ -580,14 +581,19 @@ export const CreateInvoicePage = () => {
                 <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Create Invoice" }]} />
                 <h2 className="mt-1 text-xl font-bold text-slate-950">Create Invoice</h2>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" onClick={() => navigate("/invoices")}>
-                  <ArrowLeft size={16} />
-                  Back
-                </Button>
-                <Button disabled={isSubmitting || !canSaveInvoice} type="submit">
-                  {isSubmitting ? "Saving..." : "Save Invoice"}
-                </Button>
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="secondary" onClick={() => navigate("/invoices")}>
+                    <ArrowLeft size={16} />
+                    Back
+                  </Button>
+                  <Button disabled={isSubmitting || !canSaveInvoice} type="submit">
+                    {isSubmitting ? "Saving..." : "Save Invoice"}
+                  </Button>
+                </div>
+                {validationMessage ? (
+                  <p className="text-sm font-semibold text-rose-600">{validationMessage}</p>
+                ) : null}
               </div>
             </div>
 
