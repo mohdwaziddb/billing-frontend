@@ -4,7 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useAiAssistant } from "../hooks/useAiAssistant";
 import { AiChatDrawer } from "./AiChatDrawer";
 
-const AI_WIDGET_POSITION_KEY = "bizfinity.aiWidgetPosition";
+const AI_WIDGET_POSITION_KEY = "bizio.aiWidgetPosition";
 const WIDGET_SIZE = 56;
 const WIDGET_MARGIN = 20;
 
