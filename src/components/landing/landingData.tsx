@@ -8,7 +8,6 @@ import {
   BrainCircuit,
   Building2,
   LineChart,
-  CheckCircle2,
   CircleDollarSign,
   CreditCard,
   DatabaseZap,
@@ -19,6 +18,7 @@ import {
   LayoutTemplate,
   Mail,
   MessageSquareMore,
+  Phone,
   ReceiptIndianRupee,
   ShieldCheck,
   Sparkles,
@@ -271,8 +271,8 @@ export const contactCards: Array<{
   value: string;
   icon: LucideIcon;
 }> = [
-  { label: "Email", value: "hello@bizfinity.in", icon: Mail },
-  { label: "Advisory", value: "Enterprise onboarding available", icon: CheckCircle2 },
+  { label: "Email", value: "biziotechnologies@gmail.com", icon: Mail },
+  { label: "Phone", value: "+91 98917 85824", icon: Phone },
   { label: "Coverage", value: "Billing, CRM, inventory, analytics", icon: LayoutTemplate },
-  { label: "Response", value: "Business-hour launch assistance", icon: BellRing }
+  { label: "Response", value: "Business-hour reply support", icon: BellRing }
 ];

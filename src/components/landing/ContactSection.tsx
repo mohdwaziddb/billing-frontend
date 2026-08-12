@@ -31,7 +31,7 @@ export const ContactSection = () => (
                 Login to Bizio
               </Link>
               <a
-                href="mailto:hello@bizfinity.in"
+                href="mailto:biziotechnologies@gmail.com"
                 className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-black text-slate-700"
               >
                 Talk to the team

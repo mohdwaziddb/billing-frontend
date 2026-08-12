@@ -1,4 +1,4 @@
-import { Linkedin, Mail, Twitter } from "lucide-react";
+import { Linkedin, Mail, Phone, Twitter } from "lucide-react";
 
 export const LandingFooter = () => (
   <footer className="border-t border-white/70 bg-white/84 backdrop-blur-2xl">
@@ -20,11 +20,21 @@ export const LandingFooter = () => (
 
       <div className="grid gap-4">
         <p className="text-sm font-black uppercase tracking-[0.22em] text-slate-400">Connect</p>
+        <div className="grid gap-2.5">
+          <a href="tel:+919891785824" className="flex items-center gap-2 text-sm font-bold text-slate-600 transition hover:text-slate-950">
+            <Phone size={16} className="shrink-0" />
+            +91 98917 85824
+          </a>
+          <a href="mailto:biziotechnologies@gmail.com" className="flex items-center gap-2 break-all text-sm font-bold text-slate-600 transition hover:text-slate-950">
+            <Mail size={16} className="shrink-0" />
+            biziotechnologies@gmail.com
+          </a>
+        </div>
         <div className="flex gap-3">
-          {[Linkedin, Twitter, Mail].map((Icon, index) => (
+          {[Linkedin, Twitter].map((Icon, index) => (
             <a
               key={index}
-              href={index === 2 ? "mailto:hello@bizfinity.in" : "#contact"}
+              href="#contact"
               className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-950"
             >
               <Icon size={18} />

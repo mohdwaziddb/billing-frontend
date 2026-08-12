@@ -667,6 +667,11 @@ select:-webkit-autofill {
   line-height: 1.2;
 }
 
+.bizio-home section[id],
+.bizio-home main section[id] {
+  scroll-margin-top: 4.5rem;
+}
+
 .bizio-home main article {
   padding: 1.15rem;
 }
