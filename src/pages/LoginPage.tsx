@@ -1,21 +1,19 @@
-import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Button } from "../components/Button";
-import { GlassCard } from "../components/GlassCard";
-import { Input } from "../components/Input";
-import { PasswordInput } from "../components/PasswordInput";
+import { useNavigate } from "react-router-dom";
+import { AnalyticsShowcase } from "../components/login/AnalyticsShowcase";
+import { LoginCard } from "../components/login/LoginCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { getApiErrorMessage } from "../lib/errors";
 
 const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
 
 export const LoginPage = () => {
   const { auth, sessionType, permissions, firstAccessibleRoute, login, platform } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
   const canSubmit = Boolean(form.username.trim() && form.password.trim());
 
@@ -36,69 +34,55 @@ export const LoginPage = () => {
     document.title = `Login | ${platform.platformName || PUBLIC_APP_TITLE}`;
   }, [platform.platformName]);
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submit = async () => {
     try {
       setLoading(true);
+      setError("");
       clearMessage();
       const firstRoute = await login(form);
       navigate(firstRoute ?? "/no-menu", { replace: true });
     } catch (err: any) {
-      setApiError(err, "Unable to login");
+      const message = getApiErrorMessage(err, "Unable to sign in. Please check your email and password.");
+      setError(message);
+      setApiError(err, "Unable to sign in. Please check your email and password.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-10">
-      <div className="grid w-full max-w-6xl gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="flex flex-col justify-center">
-          <div>
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:text-[var(--theme-color)]"
-            >
-              <ArrowLeft size={16} />
-              <span>Back</span>
-            </Link>
-          </div>
-          <p className="mt-8 text-sm uppercase tracking-[0.45em] text-[var(--theme-color)]">Billing operations platform</p>
-          <h1 className="mt-6 text-5xl font-extrabold leading-tight text-slate-950 md:text-6xl">
-            Financial control built for day-to-day billing teams.
-          </h1>
-          <p className="mt-6 max-w-xl text-lg text-slate-600">
-            Manage customers, invoices, collections, reminders, and analytics from one secure enterprise workspace.
-          </p>
-        </div>
-
-        <GlassCard className="p-8 md:p-10">
-          <p className="text-sm uppercase tracking-[0.35em] text-[var(--theme-color)]">Welcome back</p>
-          <h2 className="mt-4 text-3xl font-extrabold text-slate-950">Sign in to your workspace</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Access your billing, inventory, payments, and business operations from one secure workspace.
-          </p>
-          <form className="mt-8 space-y-4" onSubmit={submit}>
-            <Input
-              label="Email / Mobile / Username"
-              requiredMark
-              type="text"
-              placeholder="Email / Mobile / Username"
-              value={form.username}
-              onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-            />
-            <PasswordInput
-              label="Password"
-              requiredMark
-              value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-            />
-            <Button className="w-full" disabled={loading || !canSubmit} type="submit">
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-        </GlassCard>
+    <div
+      className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#f8fafc]"
+      style={{ fontFamily: "Manrope, Inter, system-ui, sans-serif" }}
+    >
+      <div className="grid flex-1 lg:grid-cols-2">
+        <AnalyticsShowcase />
+        <main className="relative flex items-center justify-center px-4 py-10 sm:px-8 lg:py-12">
+          <LoginCard
+            username={form.username}
+            password={form.password}
+            loading={loading}
+            canSubmit={canSubmit}
+            error={error}
+            onUsernameChange={(value) => {
+              setForm((current) => ({ ...current, username: value }));
+              if (error) {
+                setError("");
+              }
+            }}
+            onPasswordChange={(value) => {
+              setForm((current) => ({ ...current, password: value }));
+              if (error) {
+                setError("");
+              }
+            }}
+            onSubmit={submit}
+          />
+        </main>
       </div>
+      <footer className="border-t border-slate-200 bg-white/70 py-4 text-center text-xs font-medium text-slate-500">
+        © 2026 Bizio Technologies. All rights reserved.
+      </footer>
     </div>
   );
 };

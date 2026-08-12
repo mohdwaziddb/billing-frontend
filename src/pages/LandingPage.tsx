@@ -124,12 +124,9 @@ export const LandingPage = () => {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center md:flex">
           <Link to="/login" className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[10px] font-bold text-slate-700 transition hover:border-slate-300 hover:text-slate-950">
             Login
-          </Link>
-          <Link to="/login" className="rounded-xl bg-[#2453d8] px-4 py-2 text-[10px] font-bold text-white shadow-sm shadow-blue-200 transition hover:bg-[#1d47bd]">
-            Get Started
           </Link>
         </div>
 
@@ -147,12 +144,9 @@ export const LandingPage = () => {
               </a>
             ))}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Link to="/login" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-bold text-slate-700">
+          <div className="mt-3">
+            <Link to="/login" className="block rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-bold text-slate-700">
               Login
-            </Link>
-            <Link to="/login" className="rounded-xl bg-[#2453d8] px-3 py-2 text-center text-sm font-bold text-white">
-              Get Started
             </Link>
           </div>
         </nav>

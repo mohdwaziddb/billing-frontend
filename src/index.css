@@ -837,3 +837,24 @@ select:-webkit-autofill {
 .bizio-home #about + section article:nth-child(4) > div:first-child {
   background: linear-gradient(135deg, #fff7ed, #fffaf4);
 }
+
+/* Subtle float animation for decorative login-page analytics badges. */
+@keyframes login-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.login-float {
+  animation: login-float 7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-float {
+    animation: none !important;
+  }
+}

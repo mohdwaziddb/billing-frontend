@@ -40,13 +40,13 @@ export const ContactUsSection = () => (
             className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#2453d8]/30 hover:shadow-md"
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tone}`}>
                   <Icon size={17} />
                 </span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-[9px] font-extrabold uppercase tracking-[.18em] text-slate-400">{label}</p>
-                  <p className="mt-1 break-words text-sm font-extrabold text-slate-950">{value}</p>
+                  <p className="mt-1 whitespace-nowrap text-[13px] font-extrabold text-slate-950 sm:text-sm">{value}</p>
                 </div>
               </div>
               <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-[#2453d8] opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100">
