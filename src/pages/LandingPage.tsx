@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { BarChart3, Boxes, CheckCircle2, CircleDollarSign, FileText, LineChart, Mail, Menu, Phone, ReceiptText, Settings, Sparkles, UsersRound, WalletCards, X } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { ContactUsSection } from "../components/ContactUsSection";
 import { Modal } from "../components/Modal";
@@ -52,6 +52,23 @@ export const LandingPage = () => {
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
   const [contactErrors, setContactErrors] = useState<Partial<Record<"name" | "email" | "message", string>>>({});
+
+  const scrollToSection = (event: MouseEvent<HTMLAnchorElement>) => {
+    const href = event.currentTarget.getAttribute("href");
+
+    if (!href || !href.startsWith("#")) {
+      return;
+    }
+
+    event.preventDefault();
+    const target = href === "#home" ? null : document.getElementById(href.slice(1));
+
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const resetContactForm = () => {
     setContactForm({ name: "", email: "", message: "" });
@@ -111,14 +128,14 @@ export const LandingPage = () => {
   return <div className="bizio-home min-h-screen overflow-x-hidden bg-white text-slate-950" style={{ fontFamily: "Manrope, Inter, system-ui, sans-serif" }}>
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1180px] items-center justify-between px-4 py-3 sm:px-6">
-        <a href="#home" className="inline-flex items-center gap-1.5 text-[15px] font-extrabold tracking-[-0.04em]">
+        <a href="#home" onClick={scrollToSection} className="inline-flex items-center gap-1.5 text-[15px] font-extrabold tracking-[-0.04em]">
           <span className="text-[#2453d8]">Bizio</span>
           <span className="text-slate-900">Technologies</span>
         </a>
 
         <nav className="hidden items-center gap-7 text-[11px] font-semibold text-slate-700 md:flex">
           {navigation.map(([href, text]) => (
-            <a key={href} href={href} className="transition hover:text-[#2453d8]">
+            <a key={href} onClick={scrollToSection} href={href} className="transition hover:text-[#2453d8]">
               {text}
             </a>
           ))}
@@ -139,7 +156,7 @@ export const LandingPage = () => {
         <nav className="border-t border-slate-100 bg-white p-3 md:hidden">
           <div className="space-y-1">
             {navigation.map(([href, text]) => (
-              <a key={href} onClick={()=>setOpen(false)} href={href} className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#2453d8]">
+              <a key={href} onClick={(event) => { setOpen(false); scrollToSection(event); }} href={href} className="block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#2453d8]">
                 {text}
               </a>
             ))}
@@ -153,7 +170,7 @@ export const LandingPage = () => {
       )}
     </header>
     <main>
-      <section id="home" className="relative overflow-hidden bg-[radial-gradient(circle_at_80%_55%,rgba(104,123,255,.16),transparent_25%),linear-gradient(90deg,#fff,#f8faff)]"><div className="mx-auto grid max-w-[1180px] gap-7 px-4 py-9 sm:px-6 lg:grid-cols-[.78fr_1.22fr] lg:items-center lg:py-11"><div><span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[8px] font-extrabold text-[#2453d8]">SMART BUSINESS MANAGEMENT</span><h1 className="mt-4 max-w-lg text-[32px] font-extrabold leading-[1.12] tracking-tight sm:text-[42px]">Grow Your Business with Better <span className="text-[#2453d8]">Sales &amp; Collection</span> Tracking</h1><p className="mt-3 max-w-md text-[11px] leading-5 text-slate-600">Track your sales, customers, invoices and collections in one place — so you always know what is happening in your business and where your money is.</p><div className="mt-5 flex gap-2"><Link to="/login" className="rounded bg-[#2453d8] px-3 py-2 text-[9px] font-bold text-white shadow">Start Managing Your Business</Link><a href="#features" className="rounded border border-slate-200 bg-white px-3 py-2 text-[9px] font-bold">Explore Features</a></div><div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">{features.slice(0,1).concat(features.slice(3,6)).map((tile)=><div key={tile.title} className="min-h-[72px] rounded-lg border border-slate-200 bg-white p-3 text-center shadow-sm"><tile.icon size={19} className={`mx-auto ${tile.tone?.split(" ")[1]}`}/><p className="mt-2 text-[9px] font-extrabold text-slate-700">{tile.title.replace("Business ", "")}</p></div>)}</div></div><Dashboard/></div></section>
+      <section id="home" className="relative overflow-hidden bg-[radial-gradient(circle_at_80%_55%,rgba(104,123,255,.16),transparent_25%),linear-gradient(90deg,#fff,#f8faff)]"><div className="mx-auto grid max-w-[1180px] gap-7 px-4 py-9 sm:px-6 lg:grid-cols-[.78fr_1.22fr] lg:items-center lg:py-11"><div><span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[8px] font-extrabold text-[#2453d8]">SMART BUSINESS MANAGEMENT</span><h1 className="mt-4 max-w-lg text-[32px] font-extrabold leading-[1.12] tracking-tight sm:text-[42px]">Grow Your Business with Better <span className="text-[#2453d8]">Sales &amp; Collection</span> Tracking</h1><p className="mt-3 max-w-md text-[11px] leading-5 text-slate-600">Track your sales, customers, invoices and collections in one place — so you always know what is happening in your business and where your money is.</p><div className="mt-5 flex gap-2"><Link to="/login" className="rounded bg-[#2453d8] px-3 py-2 text-[9px] font-bold text-white shadow">Start Managing Your Business</Link><a onClick={scrollToSection} href="#features" className="rounded border border-slate-200 bg-white px-3 py-2 text-[9px] font-bold">Explore Features</a></div><div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">{features.slice(0,1).concat(features.slice(3,6)).map((tile)=><div key={tile.title} className="min-h-[72px] rounded-lg border border-slate-200 bg-white p-3 text-center shadow-sm"><tile.icon size={19} className={`mx-auto ${tile.tone?.split(" ")[1]}`}/><p className="mt-2 text-[9px] font-extrabold text-slate-700">{tile.title.replace("Business ", "")}</p></div>)}</div></div><Dashboard/></div></section>
       <section id="product" className="mx-auto max-w-[1040px] px-4 py-10 text-center sm:px-6"><Label>THE BUSINESS CHALLENGE</Label><h2 className="mt-2 text-xl font-extrabold tracking-tight sm:text-2xl">Know Where Your Business Stands</h2><p className="mx-auto mt-2 max-w-xl text-[10px] leading-4 text-slate-500">Running a business becomes difficult when sales, customers, invoices and collections are scattered across different places. Bizio brings the important numbers together so you can make better business decisions.</p><div className="mt-6 grid gap-3 md:grid-cols-3">{[{icon:LineChart,title:"Sales",copy:"How much did I sell?\nSee and analyze your sales performance.",tone:"bg-blue-50 text-blue-700"},{icon:WalletCards,title:"Collection",copy:"How much have I collected?\nTrack payments and collections from your customers.",tone:"bg-emerald-50 text-emerald-700"},{icon:CircleDollarSign,title:"Outstanding",copy:"How much money is still pending?\nIdentify and follow up on pending payments.",tone:"bg-orange-50 text-orange-700"}].map(tile => <article key={tile.title} className="flex gap-3 rounded-xl border border-slate-200 p-4 text-left shadow-sm"><div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tile.tone}`}><tile.icon size={20}/></div><div><p className="text-[11px] font-extrabold text-[#2453d8]">{tile.title}</p><p className="mt-1 whitespace-pre-line text-[10px] font-bold leading-4 text-slate-800">{tile.copy}</p></div></article>)}</div></section>
       <section id="features" className="bg-[#f8faff] py-9"><div className="mx-auto max-w-[1040px] px-4 sm:px-6"><div className="text-center"><Label>CORE FEATURES</Label><h2 className="mt-2 text-xl font-extrabold sm:text-2xl">Everything You Need to Track Your Business</h2></div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{features.map(tile=><TileCard key={tile.title} tile={tile}/>)}</div></div></section>
       <section className="mx-auto grid max-w-[1040px] gap-8 px-4 py-11 sm:px-6 lg:grid-cols-[.74fr_1.26fr] lg:items-center"><div><Label>SALES &amp; COLLECTION INSIGHTS</Label><h2 className="mt-2 text-xl font-extrabold leading-tight sm:text-2xl">Turn Your Business Data Into Better Decisions</h2><ul className="mt-5 space-y-2">{["Sales tell you how much business you are doing.","Collections tell you how much money has actually come back.","Outstanding tells you what still needs attention.","Bizio brings these numbers together so you can understand your real business position."].map(item=><li key={item} className="flex gap-2 text-[10px] leading-4 text-slate-600"><CheckCircle2 size={13} className="mt-0.5 shrink-0 text-[#2453d8]"/>{item}</li>)}</ul></div><Dashboard analytics/></section>
@@ -163,7 +180,7 @@ export const LandingPage = () => {
       <ContactUsSection />
       <section id="contact-cta" className="bg-gradient-to-r from-[#1746c9] to-[#2d57df]"><div className="mx-auto flex max-w-[1040px] flex-col gap-4 px-4 py-6 text-white sm:px-6 md:flex-row md:items-center md:justify-between"><div className="flex items-center gap-3"><div className="rounded-lg bg-white/15 p-2"><BarChart3 size={22}/></div><div><p className="text-lg font-extrabold">Know Your Numbers. Grow Your Business.</p><p className="mt-1 text-[10px] text-blue-100">Start tracking your sales, collections and outstanding payments with Bizio.</p></div></div><div className="flex gap-2"><Link to="/login" className="rounded bg-white px-6 py-2 text-[9px] font-extrabold text-[#2453d8]">Get Started</Link><button type="button" onClick={() => { resetContactForm(); setContactModalOpen(true); }} className="rounded border border-white/60 px-6 py-2 text-[9px] font-extrabold text-white">Contact Us</button></div></div></section>
     </main>
-    <footer className="bg-[#06142b] text-white"><div className="mx-auto grid max-w-[1040px] gap-7 px-4 py-7 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.5fr_1fr_1fr]"><div><b className="text-[15px] font-black tracking-[-0.04em]"><span className="text-[#2453d8]">Bizio</span> <span className="text-white">Technologies</span></b><p className="mt-2 max-w-xs text-[10px] leading-5 text-slate-400">Helping businesses track sales, collections and outstanding payments to grow with confidence.</p></div><div><p className="text-[10px] font-bold text-slate-300">Product</p><a href="#features" className="mt-2 block text-[10px] text-slate-400">Features</a><a href="#product" className="mt-2 block text-[10px] text-slate-400">Product</a></div><div><p className="text-[10px] font-bold text-slate-300">Contact</p><a href="#about" className="mt-2 block text-[10px] text-slate-400 hover:text-white">About Us</a><a href="#contact" className="mt-2 block text-[10px] text-slate-400 hover:text-white">Contact Us</a><Link to="/login" className="mt-2 block text-[10px] text-slate-400 hover:text-white">Login</Link></div></div><div className="border-t border-white/10 py-3 text-center text-[10px] text-slate-500">© 2026 Bizio Technologies. All rights reserved.</div></footer>
+    <footer className="bg-[#06142b] text-white"><div className="mx-auto grid max-w-[1040px] gap-7 px-4 py-7 sm:grid-cols-2 sm:px-6 lg:grid-cols-[1.5fr_1fr_1fr]"><div><b className="text-[15px] font-black tracking-[-0.04em]"><span className="text-[#2453d8]">Bizio</span> <span className="text-white">Technologies</span></b><p className="mt-2 max-w-xs text-[10px] leading-5 text-slate-400">Helping businesses track sales, collections and outstanding payments to grow with confidence.</p></div><div><p className="text-[10px] font-bold text-slate-300">Product</p><a onClick={scrollToSection} href="#features" className="mt-2 block text-[10px] text-slate-400">Features</a><a onClick={scrollToSection} href="#product" className="mt-2 block text-[10px] text-slate-400">Product</a></div><div><p className="text-[10px] font-bold text-slate-300">Contact</p><a onClick={scrollToSection} href="#about" className="mt-2 block text-[10px] text-slate-400 hover:text-white">About Us</a><a onClick={scrollToSection} href="#contact" className="mt-2 block text-[10px] text-slate-400 hover:text-white">Contact Us</a><Link to="/login" className="mt-2 block text-[10px] text-slate-400 hover:text-white">Login</Link></div></div><div className="border-t border-white/10 py-3 text-center text-[10px] text-slate-500">© 2026 Bizio Technologies. All rights reserved.</div></footer>
     <Modal open={contactModalOpen} title="Contact Bizio" eyebrow="Get in touch" onClose={() => { resetContactForm(); setContactModalOpen(false); }} maxWidthClass="max-w-xl">
       <form onSubmit={handleContactSubmit} className="space-y-4">
         <div>
