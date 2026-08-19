@@ -7,7 +7,8 @@ import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { Select } from "../components/Select";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
@@ -69,12 +70,11 @@ export const StockLedgerPage = () => {
               <Download size={16} />
               Export Excel
             </Button>
-            <Pagination
+<PagePagination
               page={ledgerPage.page}
               size={ledgerPage.size}
               totalRecords={ledgerPage.totalRecords}
               totalPages={ledgerPage.totalPages}
-              layout="inline"
               onPageChange={(nextPage) => {
                 setPage(nextPage);
                 void loadPage(nextPage);

@@ -15,7 +15,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -1009,6 +1010,16 @@ export const CreateInvoicePage = () => {
                 <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(purchaseHistory.summary.outstandingBalance)}</p>
               </div>
             </div>
+            <div className="flex justify-end">
+              <ModalPagination
+                page={purchaseHistory.page}
+                size={purchaseHistory.size}
+                totalRecords={purchaseHistory.totalRecords}
+                totalPages={purchaseHistory.totalPages}
+                disabled={historyLoading}
+                onPageChange={(nextPage) => void loadPurchaseHistory(nextPage)}
+              />
+            </div>
             <Table
               data={purchaseHistory.invoices}
               columns={[
@@ -1020,14 +1031,6 @@ export const CreateInvoicePage = () => {
                 { key: "pending", header: "Pending Amount", className: "text-right", render: (item) => <span className="block text-right text-rose-200">{formatCurrency(item.balanceAmount)}</span> },
                 { key: "status", header: "Payment Status", render: (item) => <StatusBadge label={item.paymentStatus} /> }
               ]}
-            />
-            <Pagination
-              page={purchaseHistory.page}
-              size={purchaseHistory.size}
-              totalRecords={purchaseHistory.totalRecords}
-              totalPages={purchaseHistory.totalPages}
-              disabled={historyLoading}
-              onPageChange={(nextPage) => void loadPurchaseHistory(nextPage)}
             />
           </div>
         )}

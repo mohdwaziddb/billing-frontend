@@ -11,7 +11,9 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { PasswordInput } from "../components/PasswordInput";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
@@ -319,7 +321,7 @@ export const UserManagementPage = () => {
                 <Plus size={16} />
                 Add user
               </Button> : null}
-              <Pagination page={userPage.page} size={userPage.size} totalRecords={userPage.totalRecords} totalPages={userPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadUsers(nextPage); }} />
+              <PagePagination page={userPage.page} size={userPage.size} totalRecords={userPage.totalRecords} totalPages={userPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadUsers(nextPage); }} />
             </div>
           ) : null}
         </div>
@@ -519,10 +521,13 @@ export const UserManagementPage = () => {
                 setModalSearch(event.target.value);
               }}
             />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button type="button" variant="secondary" disabled={!modalUsers.length} onClick={() => exportUsers(`${activeUserRole ?? "users"}-users.xlsx`, modalUsers)}>
               <Download size={17} />
               Export Excel
             </Button>
+            <ModalPagination page={modalUserPage.page} size={modalUserPage.size} totalRecords={modalUserPage.totalRecords} totalPages={modalUserPage.totalPages} onPageChange={setModalPage} />
+          </div>
           </div>
           <Table
             data={modalUsers}
@@ -552,7 +557,6 @@ export const UserManagementPage = () => {
               { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
             ]}
           />
-          <Pagination page={modalUserPage.page} size={modalUserPage.size} totalRecords={modalUserPage.totalRecords} totalPages={modalUserPage.totalPages} onPageChange={setModalPage} />
         </div>
       </Modal>
       <AuditLogModal open={Boolean(logTarget)} moduleName="User" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.fullName} Logs` : "User Logs"} onClose={() => setLogTarget(null)} />

@@ -21,7 +21,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -1182,10 +1183,22 @@ export const DashboardPage = () => {
                 }}
               />
             </label>
-            <Button type="button" variant="secondary" onClick={exportDetails} disabled={!details?.rows.length}>
-              <Download size={17} />
-              Export Excel
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button type="button" variant="secondary" onClick={exportDetails} disabled={!details?.rows.length}>
+                <Download size={17} />
+                Export Excel
+              </Button>
+              {details ? (
+                <ModalPagination
+                  page={details.page}
+                  size={details.size}
+                  totalRecords={details.totalElements}
+                  totalPages={details.totalPages}
+                  disabled={detailsLoading}
+                  onPageChange={setDetailPage}
+                />
+              ) : null}
+            </div>
           </div>
 
           <div className="scrollbar-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white">
@@ -1238,17 +1251,6 @@ export const DashboardPage = () => {
               </tbody>
             </table>
           </div>
-
-          {details ? (
-            <Pagination
-              page={details.page}
-              size={details.size}
-              totalRecords={details.totalElements}
-              totalPages={details.totalPages}
-              disabled={detailsLoading}
-              onPageChange={setDetailPage}
-            />
-          ) : null}
         </div>
       </Modal>
     </div>

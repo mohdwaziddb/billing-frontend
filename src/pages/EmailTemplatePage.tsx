@@ -8,7 +8,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { PreviewSurface } from "../components/PreviewSurface";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -193,7 +194,7 @@ export const EmailTemplatePage = () => {
             {can("EMAIL_TEMPLATES", "ADD") ? (
               <Button onClick={openCreate}><FilePlus2 size={16} /> New Template</Button>
             ) : null}
-            <Pagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} disabled={loading} layout="inline" onPageChange={(nextPage) => void loadTemplates(nextPage)} />
+            <PagePagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} disabled={loading} onPageChange={(nextPage) => void loadTemplates(nextPage)} />
           </div>
         </div>
 

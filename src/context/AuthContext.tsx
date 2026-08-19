@@ -5,7 +5,7 @@ import { getMyMenus } from "../api/permissions";
 import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
 import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest } from "../api/auth";
-import { authStorage } from "../lib/storage";
+import { authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
 import { sessionCache } from "../lib/sessionCache";
 import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
@@ -68,6 +68,7 @@ const clearLocalState = (
   authStorage.clear();
   sessionCache.clear(AUTH_BOOTSTRAP_CACHE_KEY);
   ThemeBootstrapService.clear();
+  platformAdminColumnPrefsStorage.clear();
   setSession(null);
   setUser(null);
   setPermissions(null);

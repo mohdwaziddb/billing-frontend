@@ -14,7 +14,9 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -185,12 +187,11 @@ export const CustomerListPage = () => {
                 </Link> : null}
                 </>
               ) : null}
-              <Pagination
+<PagePagination
                 page={customerPage.page}
                 size={customerPage.size}
                 totalRecords={customerPage.totalRecords}
                 totalPages={customerPage.totalPages}
-                layout="inline"
                 onPageChange={(nextPage) => {
                   setPage(nextPage);
                   void loadCustomers(nextPage);
@@ -268,6 +269,21 @@ export const CustomerListPage = () => {
               </div>
             </div>
           ) : null}
+          <div className="flex justify-end">
+            {selectedLedger ? (
+              <ModalPagination
+                page={selectedLedger.page}
+                size={selectedLedger.size}
+                totalRecords={selectedLedger.totalRecords}
+                totalPages={selectedLedger.totalPages}
+                onPageChange={(nextPage) => {
+                  if (ledgerCustomerId) {
+                    void loadLedger(ledgerCustomerId, nextPage);
+                  }
+                }}
+              />
+            ) : null}
+          </div>
           <div className="max-h-[420px] space-y-2 overflow-auto scrollbar-thin">
             {selectedLedger?.entries.map((entry, index) => (
               <div key={`${entry.referenceNo}-${index}`} className="rounded-[24px] border border-white/10 bg-white/5 p-4">
@@ -281,19 +297,6 @@ export const CustomerListPage = () => {
               </div>
             ))}
           </div>
-          {selectedLedger ? (
-            <Pagination
-              page={selectedLedger.page}
-              size={selectedLedger.size}
-              totalRecords={selectedLedger.totalRecords}
-              totalPages={selectedLedger.totalPages}
-              onPageChange={(nextPage) => {
-                if (ledgerCustomerId) {
-                  void loadLedger(ledgerCustomerId, nextPage);
-                }
-              }}
-            />
-          ) : null}
         </div>
       </Modal>
       <AuditLogModal open={Boolean(logTarget)} moduleName="Customer" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Customer Logs"} onClose={() => setLogTarget(null)} />

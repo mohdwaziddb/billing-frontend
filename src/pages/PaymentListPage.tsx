@@ -17,7 +17,9 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
@@ -395,7 +397,7 @@ export const PaymentListPage = () => {
               ) : null}
               </>
             ) : null}
-            <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadPayments(nextPage); }} />
+            <PagePagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadPayments(nextPage); }} />
           </div>
         </div>
         <div className="flex-1">
@@ -434,10 +436,13 @@ export const PaymentListPage = () => {
               setModalPage(0);
               setModalSearch(event.target.value);
             }} />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button type="button" variant="secondary" disabled={!modalPayments.length} onClick={() => exportPayments(`${activeSummary ?? "payment"}-details.xlsx`, modalPayments)}>
               <Download size={17} />
               Export Excel
             </Button>
+            <ModalPagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
+          </div>
           </div>
           <PaymentTable
             payments={modalPayments}
@@ -455,7 +460,6 @@ export const PaymentListPage = () => {
             onShowLogs={setLogTarget}
             onSendReminder={openReminder}
           />
-          <Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
         </div>
       </Modal>
 

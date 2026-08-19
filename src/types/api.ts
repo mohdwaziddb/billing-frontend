@@ -41,9 +41,9 @@ export type CompanySummary = {
   signatureUrl?: string | null;
   invoiceNotes?: string | null;
   invoiceTerms?: string | null;
-  isChatbotEnabled: boolean;
   inventoryConsumptionMethod?: "FIFO" | "LIFO" | "WEIGHTED_AVERAGE";
   inventoryPricingPolicy?: "LATEST_BATCH_SELLING_PRICE" | "PRODUCT_MASTER_SELLING_PRICE" | "MANUAL_PRICE" | "PRICE_LIST";
+  chatbotEnabled?: boolean;
 };
 
 export type CompanyTheme = {
@@ -105,13 +105,6 @@ export type PlatformAdminDashboardSummary = {
   totalCompanies: number;
   activeCompanies: number;
   inactiveCompanies: number;
-  ollama: {
-    enabled: boolean;
-    active: boolean;
-    baseUrl: string | null;
-    model: string | null;
-    message: string;
-  };
 };
 
 export type PlatformAdminCompany = {
@@ -121,7 +114,7 @@ export type PlatformAdminCompany = {
   email: string;
   mobile: string;
   active: boolean;
-  isChatbotEnabled: boolean;
+  chatbotEnabled: boolean;
   createdAt: string | null;
   ownerCount: number;
   adminCount: number;

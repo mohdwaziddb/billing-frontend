@@ -11,7 +11,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -168,7 +169,7 @@ export const ProductCategoryPage = () => {
                 Export Excel
               </Button> : null}
               {canAdd ? <Button onClick={openCreate}>Add Category</Button> : null}
-              <Pagination page={categoryPage.page} size={categoryPage.size} totalRecords={categoryPage.totalRecords} totalPages={categoryPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadCategories(nextPage); }} />
+              <PagePagination page={categoryPage.page} size={categoryPage.size} totalRecords={categoryPage.totalRecords} totalPages={categoryPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadCategories(nextPage); }} />
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">

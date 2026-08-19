@@ -15,7 +15,8 @@ import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -244,12 +245,11 @@ export const ProductListPage = () => {
                 </Link> : null}
                 </>
               ) : null}
-              <Pagination
+<PagePagination
                 page={productPage.page}
                 size={productPage.size}
                 totalRecords={productPage.totalRecords}
                 totalPages={productPage.totalPages}
-                layout="inline"
                 onPageChange={(nextPage) => {
                   setPage(nextPage);
                   void loadProducts(nextPage);

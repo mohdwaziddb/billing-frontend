@@ -10,7 +10,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { Select } from "../components/Select";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
@@ -156,12 +157,11 @@ export const PurchaseListPage = () => {
               <Plus size={16} />
               New Purchase
             </Button>
-            <Pagination
+<PagePagination
               page={purchasePage.page}
               size={purchasePage.size}
               totalRecords={purchasePage.totalRecords}
               totalPages={purchasePage.totalPages}
-              layout="inline"
               onPageChange={(nextPage) => {
                 setPage(nextPage);
                 void loadPage(nextPage);

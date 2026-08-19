@@ -10,7 +10,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -103,7 +104,7 @@ export const ExpenseCategoryPage = () => {
                 Add Category
               </Button>
             ) : null}
-            <Pagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} layout="inline" onPageChange={(page) => void load(page)} />
+            <PagePagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} onPageChange={(page) => void load(page)} />
           </div>
         </div>
         <Table

@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Button } from "../components/Button";
-import { GlassCard } from "../components/GlassCard";
-import { Input } from "../components/Input";
-import { PasswordInput } from "../components/PasswordInput";
+import { AnalyticsShowcase } from "../components/login/AnalyticsShowcase";
+import { LoginCard } from "../components/login/LoginCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { getApiErrorMessage } from "../lib/errors";
 
 const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
 
@@ -15,6 +14,7 @@ export const PlatformAdminLoginPage = () => {
   const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
   const canSubmit = Boolean(form.username.trim() && form.password.trim());
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/platform-admin/dashboard";
@@ -23,14 +23,16 @@ export const PlatformAdminLoginPage = () => {
     document.title = `Platform Admin Login | ${platform.platformName || PUBLIC_APP_TITLE}`;
   }, [platform.platformName]);
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submit = async () => {
     try {
       setLoading(true);
+      setError("");
       clearMessage();
       const nextRoute = await loginPlatformAdmin(form);
       navigate(from.startsWith("/platform-admin") ? from : nextRoute, { replace: true });
-    } catch (err) {
+    } catch (err: any) {
+      const message = getApiErrorMessage(err, "Unable to sign in as platform admin");
+      setError(message);
       setApiError(err, "Unable to sign in as platform admin");
     } finally {
       setLoading(false);
@@ -38,46 +40,52 @@ export const PlatformAdminLoginPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] px-4 py-10">
-      <div className="grid w-full max-w-6xl gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="flex flex-col justify-center">
-          <p className="text-sm uppercase tracking-[0.45em] text-[var(--theme-color)]">Platform owner access</p>
-          <h1 className="mt-6 text-5xl font-extrabold leading-tight text-slate-950 md:text-6xl">
-            Manage the billing platform without entering any company workspace.
-          </h1>
-          <p className="mt-6 max-w-xl text-lg text-slate-600">
-            View all companies, control activation, and update platform credentials from a separate protected session.
-          </p>
-        </div>
-
-        <GlassCard className="p-8 md:p-10">
-          <p className="text-sm uppercase tracking-[0.35em] text-[var(--theme-color)]">Platform Admin</p>
-          <h2 className="mt-4 text-3xl font-extrabold text-slate-950">Sign in to platform control</h2>
-          <form className="mt-8 space-y-4" onSubmit={submit}>
-            <Input
-              label="Username"
-              requiredMark
-              value={form.username}
-              onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-            />
-            <PasswordInput
-              label="Password"
-              requiredMark
-              value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-            />
-            <Button className="w-full" disabled={loading || !canSubmit} type="submit">
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-          <p className="mt-6 text-sm text-slate-600">
-            Need company access instead?{" "}
-            <Link className="font-semibold text-[var(--theme-color)]" to="/login">
-              Go to workspace login
-            </Link>
-          </p>
-        </GlassCard>
+    <div
+      className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#f8fafc]"
+      style={{ fontFamily: "Manrope, Inter, system-ui, sans-serif" }}
+    >
+      <div className="grid flex-1 lg:grid-cols-2">
+        <AnalyticsShowcase />
+        <main className="relative flex items-center justify-center px-4 py-10 sm:px-8 lg:py-12">
+          <LoginCard
+            username={form.username}
+            password={form.password}
+            loading={loading}
+            canSubmit={canSubmit}
+            error={error}
+            title="Platform Admin Sign in"
+            subtitle="Sign in to manage companies and platform settings from a separate protected session."
+            fieldLabel="Username"
+            fieldPlaceholder="Enter your username"
+            inputType="text"
+            showForgotPassword={false}
+            onUsernameChange={(value) => {
+              setForm((current) => ({ ...current, username: value }));
+              if (error) {
+                setError("");
+              }
+            }}
+            onPasswordChange={(value) => {
+              setForm((current) => ({ ...current, password: value }));
+              if (error) {
+                setError("");
+              }
+            }}
+            onSubmit={submit}
+            bottomBox={
+              <p className="text-[13px] font-medium leading-5 text-slate-600">
+                Need company access instead?{" "}
+                <Link className="font-semibold text-[#2453d8] transition hover:text-[#1d47bd]" to="/login">
+                  Go to workspace login
+                </Link>
+              </p>
+            }
+          />
+        </main>
       </div>
+      <footer className="border-t border-slate-200 bg-white/70 py-4 text-center text-xs font-medium text-slate-500">
+        © 2026 Bizio Technologies. All rights reserved.
+      </footer>
     </div>
   );
 };

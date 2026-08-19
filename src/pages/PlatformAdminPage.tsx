@@ -1,5 +1,6 @@
-import { Bot, Building2, CheckCircle2, LoaderCircle, Settings, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Bot, Building2, CheckCircle2, Eye, LoaderCircle, Power, Settings, XCircle } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   activatePlatformAdminCompany,
   createPlatformAdminCompany,
@@ -14,13 +15,18 @@ import {
   type CreatePlatformAdminCompanyPayload
 } from "../api/platformAdmin";
 import { Button } from "../components/Button";
+import { applyVisibleColumns, CommonColumnSelector } from "../components/CommonColumnSelector";
+import { ActionDropdown } from "../components/ActionDropdown";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { PasswordInput } from "../components/PasswordInput";
 import { Select } from "../components/Select";
+import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
@@ -41,6 +47,14 @@ type CompanyStatusActionState = {
   company: PlatformAdminCompany;
   loading: boolean;
 } | null;
+
+type CompanyColumn = {
+  key: string;
+  header: string;
+  render: (item: PlatformAdminCompany) => ReactNode;
+  className?: string;
+  locked?: boolean;
+};
 
 const emptyCompanyPage: PageResponse<PlatformAdminCompany> = { records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 };
 
@@ -87,13 +101,79 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [settingsForm, setSettingsForm] = useState(settingsFormInitial);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [statusAction, setStatusAction] = useState<CompanyStatusActionState>(null);
-  const [chatbotTogglingId, setChatbotTogglingId] = useState<number | null>(null);
+  const [chatbotToggleId, setChatbotToggleId] = useState<number | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { setApiError } = useApiMessage();
+
+  function onViewCompany(company: PlatformAdminCompany) {
+    void loadPreviewDetails(company.id).catch((err) => setApiError(err, "Unable to load company details"));
+  }
+
+  function onToggleCompany(company: PlatformAdminCompany) {
+    confirmToggleCompany(company);
+  }
+
+  function onToggleChatbot(company: PlatformAdminCompany) {
+    void toggleChatbot(company);
+  }
 
   const companyOptions = useMemo(() => [
     { label: "Select company", value: "" },
     ...companies.records.map((company) => ({ label: company.name, value: String(company.id) }))
   ], [companies.records]);
+
+  const companyColumns = useMemo(() => [
+    {
+      key: "name",
+      header: "Company Name",
+      render: (item: PlatformAdminCompany) => (
+        <div className="min-w-[180px]">
+          <p className="font-semibold text-slate-950">{item.name}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{item.ownerName ?? "--"}</p>
+        </div>
+      )
+    },
+    { key: "email", header: "Email", render: (item: PlatformAdminCompany) => <span className="block min-w-[180px]">{item.email}</span> },
+    { key: "mobile", header: "Mobile", render: (item: PlatformAdminCompany) => <span className="whitespace-nowrap">{item.mobile ?? "--"}</span> },
+    { key: "chatbot", header: "Chatbot", render: (item: PlatformAdminCompany) => <StatusBadge label={item.chatbotEnabled ? "ON" : "OFF"} /> },
+    { key: "status", header: "Status", render: (item: PlatformAdminCompany) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
+    { key: "users", header: "Users", render: (item: PlatformAdminCompany) => item.totalUsers },
+    { key: "created", header: "Created Date", render: (item: PlatformAdminCompany) => <span className="whitespace-nowrap">{formatDateTime(item.createdAt)}</span> },
+    {
+      key: "actions",
+      header: "Actions",
+      locked: true,
+      render: (item: PlatformAdminCompany) => (
+        <ActionDropdown
+          actions={[
+            { label: "View", icon: <Eye size={15} />, onClick: () => onViewCompany(item) },
+            {
+              label: item.active ? "Deactivate" : "Activate",
+              icon: <Power size={15} />,
+              danger: item.active,
+              onClick: () => onToggleCompany(item)
+            },
+            {
+              label: item.chatbotEnabled ? "Disable Chatbot" : "Enable Chatbot",
+              icon: <Bot size={15} />,
+              disabled: chatbotToggleId === item.id,
+              onClick: () => onToggleChatbot(item)
+            }
+          ]}
+        />
+      )
+    }
+  ], [chatbotToggleId, onToggleChatbot, onToggleCompany, onViewCompany]);
+
+  const visibleCompanyColumns = useMemo(
+    () => applyVisibleColumns(companyColumns, visibleColumns),
+    [companyColumns, visibleColumns]
+  );
+
+  const companyColumnOptions = useMemo(
+    () => companyColumns.map(({ key, header, locked }) => ({ key, header, locked })),
+    [companyColumns]
+  );
 
   const loadDashboard = async () => {
     setDashboardLoading(true);
@@ -168,7 +248,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const refreshCountsAndLists = async (nextCompanyPage = companyPage) => {
     await Promise.all([
       loadDashboard(),
-      mode === "companies" || mode === "details" ? loadCompanies(nextCompanyPage) : Promise.resolve(),
+      mode === "dashboard" || mode === "companies" || mode === "details" ? loadCompanies(nextCompanyPage) : Promise.resolve(),
       summaryModal ? loadSummaryCompanies(summaryModal.filter, summaryCompanies.page) : Promise.resolve()
     ]);
   };
@@ -178,7 +258,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   }, [mode]);
 
   useEffect(() => {
-    if (mode === "companies" || mode === "details") {
+    if (mode === "dashboard" || mode === "companies" || mode === "details") {
       void loadCompanies(0).catch((err) => setApiError(err, "Unable to load companies"));
     }
   }, [companySearch, companyActive, mode]);
@@ -271,101 +351,92 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     }
   };
 
-  const toggleCompanyChatbot = async (company: PlatformAdminCompany) => {
-    setChatbotTogglingId(company.id);
+  const toggleChatbot = async (company: PlatformAdminCompany) => {
+    const isEnabling = !company.chatbotEnabled;
+    setChatbotToggleId(company.id);
     try {
-      if (company.isChatbotEnabled) {
-        await disablePlatformAdminCompanyChatbot(company.id);
-        notificationService.showSuccess("Company chatbot disabled successfully");
-      } else {
+      if (isEnabling) {
         await enablePlatformAdminCompanyChatbot(company.id);
-        notificationService.showSuccess("Company chatbot enabled successfully");
+        notificationService.showSuccess("Chatbot enabled for company");
+      } else {
+        await disablePlatformAdminCompanyChatbot(company.id);
+        notificationService.showSuccess("Chatbot disabled for company");
       }
       void refreshCountsAndLists(companyPage).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
     } catch (err) {
-      setApiError(err, "Unable to update chatbot access");
+      setApiError(err, "Unable to update chatbot status");
     } finally {
-      setChatbotTogglingId(null);
+      setChatbotToggleId(null);
     }
   };
 
   return (
     <div className="space-y-4 pb-6">
       <Header title={pageMeta[mode].title} subtitle={pageMeta[mode].subtitle} />
-      <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
-        <div className="grid gap-5 bg-[linear-gradient(135deg,#0f172a,#155e75)] px-6 py-6 text-white md:grid-cols-[1fr_auto] md:items-center">
-          <div>
-            <h2 className="text-2xl font-extrabold">Separate platform-owner control layer</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-white/76">
-              This session is isolated from company users and is powered only by credentials stored in platform settings.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-right shadow-inner">
-            <p className="text-xs font-bold uppercase tracking-wide text-cyan-100">Platform Mode</p>
-            <p className="mt-1 text-lg font-extrabold">PLATFORM ADMIN</p>
-            <div className="mt-3 border-t border-white/10 pt-3 text-left">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-100">Ollama</p>
-                <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ${dashboard?.ollama?.active ? "bg-emerald-400/18 text-emerald-100" : "bg-rose-400/18 text-rose-100"}`}>
-                  {dashboard?.ollama?.active ? "ACTIVE" : "INACTIVE"}
-                </span>
-              </div>
-              {dashboard?.ollama?.model ? <p className="mt-1 text-[11px] font-medium text-white/72">{dashboard.ollama.model}</p> : null}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {mode === "dashboard" ? (
-        <div className="grid gap-4 md:grid-cols-3">
-          <MetricCard
-            label="Total Companies"
-            value={dashboard?.totalCompanies ?? 0}
-            icon={Building2}
-            loading={dashboardLoading}
-            onClick={() => openSummaryModal("all", "All Companies")}
-          />
-          <MetricCard
-            label="Active Companies"
-            value={dashboard?.activeCompanies ?? 0}
-            icon={CheckCircle2}
-            loading={dashboardLoading}
-            onClick={() => openSummaryModal("active", "Active Companies")}
-          />
-          <MetricCard
-            label="Inactive Companies"
-            value={dashboard?.inactiveCompanies ?? 0}
-            icon={XCircle}
-            loading={dashboardLoading}
-            onClick={() => openSummaryModal("inactive", "Inactive Companies")}
-          />
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <StatCard
+              label="Total Companies"
+              value={dashboardLoading ? "…" : String(dashboard?.totalCompanies ?? 0)}
+              caption="All registered tenant companies"
+              icon={<Building2 size={18} />}
+              analyticsColor="#2453d8"
+              onClick={() => openSummaryModal("all", "All Companies")}
+            />
+            <StatCard
+              label="Active Companies"
+              value={dashboardLoading ? "…" : String(dashboard?.activeCompanies ?? 0)}
+              caption="Live tenant workspaces"
+              icon={<CheckCircle2 size={18} />}
+              analyticsColor="#16a34a"
+              onClick={() => openSummaryModal("active", "Active Companies")}
+            />
+            <StatCard
+              label="Inactive Companies"
+              value={dashboardLoading ? "…" : String(dashboard?.inactiveCompanies ?? 0)}
+              caption="Suspended or deactivated tenants"
+              icon={<XCircle size={18} />}
+              analyticsColor="#ef4444"
+              onClick={() => openSummaryModal("inactive", "Inactive Companies")}
+            />
+          </div>
+
+          <GlassCard className="p-6 md:p-7">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <SectionHeader title="Recent Companies" subtitle="Latest tenant companies registered on the platform." />
+              <Link to="/platform-admin/companies" className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:text-slate-950">
+                View all companies
+              </Link>
+            </div>
+            {companiesLoading ? <LoadingPanel label="Loading companies..." /> : null}
+            <CompanyTable companies={companies.records.slice(0, 5)} columns={visibleCompanyColumns} />
+          </GlassCard>
+        </>
       ) : null}
 
       {mode === "companies" ? (
         <GlassCard className="p-6 md:p-7">
-          <SectionHeader title="Registered Companies" subtitle="Create, inspect, activate, and suspend tenant companies from one clean operational workspace." />
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <SectionHeader title="Registered Companies" subtitle="Create, inspect, activate, and suspend tenant companies from one clean operational workspace." />
+            <div className="flex flex-wrap items-center gap-2 md:pt-0.5">
+              <CommonColumnSelector tableName="PLATFORM_COMPANIES" availableColumns={companyColumnOptions} visibleColumns={visibleColumns} onApply={setVisibleColumns} localOnly />
+              <PagePagination
+                page={companies.page}
+                size={companies.size}
+                totalRecords={companies.totalRecords}
+                totalPages={companies.totalPages}
+                disabled={companiesLoading}
+                onPageChange={(page) => {
+                  void loadCompanies(page).catch((err) => setApiError(err, "Unable to load companies"));
+                }}
+              />
+            </div>
+          </div>
           <Toolbar search={companySearch} setSearch={setCompanySearch} active={companyActive} setActive={setCompanyActive} onAdd={() => setCompanyFormOpen(true)} />
           {companiesLoading ? <LoadingPanel label="Loading companies..." /> : null}
-          <CompanyTable
-            companies={companies.records}
-            onToggle={confirmToggleCompany}
-            onToggleChatbot={(company) => void toggleCompanyChatbot(company)}
-            chatbotTogglingId={chatbotTogglingId}
-            onView={(company) => {
-              void loadPreviewDetails(company.id).catch((err) => setApiError(err, "Unable to load company details"));
-            }}
-          />
-          <Pagination
-            page={companies.page}
-            size={companies.size}
-            totalRecords={companies.totalRecords}
-            totalPages={companies.totalPages}
-            disabled={companiesLoading}
-            onPageChange={(page) => {
-              void loadCompanies(page).catch((err) => setApiError(err, "Unable to load companies"));
-            }}
-          />
+          <CompanyTable companies={companies.records} columns={visibleCompanyColumns} />
         </GlassCard>
       ) : null}
 
@@ -432,40 +503,9 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   );
 };
 
-const MetricCard = ({
-  label,
-  value,
-  icon: Icon,
-  loading,
-  onClick
-}: {
-  label: string;
-  value: number;
-  icon: typeof Building2;
-  loading: boolean;
-  onClick: () => void;
-}) => (
-  <button type="button" className="text-left" onClick={onClick}>
-    <GlassCard className="h-full p-5 transition hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.18)]">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-slate-400">{label}</p>
-          <div className="mt-3 flex min-h-9 items-center gap-2">
-            {loading ? <LoaderCircle className="animate-spin text-white/70" size={22} /> : <p className="text-3xl font-extrabold text-white">{value}</p>}
-          </div>
-          <p className="mt-3 text-xs font-semibold uppercase tracking-[0.24em] text-white/72 dark:text-white/88">Click to view companies</p>
-        </div>
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
-          <Icon className="text-white/76" size={25} />
-        </span>
-      </div>
-    </GlassCard>
-  </button>
-);
-
 const SectionHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
   <div className="mb-5 flex flex-col gap-1">
-    <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--theme-color)]">{title}</p>
+    <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#2453d8]">{title}</p>
     <p className="max-w-3xl text-sm leading-6 text-slate-500">{subtitle}</p>
   </div>
 );
@@ -480,36 +520,12 @@ const Toolbar = ({ search, setSearch, active, setActive, onAdd }: { search: stri
 
 const CompanyTable = ({
   companies,
-  onToggle,
-  onToggleChatbot,
-  chatbotTogglingId,
-  onView
+  columns
 }: {
   companies: PlatformAdminCompany[];
-  onToggle: (company: PlatformAdminCompany) => void;
-  onToggleChatbot: (company: PlatformAdminCompany) => void;
-  chatbotTogglingId: number | null;
-  onView: (company: PlatformAdminCompany) => void;
+  columns: CompanyColumn[];
 }) => (
-  <Table data={companies} emptyText="No companies found." columns={[
-    { key: "name", header: "Company Name", render: (item) => <span className="font-semibold text-slate-950">{item.name}</span> },
-    { key: "owner", header: "Owner Name", render: (item) => item.ownerName ?? "--" },
-    { key: "email", header: "Email", render: (item) => item.email },
-    { key: "mobile", header: "Mobile", render: (item) => item.mobile ?? "--" },
-    { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
-    { key: "chatbot", header: "AI Assistant", render: (item) => <StatusBadge label={item.isChatbotEnabled ? "ENABLED" : "DISABLED"} /> },
-    { key: "created", header: "Created Date", render: (item) => formatDateTime(item.createdAt) },
-    { key: "actions", header: "Actions", render: (item) => (
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" onClick={() => onView(item)}>View</Button>
-        <Button type="button" variant="secondary" disabled={chatbotTogglingId === item.id} onClick={() => onToggleChatbot(item)}>
-          {chatbotTogglingId === item.id ? <LoaderCircle className="animate-spin" size={16} /> : <Bot size={16} />}
-          {item.isChatbotEnabled ? "Disable AI" : "Enable AI"}
-        </Button>
-        <Button type="button" variant={item.active ? "danger" : "secondary"} onClick={() => onToggle(item)}>{item.active ? "Deactivate" : "Activate"}</Button>
-      </div>
-    ) }
-  ]} />
+  <Table data={companies} emptyText="No companies found." columns={columns} />
 );
 
 const CompanyDetailsView = ({ details, hideSummaryLabels = [] }: { details: PlatformAdminCompanyDetails; hideSummaryLabels?: string[] }) => (
@@ -520,7 +536,7 @@ const CompanyDetailsView = ({ details, hideSummaryLabels = [] }: { details: Plat
       {!hideSummaryLabels.includes("Owners") ? <Info label="Owners" value={details.ownerCount} /> : null}
       {!hideSummaryLabels.includes("Admins") ? <Info label="Admins" value={details.adminCount} /> : null}
       {!hideSummaryLabels.includes("Users") ? <Info label="Users" value={details.userCount} /> : null}
-      {!hideSummaryLabels.includes("AI Assistant") ? <Info label="AI Assistant" value={details.company.isChatbotEnabled ? "Enabled" : "Disabled"} /> : null}
+      {!hideSummaryLabels.includes("Chatbot") ? <Info label="Chatbot" value={details.company.chatbotEnabled ? "ON" : "OFF"} /> : null}
       {!hideSummaryLabels.includes("Audit Logs") ? <Info label="Audit Logs" value={details.auditLogCount} /> : null}
     </div>
     <Table data={details.users} emptyText="No users found." columns={[
@@ -565,12 +581,14 @@ const CompanySummaryModal = ({
   <Modal open={Boolean(state)} title={state?.title ?? "Companies"} eyebrow="Platform Dashboard" maxWidthClass="max-w-4xl" onClose={onClose}>
     {loading ? <LoadingPanel label="Loading companies..." /> : null}
     <div className="flex min-h-[540px] flex-col gap-5">
-      <Input label="Search By Company Name" value={search} onChange={(event) => onSearchChange(event.target.value)} />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <Input label="Search By Company Name" value={search} onChange={(event) => onSearchChange(event.target.value)} />
+        </div>
+        <ModalPagination page={companies.page} size={companies.size} totalRecords={companies.totalRecords} totalPages={companies.totalPages} disabled={loading} onPageChange={onPageChange} />
+      </div>
       <div className="flex-1">
         <CompanySummaryTable companies={companies.records} onView={onView} />
-      </div>
-      <div className="min-h-[52px]">
-        <Pagination page={companies.page} size={companies.size} totalRecords={companies.totalRecords} totalPages={companies.totalPages} disabled={loading} onPageChange={onPageChange} />
       </div>
     </div>
   </Modal>
@@ -651,7 +669,7 @@ const CompanyFormModal = ({
         {stepItems.map((item) => {
           const active = step === item.step;
           const complete = step > item.step;
-          return (
+  return (
             <div key={item.step} className={`flex-1 rounded-2xl border px-4 py-3 ${active ? "border-[var(--theme-color)] bg-[color-mix(in_srgb,var(--theme-color)_8%,white)]" : complete ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
               <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Step {item.step}</p>
               <p className="mt-1 text-sm font-semibold text-slate-950">{item.title}</p>

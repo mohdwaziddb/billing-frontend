@@ -11,7 +11,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -191,7 +192,7 @@ export const TaxMasterPage = () => {
                 </Button>
               ) : null}
               {canAdd ? <Button onClick={openCreate}>Add Tax</Button> : null}
-              <Pagination page={taxPage.page} size={taxPage.size} totalRecords={taxPage.totalRecords} totalPages={taxPage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadTaxes(nextPage); }} />
+              <PagePagination page={taxPage.page} size={taxPage.size} totalRecords={taxPage.totalRecords} totalPages={taxPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadTaxes(nextPage); }} />
             </div>
           </div>
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_180px_160px]">

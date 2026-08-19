@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Columns3, Settings2 } from "lucide-react";
 import { getColumnPreference, saveColumnPreference } from "../api/columnPreferences";
+import { platformAdminColumnPrefsStorage } from "../lib/storage";
 import { notificationService } from "../services/notificationService";
 
 export type ColumnSelectorOption = {
@@ -13,12 +14,14 @@ export const CommonColumnSelector = ({
   tableName,
   availableColumns,
   visibleColumns,
-  onApply
+  onApply,
+  localOnly = false
 }: {
   tableName: string;
   availableColumns: ColumnSelectorOption[];
   visibleColumns: string[];
   onApply: (columns: string[]) => void;
+  localOnly?: boolean;
 }) => {
   const defaultColumns = useMemo(() => availableColumns.map((column) => column.key), [availableColumns]);
   const lockedColumns = useMemo(() => availableColumns.filter((column) => column.locked).map((column) => column.key), [availableColumns]);
@@ -43,6 +46,12 @@ export const CommonColumnSelector = ({
   };
 
   const persistColumns = async (next: string[], fallback: string[]) => {
+    if (localOnly) {
+      platformAdminColumnPrefsStorage.set(tableName, next);
+      setDraft(next);
+      onApply(next);
+      return;
+    }
     const requestId = ++saveSequence.current;
     try {
       const saved = await saveColumnPreference(tableName, next);
@@ -63,6 +72,15 @@ export const CommonColumnSelector = ({
 
   useEffect(() => {
     let cancelled = false;
+    if (localOnly) {
+      const stored = platformAdminColumnPrefsStorage.get(tableName);
+      const initial = normalizeColumns(stored ?? defaultColumns);
+      setDraft(initial);
+      onApply(initial);
+      return () => {
+        cancelled = true;
+      };
+    }
     getColumnPreference(tableName)
       .then((preference) => {
         if (cancelled) {

@@ -1,5 +1,5 @@
-import { CheckCircle2, CircleAlert, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, CircleAlert, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { ForgotPasswordModal } from "../ForgotPasswordModal";
 import { LoginBrand } from "./LoginBrand";
 
@@ -17,6 +17,13 @@ type LoginCardProps = {
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: () => void;
+  title?: string;
+  subtitle?: string;
+  fieldLabel?: string;
+  fieldPlaceholder?: string;
+  inputType?: "email" | "text";
+  showForgotPassword?: boolean;
+  bottomBox?: ReactNode;
 };
 
 export const LoginCard = ({
@@ -27,7 +34,14 @@ export const LoginCard = ({
   error,
   onUsernameChange,
   onPasswordChange,
-  onSubmit
+  onSubmit,
+  title = "Welcome back",
+  subtitle = "Sign in to continue to your Bizio workspace.",
+  fieldLabel = "Email address",
+  fieldPlaceholder = "Enter your email",
+  inputType = "email",
+  showForgotPassword = true,
+  bottomBox
 }: LoginCardProps) => {
   const [remember, setRemember] = useState(() => {
     try {
@@ -54,8 +68,8 @@ export const LoginCard = ({
       <div className="w-full max-w-[620px] rounded-[24px] border border-slate-200 bg-white p-8 text-left shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-12">
         <LoginBrand />
         <div className="mt-8 text-left">
-          <h2 className="text-[30px] font-extrabold tracking-[-0.03em] text-slate-950">Welcome back</h2>
-          <p className="mt-2 text-[15px] leading-7 text-slate-500">Sign in to continue to your Bizio workspace.</p>
+          <h2 className="text-[30px] font-extrabold tracking-[-0.03em] text-slate-950">{title}</h2>
+          <p className="mt-2 text-[15px] leading-7 text-slate-500">{subtitle}</p>
         </div>
 
         <form
@@ -70,15 +84,19 @@ export const LoginCard = ({
         >
           <div className="space-y-1.5">
             <label htmlFor="login-email" className="block text-[13px] font-bold text-slate-700">
-              Email address
+              {fieldLabel}
             </label>
             <div className="relative">
-              <Mail size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              {inputType === "email" ? (
+                <Mail size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              ) : (
+                <User size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              )}
               <input
                 id="login-email"
-                type="email"
-                autoComplete="email"
-                placeholder="Enter your email"
+                type={inputType}
+                autoComplete={inputType === "email" ? "email" : "username"}
+                placeholder={fieldPlaceholder}
                 value={username}
                 disabled={loading}
                 aria-invalid={Boolean(error)}
@@ -134,14 +152,16 @@ export const LoginCard = ({
               />
               Remember me
             </label>
-            <button
-              type="button"
-              disabled={loading}
-              className="rounded text-sm font-bold text-[#2453d8] transition hover:text-[#1d47bd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(36,83,216,0.40)] disabled:cursor-not-allowed"
-              onClick={() => setForgotOpen(true)}
-            >
-              Forgot password?
-            </button>
+            {showForgotPassword ? (
+              <button
+                type="button"
+                disabled={loading}
+                className="rounded text-sm font-bold text-[#2453d8] transition hover:text-[#1d47bd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(36,83,216,0.40)] disabled:cursor-not-allowed"
+                onClick={() => setForgotOpen(true)}
+              >
+                Forgot password?
+              </button>
+            ) : null}
           </div>
 
           {error ? (
@@ -172,19 +192,25 @@ export const LoginCard = ({
           </button>
 
           <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.10em] text-slate-400">Your Bizio workspace</p>
-            <ul className="mt-2.5 space-y-2">
-              {[
-                "Track sales, collections and outstanding from one dashboard",
-                "Manage customers, invoices and payments in one place",
-                "Get clear analytics and reports for better decisions"
-              ].map((item) => (
-                <li key={item} className="flex items-start gap-2 text-[12px] font-medium leading-5 text-slate-600">
-                  <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[#2453d8]" />
-                  {item}
-                </li>
-              ))}
-            </ul>
+            {bottomBox ? (
+              bottomBox
+            ) : (
+              <>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.10em] text-slate-400">Your Bizio workspace</p>
+                <ul className="mt-2.5 space-y-2">
+                  {[
+                    "Track sales, collections and outstanding from one dashboard",
+                    "Manage customers, invoices and payments in one place",
+                    "Get clear analytics and reports for better decisions"
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-[12px] font-medium leading-5 text-slate-600">
+                      <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[#2453d8]" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         </form>
       </div>

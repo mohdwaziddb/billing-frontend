@@ -25,7 +25,8 @@ import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
 import { StatCard } from "../components/StatCard";
 import { Table } from "../components/Table";
 import { TrendBadge } from "../components/TrendBadge";
@@ -469,9 +470,18 @@ export const SalesAnalyticsPage = () => {
         </GlassCard>
 
         <GlassCard className="p-6 md:p-7">
-          <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Inventory alert</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Low stock products</h2>
+          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase text-slate-400">Inventory alert</p>
+              <h2 className="mt-2 text-2xl font-bold text-white">Low stock products</h2>
+            </div>
+            <PagePagination
+              page={lowStockPage.page}
+              size={lowStockPage.size}
+              totalRecords={lowStockPage.totalRecords}
+              totalPages={lowStockPage.totalPages}
+              onPageChange={(nextPage) => void loadLowStockProducts(nextPage)}
+            />
           </div>
           <Table
             data={lowStockPage.records}
@@ -482,20 +492,22 @@ export const SalesAnalyticsPage = () => {
               { key: "min", header: "Min", className: "text-right", render: (item) => <span className="block text-right">{item.minStockQty}</span> }
             ]}
           />
-          <Pagination
-            page={lowStockPage.page}
-            size={lowStockPage.size}
-            totalRecords={lowStockPage.totalRecords}
-            totalPages={lowStockPage.totalPages}
-            onPageChange={(nextPage) => void loadLowStockProducts(nextPage)}
-          />
         </GlassCard>
       </div>
 
       <GlassCard className="p-6 md:p-7">
-        <div className="mb-5">
-          <p className="text-xs uppercase text-slate-400">Customer dues</p>
-          <h2 className="mt-2 text-2xl font-bold text-white">Due customer list</h2>
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase text-slate-400">Customer dues</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">Due customer list</h2>
+          </div>
+          <PagePagination
+            page={dueCustomersPage.page}
+            size={dueCustomersPage.size}
+            totalRecords={dueCustomersPage.totalRecords}
+            totalPages={dueCustomersPage.totalPages}
+            onPageChange={(nextPage) => void loadDueCustomers(nextPage)}
+          />
         </div>
         <Table
           data={dueCustomersPage.records}
@@ -505,13 +517,6 @@ export const SalesAnalyticsPage = () => {
             { key: "email", header: "Email", render: (item) => item.email ?? "--" },
             { key: "due", header: "Current Due", className: "text-right", render: (item) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.currentBalance)}</span> }
           ]}
-        />
-        <Pagination
-          page={dueCustomersPage.page}
-          size={dueCustomersPage.size}
-          totalRecords={dueCustomersPage.totalRecords}
-          totalPages={dueCustomersPage.totalPages}
-          onPageChange={(nextPage) => void loadDueCustomers(nextPage)}
         />
       </GlassCard>
       <CommonDashboardDetailModal

@@ -11,7 +11,8 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { Table } from "../components/Table";
@@ -219,7 +220,12 @@ export const ProfitLossReportPage = () => {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <span className="text-sm font-semibold text-slate-700">{activeFilters.join(" | ") || "No filters applied"}</span>
-            <Button type="button" variant="secondary" onClick={exportDetail}><Download size={16} />Export</Button>
+            <div className="flex flex-wrap items-center gap-3">
+              {activeDetail === "revenue" ? <ModalPagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={setDetailPage} /> : null}
+              {activeDetail === "expense" ? <ModalPagination page={expensePage.page} size={expensePage.size} totalRecords={expensePage.totalRecords} totalPages={expensePage.totalPages} onPageChange={setDetailPage} /> : null}
+              {activeDetail === "net" ? <ModalPagination page={netPage.page} size={netPage.size} totalRecords={netPage.totalRecords} totalPages={netPage.totalPages} onPageChange={setDetailPage} /> : null}
+              <Button type="button" variant="secondary" onClick={exportDetail}><Download size={16} />Export</Button>
+            </div>
           </div>
           {activeDetail === "revenue" ? (
             <>
@@ -229,7 +235,6 @@ export const ProfitLossReportPage = () => {
                 { key: "date", header: "Date", render: (item) => formatDate(item.invoiceDate) },
                 { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold">{formatCurrency(item.totalAmount)}</span> }
               ]} />
-              <Pagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={setDetailPage} />
             </>
           ) : null}
           {activeDetail === "expense" ? (
@@ -240,7 +245,6 @@ export const ProfitLossReportPage = () => {
                 { key: "date", header: "Date", render: (item) => formatDate(item.expenseDate) },
                 { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold">{formatCurrency(item.amount)}</span> }
               ]} />
-              <Pagination page={expensePage.page} size={expensePage.size} totalRecords={expensePage.totalRecords} totalPages={expensePage.totalPages} onPageChange={setDetailPage} />
             </>
           ) : null}
           {activeDetail === "net" ? (
@@ -251,7 +255,6 @@ export const ProfitLossReportPage = () => {
                 { key: "expense", header: "Expense", className: "text-right", render: (item) => <span className="block text-right">{formatCurrency(item.expense ?? 0)}</span> },
                 { key: "net", header: "Net", className: "text-right", render: (item) => <span className="block text-right font-semibold">{formatCurrency(item.netRevenue ?? 0)}</span> }
               ]} />
-              <Pagination page={netPage.page} size={netPage.size} totalRecords={netPage.totalRecords} totalPages={netPage.totalPages} onPageChange={setDetailPage} />
             </>
           ) : null}
         </div>

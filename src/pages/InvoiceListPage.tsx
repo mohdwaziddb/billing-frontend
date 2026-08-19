@@ -15,7 +15,9 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
+import { PagePagination } from "../components/PagePagination";
+import { ModalPagination } from "../components/ModalPagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
@@ -522,7 +524,7 @@ export const InvoiceListPage = () => {
               ) : null}
               </>
             ) : null}
-            <Pagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} layout="inline" onPageChange={(nextPage) => { setPage(nextPage); void loadInvoices(nextPage); }} />
+            <PagePagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadInvoices(nextPage); }} />
           </div>
         </div>
         <div className="flex-1">
@@ -542,19 +544,21 @@ export const InvoiceListPage = () => {
               setModalPage(0);
               setModalSearch(event.target.value);
             }} />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button type="button" variant="secondary" disabled={!modalInvoices.length} onClick={() => exportInvoices(`${activeSummary ?? "invoice"}-details.xlsx`, modalInvoices)}>
               <Download size={17} />
               Export Excel
             </Button>
+            <ModalPagination
+              page={modalInvoicePage.page}
+              size={modalInvoicePage.size}
+              totalRecords={modalInvoicePage.totalRecords}
+              totalPages={modalInvoicePage.totalPages}
+              onPageChange={setModalPage}
+            />
+          </div>
           </div>
           <InvoiceTable invoices={modalInvoices} logCounts={logCounts} canDelete={false} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={(invoice) => void handleRestore(invoice)} onShowLogs={setLogTarget} />
-          <Pagination
-            page={modalInvoicePage.page}
-            size={modalInvoicePage.size}
-            totalRecords={modalInvoicePage.totalRecords}
-            totalPages={modalInvoicePage.totalPages}
-            onPageChange={setModalPage}
-          />
         </div>
       </Modal>
 

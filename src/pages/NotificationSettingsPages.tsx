@@ -362,7 +362,7 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                   type="button"
                   className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
                     active
-                      ? "border-[var(--theme-color)] bg-[color:color-mix(in_srgb,var(--theme-color)_12%,white)] text-[var(--theme-color)]"
+                      ? "border-[#2453d8] bg-[#2453d8]/10 text-[#2453d8]"
                       : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
                   }`}
                   onClick={() => switchTab(value)}
@@ -431,7 +431,7 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                     header: "Provider",
                     render: (record) => (
                       <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--theme-light)] text-[var(--theme-light-contrast)]">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#2453d8]/10 text-[#2453d8]">
                           {tab === "email" ? <Mail size={18} /> : <MessageSquare size={18} />}
                         </span>
                         <div>
