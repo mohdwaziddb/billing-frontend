@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { X } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState, type InputHTMLAttributes } from "react";
+import { blurNumberInputOnWheel, isNumberStepKey } from "../lib/numberInputGuards";
 import { DatePicker } from "./DatePicker";
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -95,7 +96,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             onInput?.(event);
           }}
           onKeyDown={(event) => {
-            if (isNumberInput && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+            if (isNumberInput && isNumberStepKey(event.key)) {
               event.preventDefault();
               return;
             }
@@ -103,7 +104,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           }}
           onWheel={(event) => {
             if (isNumberInput) {
-              event.currentTarget.blur();
+              blurNumberInputOnWheel(event);
               event.preventDefault();
               return;
             }

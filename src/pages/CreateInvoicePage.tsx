@@ -1,11 +1,11 @@
-import { ArrowLeft, Eye, History, Plus, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, ChevronDown, Eye, History, Plus, Search } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from "../api/customers";
 import { createInvoice } from "../api/invoices";
 import { getPaymentModes } from "../api/paymentModes";
-import { getProducts } from "../api/products";
+import { getProductsPage } from "../api/products";
 import { getStates } from "../api/states";
 import { getActiveReferralUsers } from "../api/users";
 import { Button } from "../components/Button";
@@ -25,6 +25,7 @@ import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
+import { blockNumberStepKeys, blurNumberInputOnWheel } from "../lib/numberInputGuards";
 import { InvoiceCalculationService } from "../services/InvoiceCalculationService";
 import { notificationService } from "../services/notificationService";
 import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, PaymentModeMaster, Product, UserProfile } from "../types/api";
@@ -165,11 +166,35 @@ export const CreateInvoicePage = () => {
   });
 
   const { fields, append, remove, update, replace } = useFieldArray({ control, name: "items" });
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(() => new Set());
+
+  const toggleRowExpanded = (rowId: string) => {
+    setExpandedRows((current) => {
+      const next = new Set(current);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
+  };
+
+  const expandRow = (rowId: string) => {
+    setExpandedRows((current) => {
+      if (current.has(rowId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.add(rowId);
+      return next;
+    });
+  };
 
   useEffect(() => {
-    void Promise.all([getProducts({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 }), getActiveReferralUsers(), getStates()])
+    void Promise.all([getProductsPage({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 }), getActiveReferralUsers(), getStates()])
       .then(([productData, modeData, referralData, stateData]) => {
-        setProducts(productData.filter((item) => item.active));
+        setProducts(productData.records.filter((item) => item.active));
         setPaymentModes(modeData);
         setReferralUsers(referralData.filter((item) => item.active));
         setStates(stateData);
@@ -255,6 +280,9 @@ export const CreateInvoicePage = () => {
     const discountValue = Math.max(0, numberValue(item.discountValue));
     const issues: RowIssue[] = [];
 
+    if (watchedItems.filter((row) => row.productId && row.productId === item.productId).length > 1) {
+      issues.push({ message: `"${product.name}" is already added in another row.` });
+    }
     if (qty < 1) {
       issues.push({ message: "Quantity must be at least 1." });
     }
@@ -324,6 +352,36 @@ export const CreateInvoicePage = () => {
     (invoiceSummary.paidAmount <= 0 || paymentModeInput)
   );
   const canSaveInvoice = hasRequiredInvoiceFields && !hasClientValidationErrors;
+  const allRowsExpanded = fields.length > 0 && fields.every((item) => expandedRows.has(item.id));
+
+  useEffect(() => {
+    setExpandedRows((current) => {
+      if (current.size === 0) {
+        return current;
+      }
+      const liveIds = new Set(fields.map((item) => item.id));
+      if ([...current].every((id) => liveIds.has(id))) {
+        return current;
+      }
+      return new Set([...current].filter((id) => liveIds.has(id)));
+    });
+  }, [fields]);
+
+  useEffect(() => {
+    const erroredIds = fields
+      .filter((_, index) => (rowIssues[index]?.length ?? 0) > 0)
+      .map((item) => item.id)
+      .filter((id) => id);
+    if (erroredIds.length === 0) {
+      return;
+    }
+    setExpandedRows((current) => {
+      if (erroredIds.every((id) => current.has(id))) {
+        return current;
+      }
+      return new Set([...current, ...erroredIds]);
+    });
+  }, [fields, rowIssues]);
   const customerMobileError = customerMobile.trim() && !isValidMobileNumber(customerMobile) ? MOBILE_VALIDATION_MESSAGE : undefined;
   const canCreateNewCustomer = Boolean(
     newCustomer.name.trim() &&
@@ -753,18 +811,37 @@ export const CreateInvoicePage = () => {
                   <p className="mt-1 text-sm font-medium text-slate-500">Find or add a customer first to continue invoice entry.</p>
                 ) : null}
               </div>
-              <Button type="button" variant="secondary" disabled={!canProceedWithInvoice} onClick={() => append(createEmptyItem())}>
-                <Plus size={16} />
-                Add Product
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {fields.length > 1 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={!canProceedWithInvoice}
+                    onClick={() => {
+                      if (allRowsExpanded) {
+                        setExpandedRows(new Set());
+                      } else {
+                        setExpandedRows(new Set(fields.map((item) => item.id)));
+                      }
+                    }}
+                  >
+                    {allRowsExpanded ? "Collapse all" : "Expand all"}
+                  </Button>
+                ) : null}
+                <Button type="button" variant="secondary" disabled={!canProceedWithInvoice} onClick={() => append(createEmptyItem())}>
+                  <Plus size={16} />
+                  Add Product
+                </Button>
+              </div>
             </div>
 
-            <div className="hidden grid-cols-[minmax(220px,1fr)_78px_116px_96px_112px_46px] gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 md:grid">
+            <div className="hidden grid-cols-[minmax(0,1fr)_64px_90px_80px_160px_46px_46px] gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-500 md:grid">
               <div>Product</div>
               <div>Qty</div>
               <div>Rate</div>
               <div>Discount</div>
               <div>Total</div>
+              <div></div>
               <div></div>
             </div>
 
@@ -772,15 +849,37 @@ export const CreateInvoicePage = () => {
               {fields.map((field, index) => {
                   const item = watchedItems[index] ?? createEmptyItem();
                   const hasProduct = Boolean(item.productId);
+                  const product = productMap.get(item.productId);
                   const lineSummary = invoiceSummary.rows[index];
+                  const isExpanded = expandedRows.has(field.id);
+                  const issues = rowIssues[index] ?? [];
+                  const taxable = Boolean(product?.taxable);
+                  const taxPercent = product?.taxPercent ?? 0;
+                  const isExempt = !taxable || taxPercent <= 0;
+                  const gstHint = !hasProduct
+                    ? "--"
+                    : isExempt
+                      ? "Exempt • Tax ₹0"
+                      : (lineSummary?.igstAmount ?? 0) > 0
+                        ? `IGST ${lineSummary?.igstRate ?? taxPercent}% • Tax ${formatCurrency(lineSummary?.igstAmount ?? 0)}`
+                        : `GST ${taxPercent}% • Tax ${formatCurrency(lineSummary?.taxAmount ?? 0)}`;
+                  const otherSelectedIds = new Set(
+                    watchedItems
+                      .filter((_, rowIndex) => rowIndex !== index)
+                      .map((row) => row.productId)
+                      .filter((id) => id)
+                  );
+                  const productOptions = products.filter((entry) => !otherSelectedIds.has(String(entry.id)));
+                  const exceedsStock = hasProduct && numberValue(item.qty) > (product?.stockQty ?? 0);
                   const rateRegister = register(`items.${index}.rate`, {
                     required: "Rate is required",
                     validate: (value) => Number(value) >= 0 || "Rate cannot be negative"
                   });
 
                   return (
-                    <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-2.5">
-                      <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_78px_116px_96px_112px_46px] md:items-center">
+                    <Fragment key={field.id}>
+                    <div className={`rounded-xl border bg-white p-2.5 ${issues.length > 0 ? "border-rose-300" : "border-slate-200"}`}>
+                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_64px_90px_80px_160px_46px_46px] md:items-center">
                         <div className="md:min-w-0">
                           <Controller
                             control={control}
@@ -790,7 +889,7 @@ export const CreateInvoicePage = () => {
                               <Select
                                 options={[
                                   { label: "Select Product", value: "" },
-                                  ...products.map((entry) => ({
+                                  ...productOptions.map((entry) => ({
                                     label: entry.name,
                                     value: String(entry.id),
                                   })),
@@ -804,8 +903,15 @@ export const CreateInvoicePage = () => {
                                 onBlur={productField.onBlur}
                                 ref={productField.ref}
                                 onChange={(event) => {
-                                  productField.onChange(event.target.value);
-                                  syncProductDefaults(index, event.target.value);
+                                  const nextId = event.target.value;
+                                  if (nextId && otherSelectedIds.has(nextId)) {
+                                    const dupName = productMap.get(nextId)?.name ?? "This product";
+                                    notificationService.showError(`"${dupName}" is already added in another row.`);
+                                    return;
+                                  }
+                                  productField.onChange(nextId);
+                                  syncProductDefaults(index, nextId);
+                                  expandRow(field.id);
                                 }}
                               />
                             )}
@@ -818,12 +924,14 @@ export const CreateInvoicePage = () => {
                             type="number"
                             min={1}
                             disabled={!canProceedWithInvoice}
-                            className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white px-2 text-center text-sm font-semibold text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.qty?.message ? "border-rose-400/70" : "border-slate-200"}`}
+                            className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white px-1 text-center text-sm font-semibold text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.qty?.message || exceedsStock ? "border-rose-400/70" : "border-slate-200"}`}
                             {...register(`items.${index}.qty`, {
                               required: "Quantity is required",
                               validate: (value) => Number(value) >= 1 || "Quantity must be at least 1"
                             })}
                             aria-label="Qty"
+                            onKeyDown={blockNumberStepKeys}
+                            onWheel={blurNumberInputOnWheel}
                           />
                         </div>
 
@@ -837,6 +945,8 @@ export const CreateInvoicePage = () => {
                             aria-label="Rate"
                             placeholder="Rate"
                             {...rateRegister}
+                            onKeyDown={blockNumberStepKeys}
+                            onWheel={blurNumberInputOnWheel}
                             className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.rate?.message ? "border-rose-400/70" : "border-slate-200"}`}
                           />
                         </div>
@@ -853,12 +963,32 @@ export const CreateInvoicePage = () => {
                             {...register(`items.${index}.discountValue`, {
                               validate: (value) => Number(value || 0) >= 0 || "Discount cannot be negative"
                             })}
+                            onKeyDown={blockNumberStepKeys}
+                            onWheel={blurNumberInputOnWheel}
                             className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white px-2 text-sm font-medium text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.discountValue?.message ? "border-rose-400/70" : "border-slate-200"}`}
                           />
                         </div>
 
-                        <div className="flex h-[46px] items-center justify-start rounded-[var(--radius-control)] border border-slate-200 bg-slate-50 px-3">
-                          <span className="truncate text-sm font-extrabold text-slate-950">{hasProduct ? formatCurrency(lineSummary?.totalAmount ?? 0) : "--"}</span>
+                        <div className="flex h-[46px] flex-col justify-center gap-0.5 overflow-hidden rounded-[var(--radius-control)] border border-slate-200 bg-slate-50 px-3" title={hasProduct ? gstHint : "GST breakup"}>
+                          <span className="truncate text-sm font-extrabold leading-none text-slate-950">{hasProduct ? formatCurrency(lineSummary?.totalAmount ?? 0) : "--"}</span>
+                          <span className="whitespace-nowrap text-[10px] font-semibold leading-none text-slate-500">
+                            {gstHint}
+                          </span>
+                        </div>
+
+                        <div className="flex h-[46px] items-center justify-end md:justify-center">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="h-[46px] w-[46px] min-w-[46px] px-0"
+                            disabled={!canProceedWithInvoice}
+                            aria-expanded={isExpanded}
+                            aria-label={isExpanded ? `Hide GST breakup for row ${index + 1}` : `Show GST breakup for row ${index + 1}`}
+                            title={isExpanded ? "Hide GST breakup" : "Show GST breakup"}
+                            onClick={() => toggleRowExpanded(field.id)}
+                          >
+                            <ChevronDown size={18} className={`transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          </Button>
                         </div>
 
                         <div className="flex h-[46px] items-center justify-end md:justify-center">
@@ -866,6 +996,59 @@ export const CreateInvoicePage = () => {
                         </div>
                       </div>
                     </div>
+                      {isExpanded ? (
+                        <div className="-mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          {!hasProduct ? (
+                            <p className="text-xs font-medium text-slate-500">Select a product to see HSN and GST breakup.</p>
+                          ) : (
+                            <div className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                              <div className="min-w-0">
+                                <p className="font-bold uppercase tracking-wide text-slate-400">HSN</p>
+                                <p className="mt-0.5 break-words font-bold text-slate-900">{product?.hsnCode ?? "--"}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold uppercase tracking-wide text-slate-400">GST</p>
+                                <p className="mt-0.5 break-words font-bold text-slate-900">
+                                  {isExempt ? "Exempt" : (product?.taxName && product.taxName.includes("%") ? product.taxName : `${taxPercent}%${product?.taxName ? ` • ${product.taxName}` : ""}`)}
+                                </p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold uppercase tracking-wide text-slate-400">Stock</p>
+                                <p className={`mt-0.5 break-words font-bold ${exceedsStock ? "text-rose-600" : "text-slate-900"}`}>
+                                  {product?.stockQty ?? 0} available
+                                </p>
+                                <p className="mt-0.5 break-words font-semibold text-slate-500">In this bill: {numberValue(item.qty)}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold uppercase tracking-wide text-slate-400">Taxable</p>
+                                <p className="mt-0.5 break-words font-bold text-slate-900">{formatCurrency(lineSummary?.taxableAmount ?? 0)}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold uppercase tracking-wide text-slate-400">Tax Breakup</p>
+                                {(lineSummary?.igstAmount ?? 0) > 0 ? (
+                                  <p className="mt-0.5 break-words font-bold text-slate-900">
+                                    IGST {lineSummary?.igstRate ?? 0}% • {formatCurrency(lineSummary?.igstAmount ?? 0)}
+                                  </p>
+                                ) : (
+                                  <div className="mt-0.5 space-y-0.5 font-bold text-slate-900">
+                                    <p className="break-words">CGST {lineSummary?.cgstRate ?? 0}% • {formatCurrency(lineSummary?.cgstAmount ?? 0)}</p>
+                                    <p className="break-words">SGST {lineSummary?.sgstRate ?? 0}% • {formatCurrency(lineSummary?.sgstAmount ?? 0)}</p>
+                                  </div>
+                                )}
+                                <p className="mt-0.5 break-words font-semibold text-slate-500">Total Tax {formatCurrency(lineSummary?.taxAmount ?? 0)}</p>
+                              </div>
+                            </div>
+                          )}
+                          {issues.length > 0 ? (
+                            <div className="mt-2 space-y-1 border-t border-rose-200 pt-2">
+                              {issues.map((issue, issueIndex) => (
+                                <p key={`${field.id}-issue-${issueIndex}`} className="text-xs font-semibold text-rose-600">{issue.message}</p>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </Fragment>
                   );
               })}
             </div>
