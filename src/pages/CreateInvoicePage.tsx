@@ -1,6 +1,6 @@
 import { ArrowLeft, Eye, History, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type FieldErrors, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { type FieldErrors, Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from "../api/customers";
 import { createInvoice } from "../api/invoices";
@@ -149,6 +149,7 @@ export const CreateInvoicePage = () => {
     register,
     handleSubmit,
     setValue,
+    getValues,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues: {
@@ -489,7 +490,8 @@ export const CreateInvoicePage = () => {
   };
 
   const syncProductDefaults = (index: number, productId: string) => {
-    const current = watchedItems[index] ?? createEmptyItem();
+    const latestItems = getValues("items") ?? [];
+    const current = latestItems[index] ?? watchedItems[index] ?? createEmptyItem();
     const product = productMap.get(productId);
     if (!product) {
       update(index, {
@@ -499,7 +501,7 @@ export const CreateInvoicePage = () => {
       });
       return;
     }
-    const currentQty = numberValue(watchedItems[index]?.qty);
+    const currentQty = numberValue(current.qty);
     update(index, {
       ...current,
       productId,
@@ -636,18 +638,28 @@ export const CreateInvoicePage = () => {
                 error={errors.invoiceDate?.message}
                 {...register("invoiceDate", { required: "Invoice date is required" })}
               />
-              <Select
-                label="Refer By"
-                disabled={!canProceedWithInvoice}
-                placeholder="No Referral"
-                options={[
-                  { label: "No Referral", value: "" },
-                  ...referralUsers.map((entry) => ({
-                    label: `${entry.fullName} (${entry.mobileNumber || entry.username})`,
-                    value: String(entry.id)
-                  }))
-                ]}
-                {...register("referByUserId")}
+              <Controller
+                control={control}
+                name="referByUserId"
+                render={({ field }) => (
+                  <Select
+                    label="Refer By"
+                    disabled={!canProceedWithInvoice}
+                    placeholder="No Referral"
+                    options={[
+                      { label: "No Referral", value: "" },
+                      ...referralUsers.map((entry) => ({
+                        label: `${entry.fullName} (${entry.mobileNumber || entry.username})`,
+                        value: String(entry.id)
+                      }))
+                    ]}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
             </div>
 
@@ -761,7 +773,6 @@ export const CreateInvoicePage = () => {
                   const item = watchedItems[index] ?? createEmptyItem();
                   const hasProduct = Boolean(item.productId);
                   const lineSummary = invoiceSummary.rows[index];
-                  const productRegister = register(`items.${index}.productId`, { required: "Product is required" });
                   const rateRegister = register(`items.${index}.rate`, {
                     required: "Rate is required",
                     validate: (value) => Number(value) >= 0 || "Rate cannot be negative"
@@ -771,23 +782,33 @@ export const CreateInvoicePage = () => {
                     <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-2.5">
                       <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_78px_116px_96px_112px_46px] md:items-center">
                         <div className="md:min-w-0">
-                          <Select
-                            {...productRegister}
-                            options={[
-                              { label: "Select Product", value: "" },
-                              ...products.map((entry) => ({
-                                label: entry.name,
-                                value: String(entry.id),
-                              })),
-                            ]}
-                            aria-label="Product"
-                            disabled={!canProceedWithInvoice}
-                            error={errors.items?.[index]?.productId?.message}
-                            className="h-[46px]"
-                            onChange={(event) => {
-                              productRegister.onChange(event);
-                              syncProductDefaults(index, event.target.value);
-                            }}
+                          <Controller
+                            control={control}
+                            name={`items.${index}.productId` as const}
+                            rules={{ required: "Product is required" }}
+                            render={({ field: productField }) => (
+                              <Select
+                                options={[
+                                  { label: "Select Product", value: "" },
+                                  ...products.map((entry) => ({
+                                    label: entry.name,
+                                    value: String(entry.id),
+                                  })),
+                                ]}
+                                aria-label="Product"
+                                disabled={!canProceedWithInvoice}
+                                error={errors.items?.[index]?.productId?.message}
+                                className="h-[46px]"
+                                name={productField.name}
+                                value={productField.value ?? ""}
+                                onBlur={productField.onBlur}
+                                ref={productField.ref}
+                                onChange={(event) => {
+                                  productField.onChange(event.target.value);
+                                  syncProductDefaults(index, event.target.value);
+                                }}
+                              />
+                            )}
                           />
                         </div>
 
@@ -840,7 +861,7 @@ export const CreateInvoicePage = () => {
                           <span className="truncate text-sm font-extrabold text-slate-950">{hasProduct ? formatCurrency(lineSummary?.totalAmount ?? 0) : "--"}</span>
                         </div>
 
-                        <div className="flex h-[46px] items-center justify-center">
+                        <div className="flex h-[46px] items-center justify-end md:justify-center">
                           <CommonDeleteIconButton disabled={!canProceedWithInvoice} label="Remove product line" onClick={() => removeProductLine(index)} />
                         </div>
                       </div>
@@ -857,12 +878,22 @@ export const CreateInvoicePage = () => {
               <h3 className="text-base font-bold text-slate-950">Invoice Summary</h3>
 
               <div className="grid gap-2">
-                <Select
-                  label="Invoice Discount Type"
-                  placeholder={null}
-                  options={[{ label: "Fixed", value: "FIXED" }, { label: "Percent", value: "PERCENT" }]}
-                  disabled={!canProceedWithInvoice}
-                  {...register("invoiceDiscountType")}
+                <Controller
+                  control={control}
+                  name="invoiceDiscountType"
+                  render={({ field }) => (
+                    <Select
+                      label="Invoice Discount Type"
+                      placeholder={null}
+                      options={[{ label: "Fixed", value: "FIXED" }, { label: "Percent", value: "PERCENT" }]}
+                      disabled={!canProceedWithInvoice}
+                      name={field.name}
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    />
+                  )}
                 />
                 <Input
                   label="Invoice Discount"
@@ -885,14 +916,24 @@ export const CreateInvoicePage = () => {
                     }
                   })}
                 />
-                <Select
-                  label="Payment Mode"
-                  requiredMark={invoiceSummary.paidAmount > 0}
-                  disabled={!canProceedWithInvoice || invoiceSummary.paidAmount <= 0}
-                  placeholder="No Mode Selected"
-                  error={summaryIssues.find((issue) => issue.toLowerCase().includes("payment mode"))}
-                  options={[{ label: "No Mode Selected", value: "" }, ...paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))]}
-                  {...register("paymentMode")}
+                <Controller
+                  control={control}
+                  name="paymentMode"
+                  render={({ field }) => (
+                    <Select
+                      label="Payment Mode"
+                      requiredMark={invoiceSummary.paidAmount > 0}
+                      disabled={!canProceedWithInvoice || invoiceSummary.paidAmount <= 0}
+                      placeholder="No Mode Selected"
+                      error={summaryIssues.find((issue) => issue.toLowerCase().includes("payment mode"))}
+                      options={[{ label: "No Mode Selected", value: "" }, ...paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))]}
+                      name={field.name}
+                      value={field.value}
+                      onChange={(event) => field.onChange(event.target.value)}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                    />
+                  )}
                 />
               </div>
 
