@@ -26,6 +26,24 @@ export const formatCurrency = (value: number | string | null | undefined) => {
   return formatter.format(normalizeAmount(value));
 };
 
+const trimDecimals = (amount: number) => {
+  const rounded = Math.round(amount * 100) / 100;
+  return String(rounded).replace(/\.0+$/, "").replace(/(\.\d)0$/, "$1");
+};
+
+export const formatCompactCurrency = (value: number | string | null | undefined) => {
+  const amount = normalizeAmount(value);
+  const absolute = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  if (absolute >= 9.95e6) {
+    return `${sign}₹${trimDecimals(absolute / 1e7)}Cr`;
+  }
+  if (absolute >= 1e6) {
+    return `${sign}₹${trimDecimals(absolute / 1e5)}L`;
+  }
+  return formatCurrency(amount);
+};
+
 export const formatAmount = (value: number | string | null | undefined) => {
   return amountFormatter.format(normalizeAmount(value));
 };

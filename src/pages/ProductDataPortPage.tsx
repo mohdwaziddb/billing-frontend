@@ -14,6 +14,7 @@ import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Modal } from "../components/Modal";
+import { Select } from "../components/Select";
 import { useAuth } from "../context/AuthContext";
 import { notificationService } from "../services/notificationService";
 import type {
@@ -326,16 +327,14 @@ export const ProductDataPortPage = () => {
                       <EditableCell row={row} field="productSubCategory" value={row.productSubCategory} onChange={updateRow} />
                       <EditableCell row={row} field="sku" value={row.sku} onChange={updateRow} />
                       <td className="border-b border-slate-100 px-3 py-3 align-top">
-                        <select
+                        <Select
+                          density="sm"
+                          options={[{ label: "Blank", value: "" }, ...activeOptions]}
                           value={row.active}
                           onChange={(event) => updateRow(row.rowNumber, "active", event.target.value)}
-                          className="w-[110px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[var(--theme-color)]"
-                        >
-                          <option value="">Blank</option>
-                          {activeOptions.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
+                          aria-label="Active status"
+                          wrapperClassName="w-[130px]"
+                        />
                         <ValidationMessage message={row.validationErrors.active} />
                       </td>
                       <EditableCell row={row} field="brand" value={row.brand ?? ""} onChange={updateRow} />

@@ -574,7 +574,7 @@ select:-webkit-autofill {
 }
 
 .stat-card-value {
-  font-size: clamp(1.45rem, 12cqw, 2rem);
+  font-size: clamp(1.05rem, 9cqw, 1.5rem);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }

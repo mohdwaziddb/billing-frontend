@@ -4,6 +4,7 @@ import { GlassCard } from "./GlassCard";
 export const StatCard = ({
   label,
   value,
+  valueTitle,
   caption,
   icon,
   growth,
@@ -13,6 +14,7 @@ export const StatCard = ({
 }: {
   label: string;
   value: string;
+  valueTitle?: string;
   caption: string;
   icon?: ReactNode;
   growth?: string;
@@ -37,7 +39,16 @@ export const StatCard = ({
         <p className="min-h-10 text-sm font-bold leading-5 text-slate-700">{label}</p>
       </div>
       <div className="mt-3 min-w-0">
-        <p className="stat-card-value block max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-extrabold leading-tight text-slate-950">{value}</p>
+        {valueTitle && valueTitle !== value ? (
+          <span className="group/statvalue relative block max-w-full">
+            <span className="stat-card-value block max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-extrabold leading-tight text-slate-950">{value}</span>
+            <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-0 z-50 whitespace-nowrap rounded-xl border border-[var(--panel-border)] bg-[var(--panel-strong)] px-3 py-2 text-sm font-bold text-[var(--text-primary)] opacity-0 shadow-[var(--shadow-panel)] transition group-hover/statvalue:opacity-100">
+              {valueTitle}
+            </span>
+          </span>
+        ) : (
+          <p className="stat-card-value block max-w-full overflow-hidden text-ellipsis whitespace-nowrap font-extrabold leading-tight text-slate-950">{value}</p>
+        )}
       </div>
       <div className="mt-4 flex items-center justify-between gap-3">
         <p title={caption} className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-500">{caption}</p>

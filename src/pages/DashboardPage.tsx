@@ -23,11 +23,12 @@ import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import { ModalPagination } from "../components/ModalPagination";
+import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
-import { formatAmount, formatCurrency } from "../lib/currency";
+import { formatAmount, formatCompactCurrency, formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import type { CustomerDue, DashboardCardKey, DashboardDetail, DashboardDetailRow, DashboardSummary, Invoice, MetricPoint, OwnerAnalytics, PageResponse, SalesByCategory, TopSellingProduct } from "../types/api";
@@ -441,6 +442,34 @@ const DashboardCompactCard = ({
   </button>
 );
 
+const Money = ({
+  value,
+  className = "",
+  align = "center",
+}: {
+  value: number | string | null | undefined;
+  className?: string;
+  align?: "center" | "right";
+}) => {
+  const short = formatCompactCurrency(value);
+  const full = formatCurrency(value);
+  if (short === full) {
+    return <span className={`block truncate ${className}`}>{short}</span>;
+  }
+  return (
+    <span className={`group/money relative inline-block max-w-full align-bottom ${className}`}>
+      <span className="block truncate">{short}</span>
+      <span
+        className={`pointer-events-none absolute bottom-[calc(100%+6px)] z-50 whitespace-nowrap rounded-lg border border-[var(--panel-border)] bg-[var(--panel-strong)] px-2.5 py-1.5 text-xs font-bold text-[var(--text-primary)] opacity-0 shadow-[var(--shadow-panel)] transition group-hover/money:opacity-100 ${
+          align === "right" ? "right-0" : "left-1/2 -translate-x-1/2"
+        }`}
+      >
+        {full}
+      </span>
+    </span>
+  );
+};
+
 export const DashboardPage = () => {
   const { preferences } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -498,7 +527,8 @@ export const DashboardPage = () => {
         {
           key: "totalSales" as const,
           label: "Total Sales",
-          value: formatCurrency(summary?.totalSales),
+          value: formatCompactCurrency(summary?.totalSales),
+          fullValue: formatCurrency(summary?.totalSales),
           caption: "In selected period",
           icon: <TrendingUp size={18} />,
           growth: formatTrend(summary?.totalSalesTrendPercentage),
@@ -508,7 +538,8 @@ export const DashboardPage = () => {
         {
           key: "collections" as const,
           label: "Collections",
-          value: formatCurrency(summary?.totalCollection),
+          value: formatCompactCurrency(summary?.totalCollection),
+          fullValue: formatCurrency(summary?.totalCollection),
           caption: "Recorded payments",
           icon: <CreditCard size={18} />,
           growth: formatTrend(summary?.collectionTrendPercentage),
@@ -518,7 +549,8 @@ export const DashboardPage = () => {
         {
           key: "outstanding" as const,
           label: "Outstanding",
-          value: formatCurrency(summary?.outstandingAmount),
+          value: formatCompactCurrency(summary?.outstandingAmount),
+          fullValue: formatCurrency(summary?.outstandingAmount),
           caption: "Pending balance",
           icon: <Wallet size={18} />,
           growth: formatTrend(summary?.outstandingTrendPercentage),
@@ -752,6 +784,7 @@ export const DashboardPage = () => {
             key={card.label}
             label={card.label}
             value={card.value}
+            valueTitle={card.fullValue}
             caption={card.caption}
             icon={card.icon}
             growth={card.growth}
@@ -762,7 +795,8 @@ export const DashboardPage = () => {
         ))}
         <StatCard
           label="Total Expense"
-          value={formatCurrency(summary?.totalExpense)}
+          value={formatCompactCurrency(summary?.totalExpense)}
+          valueTitle={formatCurrency(summary?.totalExpense)}
           caption="Recorded business spend"
           icon={<Banknote size={18} />}
           analyticsColor="#f97316"
@@ -772,7 +806,8 @@ export const DashboardPage = () => {
         />
         <StatCard
           label="Net Revenue"
-          value={formatCurrency(summary?.netRevenue)}
+          value={formatCompactCurrency(summary?.netRevenue)}
+          valueTitle={formatCurrency(summary?.netRevenue)}
           caption="Collection minus expense"
           icon={<TrendingUp size={18} />}
           analyticsColor="#0d9488"
@@ -819,16 +854,14 @@ export const DashboardPage = () => {
               <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Analytics</p>
               <h2 className="mt-2 text-xl font-extrabold text-slate-950">Sales Trend</h2>
             </div>
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_12%,transparent)]"
+            <Select
+              density="sm"
+              options={GRAPH_PRESET_OPTIONS}
               value={salesTrendPreset}
               onChange={(event) => setSalesTrendPreset(event.target.value as DatePreset)}
               aria-label="Sales trend range"
-            >
-              {GRAPH_PRESET_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
+              wrapperClassName="w-auto min-w-[150px]"
+            />
           </div>
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -840,8 +873,8 @@ export const DashboardPage = () => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke={chartGridColor} strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: chartTextColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: chartTextColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="label" minTickGap={24} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis width={64} tickFormatter={(tickValue: number) => formatCompactCurrency(tickValue)} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                 <Area type="monotone" dataKey="value" stroke={CHART_COLORS.sales} strokeWidth={3} fill="url(#salesArea)" dot={{ r: 3, fill: CHART_COLORS.sales }} />
               </AreaChart>
@@ -875,7 +908,7 @@ export const DashboardPage = () => {
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: CHART_COLORS.palette[index % CHART_COLORS.palette.length] }} />
                     <p className="truncate text-sm font-bold text-slate-700">{product.productName}</p>
                   </div>
-                  <p className="shrink-0 text-sm font-bold text-slate-950">{formatCurrency(product.totalSalesAmount)}</p>
+                  <Money value={product.totalSalesAmount} align="right" className="shrink-0 text-sm font-bold text-slate-950" />
                 </div>
               ))}
             </div>
@@ -946,9 +979,9 @@ export const DashboardPage = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Sales</p>
-                      <p className="mt-1 font-semibold text-slate-950">{formatCurrency(customer.totalPurchaseAmount)}</p>
-                      <p className="mt-2 text-xs text-slate-400">Paid: {formatCurrency(customer.totalPaidAmount)}</p>
-                      <p className="text-xs text-rose-200">Outstanding: {formatCurrency(customer.outstandingBalance)}</p>
+                      <Money value={customer.totalPurchaseAmount} align="right" className="mt-1 font-semibold text-slate-950" />
+                      <p className="mt-2 text-xs text-slate-400">Paid: <Money value={customer.totalPaidAmount} /></p>
+                      <p className="text-xs font-semibold text-rose-600">Outstanding: <Money value={customer.outstandingBalance} /></p>
                     </div>
                   </div>
                 </div>
@@ -1005,7 +1038,7 @@ export const DashboardPage = () => {
                   <span className="truncate text-sm font-bold text-slate-700">{category.categoryName}</span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block text-sm font-extrabold text-slate-950">{formatCurrency(category.totalAmount)}</span>
+                  <Money value={category.totalAmount} align="right" className="block text-sm font-extrabold text-slate-950" />
                   <span className="text-xs font-bold text-slate-400">{categoryTotal ? category.percentage.toFixed(0) : "0"}%</span>
                 </span>
               </button>
@@ -1033,19 +1066,19 @@ export const DashboardPage = () => {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-rose-200/70 bg-[rgba(220,38,38,0.12)] p-4 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Total Outstanding</p>
-              <p className="mt-2 text-xl font-extrabold text-slate-950">{formatCurrency(totalOutstandingBase)}</p>
+              <Money value={totalOutstandingBase} className="mt-2 text-lg font-extrabold text-slate-950" />
             </div>
             <div className="rounded-2xl border border-emerald-200/70 bg-[rgba(22,163,74,0.12)] p-4 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Collected Amount</p>
-              <p className="mt-2 text-xl font-extrabold text-slate-950">{formatCurrency(collectedAmount)}</p>
+              <Money value={collectedAmount} className="mt-2 text-lg font-extrabold text-slate-950" />
             </div>
             <div className="rounded-2xl border border-orange-200/70 bg-[rgba(249,115,22,0.12)] p-4 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Remaining Amount</p>
-              <p className="mt-2 text-xl font-extrabold text-slate-950">{formatCurrency(remainingAmount)}</p>
+              <Money value={remainingAmount} className="mt-2 text-lg font-extrabold text-slate-950" />
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Collection Rate</p>
-              <p className="mt-2 text-xl font-extrabold text-slate-950">{collectionRate.toFixed(1)}%</p>
+              <p className="mt-2 truncate text-lg font-extrabold text-slate-950">{collectionRate.toFixed(1)}%</p>
             </div>
           </div>
           <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1061,7 +1094,7 @@ export const DashboardPage = () => {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-extrabold text-slate-950">{collectionRate.toFixed(0)}%</span>
+                    <span className="text-xl font-extrabold text-slate-950">{collectionRate.toFixed(0)}%</span>
                     <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Collected</span>
                   </div>
                 </div>
@@ -1104,7 +1137,7 @@ export const DashboardPage = () => {
                     <p className="truncate text-sm font-bold text-slate-700">{customer.customerName}</p>
                     <p className="truncate text-xs text-slate-400">{customer.mobile}</p>
                   </div>
-                  <p className="shrink-0 text-sm font-bold text-slate-950">{formatCurrency(customer.currentBalance)}</p>
+                  <Money value={customer.currentBalance} align="right" className="shrink-0 text-sm font-bold text-slate-950" />
                 </div>
               )) : (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No outstanding customers found.</div>

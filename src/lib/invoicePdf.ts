@@ -154,7 +154,7 @@ const buildInvoicePdfDocument = async (invoice: Invoice, company: CompanySummary
       (item.igstAmount ?? 0) > 0
         ? `IGST ${item.igstRate ?? 0}% ${formatAmount(item.igstAmount ?? 0)}`
         : `CGST ${item.cgstRate ?? 0}% ${formatAmount(item.cgstAmount ?? 0)} / SGST ${item.sgstRate ?? 0}% ${formatAmount(item.sgstAmount ?? 0)}`,
-      formatAmount(item.lineTotal)
+      formatAmount(item.grandAmount ?? item.netAmount ?? item.lineTotal)
     ])
   });
 

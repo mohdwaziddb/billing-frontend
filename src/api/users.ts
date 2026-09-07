@@ -1,4 +1,4 @@
-import { apiClient } from "./apiClient";
+  import { apiClient } from "./apiClient";
 import type { ApiResponse, CompanyUserRequest, PageResponse, Role, UserProfile } from "../types/api";
 
 const companyRoles: Role[] = ["OWNER", "ADMIN", "USER"];

@@ -285,9 +285,6 @@ export const CreateInvoicePage = () => {
     if (numberValue(paidAmountInput) < 0) {
       issues.push("Paid amount cannot be negative.");
     }
-    if (numberValue(paidAmountInput) === 0) {
-      issues.push("Paid amount must be greater than 0.");
-    }
     if (numberValue(paidAmountInput) > invoiceSummary.grandTotal) {
       issues.push("Paid amount cannot exceed grand total.");
     }
@@ -322,8 +319,8 @@ export const CreateInvoicePage = () => {
     invoiceDateInput &&
     watchedItems.length > 0 &&
     watchedItems.every((item) => item.productId && numberValue(item.qty) >= 1 && numberValue(item.rate) >= 0) &&
-    invoiceSummary.paidAmount > 0 &&
-    paymentModeInput
+    invoiceSummary.paidAmount >= 0 &&
+    (invoiceSummary.paidAmount <= 0 || paymentModeInput)
   );
   const canSaveInvoice = hasRequiredInvoiceFields && !hasClientValidationErrors;
   const customerMobileError = customerMobile.trim() && !isValidMobileNumber(customerMobile) ? MOBILE_VALIDATION_MESSAGE : undefined;
@@ -774,23 +771,24 @@ export const CreateInvoicePage = () => {
                     <div key={field.id} className="rounded-xl border border-slate-200 bg-white p-2.5">
                       <div className="grid gap-2 md:grid-cols-[minmax(220px,1fr)_78px_116px_96px_112px_46px] md:items-center">
                         <div className="md:min-w-0">
-                          <label className="sr-only">Product</label>
-                          <select
+                          <Select
                             {...productRegister}
+                            options={[
+                              { label: "Select Product", value: "" },
+                              ...products.map((entry) => ({
+                                label: entry.name,
+                                value: String(entry.id),
+                              })),
+                            ]}
+                            aria-label="Product"
                             disabled={!canProceedWithInvoice}
-                            className={`h-[46px] w-full rounded-[var(--radius-control)] border bg-white py-0 pl-3 pr-12 text-sm font-medium text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)] ${errors.items?.[index]?.productId?.message ? "border-rose-400/70" : "border-slate-200"}`}
+                            error={errors.items?.[index]?.productId?.message}
+                            className="h-[46px]"
                             onChange={(event) => {
                               productRegister.onChange(event);
                               syncProductDefaults(index, event.target.value);
                             }}
-                          >
-                            <option value="">Select Product</option>
-                            {products.map((entry) => (
-                              <option key={entry.id} value={entry.id}>
-                                {entry.name}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
 
                         <div>
@@ -889,7 +887,7 @@ export const CreateInvoicePage = () => {
                 />
                 <Select
                   label="Payment Mode"
-                  requiredMark
+                  requiredMark={invoiceSummary.paidAmount > 0}
                   disabled={!canProceedWithInvoice || invoiceSummary.paidAmount <= 0}
                   placeholder="No Mode Selected"
                   error={summaryIssues.find((issue) => issue.toLowerCase().includes("payment mode"))}
