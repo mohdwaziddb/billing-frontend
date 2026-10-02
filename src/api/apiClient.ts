@@ -91,7 +91,28 @@ const isAuthBypassRoute = (url?: string) => {
   ].some((route) => url.includes(route));
 };
 
+const getSubdomainCompanyCode = (): string | null => {
+  if (typeof window === "undefined") return null;
+  const host = window.location.hostname.toLowerCase();
+  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com" || host === "localhost" || host === "127.0.0.1") return null;
+  if (host.endsWith(".biziotechnologies.com")) {
+    const sub = host.split(".")[0];
+    if (sub && sub !== "www" && sub !== "biziotechnologies") return sub;
+  }
+  if (host.endsWith(".localhost")) {
+    const sub = host.split(".")[0];
+    if (sub && sub !== "localhost") return sub;
+  }
+  return null;
+};
+
 apiClient.interceptors.request.use((config) => {
+  // DATABASE-per-tenant: backend Host is always localhost:9009 in dev, so send
+  // X-Company-Code from frontend subdomain (TSM-like routing).
+  const companyCode = getSubdomainCompanyCode();
+  if (companyCode && !config.headers["X-Company-Code"]) {
+    config.headers["X-Company-Code"] = companyCode;
+  }
   if (isAuthBypassRoute(config.url)) {
     delete config.headers.Authorization;
     return config;

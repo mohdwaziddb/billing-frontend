@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
 import { PermissionRoute } from "./components/PermissionRoute";
@@ -30,7 +31,7 @@ import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { PlatformAdminCommunicationPage } from "./pages/NotificationSettingsPages";
+import { CommunicationSettingsPage } from "./pages/NotificationSettingsPages";
 import { RolePermissionsPage } from "./pages/RolePermissionsPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
 import { SalesReferralsPage } from "./pages/SalesReferralsPage";
@@ -44,12 +45,40 @@ import { PurchaseListPage } from "./pages/PurchaseListPage";
 import { StockLedgerPage } from "./pages/StockLedgerPage";
 import { InvoiceTemplatesPage } from "./pages/InvoiceTemplatesPage";
 
+function isAppHost(): boolean {
+  // Single-DB local dev: plain localhost opens the app login (configured DB),
+  // not the marketing page. Only the main production domain shows LandingPage.
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname.toLowerCase();
+  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com") return false;
+  return true;
+}
+
+function isTenantSubdomainHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname.toLowerCase();
+  // Platform-admin is main-domain only (biziotechnologies.com); localhost always allowed for dev.
+  if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost")) return false;
+  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com") return false;
+  if (host.endsWith(".biziotechnologies.com") && host.split(".").length > 2) return true;
+  return false;
+}
+
+function PlatformAdminHostGuard({ children }: { children: ReactNode }) {
+  if (typeof window !== "undefined" && isTenantSubdomainHost()) {
+    window.location.href = "https://biziotechnologies.com/platform-admin/login";
+    return null;
+  }
+  return <>{children}</>;
+}
+
 function App() {
+  const isApp = isAppHost();
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={isApp ? <LoginPage /> : <LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
+      <Route path="/platform-admin/login" element={<PlatformAdminHostGuard><PlatformAdminLoginPage /></PlatformAdminHostGuard>} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
@@ -75,7 +104,7 @@ function App() {
           <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
           <Route path="/setup/sms-templates" element={<PermissionRoute menuCode="SMS_TEMPLATES"><SmsTemplatePage /></PermissionRoute>} />
           <Route path="/setup/invoice-templates" element={<PermissionRoute menuCode="INVOICE_TEMPLATES"><InvoiceTemplatesPage /></PermissionRoute>} />
-          <Route path="/setup/communication" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/communication" element={<PermissionRoute menuCode="COMMUNICATION"><CommunicationSettingsPage /></PermissionRoute>} />
           <Route path="/setup/email-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/sms-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/whatsapp-settings" element={<Navigate replace to="/dashboard" />} />
@@ -101,12 +130,11 @@ function App() {
         </Route>
       </Route>
 
-      <Route element={<PlatformAdminRoute />}>
+      <Route element={<PlatformAdminHostGuard><PlatformAdminRoute /></PlatformAdminHostGuard>}>
         <Route element={<DashboardLayout />}>
           <Route path="/platform-admin" element={<PlatformAdminPage mode="dashboard" />} />
           <Route path="/platform-admin/dashboard" element={<PlatformAdminPage mode="dashboard" />} />
           <Route path="/platform-admin/companies" element={<PlatformAdminPage mode="companies" />} />
-          <Route path="/platform-admin/communication" element={<PlatformAdminCommunicationPage />} />
           <Route path="/platform-admin/company-details" element={<PlatformAdminPage mode="details" />} />
           <Route path="/platform-admin/settings" element={<PlatformAdminPage mode="settings" />} />
         </Route>

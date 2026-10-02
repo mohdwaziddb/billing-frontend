@@ -32,6 +32,8 @@ import { Table } from "../components/Table";
 import { TrendBadge } from "../components/TrendBadge";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
+import { CHART_PALETTE, getChartTheme } from "../lib/chartTheme";
+import { useIsDarkMode } from "../hooks/useIsDarkMode";
 import type { AnalyticsSummary, Customer, CustomerDue, Expense, Invoice, LowStockProduct, OwnerAnalytics, PageResponse, Payment } from "../types/api";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
@@ -78,13 +80,10 @@ const buildRange = (preset: DatePreset) => {
   return { startDate: toIso(start), endDate: toIso(today) };
 };
 
-const chartTooltip = {
-  contentStyle: { background: "rgba(15,23,42,0.96)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16 }
-};
-
-const chartColors = ["#38bdf8", "#10b981", "#f97316", "#a78bfa", "#f43f5e"];
+const chartColors = CHART_PALETTE;
 
 export const SalesAnalyticsPage = () => {
+  const chart = getChartTheme(useIsDarkMode());
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [overview, setOverview] = useState<OwnerAnalytics | null>(null);
   const [lowStockPage, setLowStockPage] = useState<PageResponse<LowStockProduct>>({
@@ -336,8 +335,8 @@ export const SalesAnalyticsPage = () => {
                     <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
                   ))}
                 </Pie>
-                <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
-                <Legend iconType="circle" wrapperStyle={{ color: "#cbd5e1", fontSize: 12 }} />
+                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
+                <Legend iconType="circle" wrapperStyle={{ color: chart.legend, fontSize: 12 }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -351,11 +350,11 @@ export const SalesAnalyticsPage = () => {
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={salesVsPayments}>
-                <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <XAxis dataKey="label" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
-                <Legend wrapperStyle={{ color: "#cbd5e1", fontSize: 12 }} />
+                <CartesianGrid stroke={chart.grid} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
+                <Legend wrapperStyle={{ color: chart.legend, fontSize: 12 }} />
                 <Bar dataKey="sales" name="Revenue" fill="#38bdf8" radius={[8, 8, 0, 0]} />
                 <Bar dataKey="payments" name="Collection" fill="#10b981" radius={[8, 8, 0, 0]} />
                 <Bar dataKey="expense" name="Expense" fill="#f97316" radius={[8, 8, 0, 0]} />
@@ -378,10 +377,10 @@ export const SalesAnalyticsPage = () => {
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={overview?.salesTrend ?? []}>
-                <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <XAxis dataKey="label" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
+                <CartesianGrid stroke={chart.grid} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
                 <Area type="monotone" dataKey="value" name="Sales" stroke="#38bdf8" strokeWidth={3} fill="#38bdf8" fillOpacity={0.18} />
               </AreaChart>
             </ResponsiveContainer>
@@ -396,10 +395,10 @@ export const SalesAnalyticsPage = () => {
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={overview?.outstandingTrend ?? []}>
-                <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <XAxis dataKey="label" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
+                <CartesianGrid stroke={chart.grid} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
                 <Bar dataKey="value" fill="#f97316" radius={[10, 10, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -416,10 +415,10 @@ export const SalesAnalyticsPage = () => {
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={overview?.netProfitTrend ?? []}>
-                <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <XAxis dataKey="label" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip {...chartTooltip} formatter={(value: number) => formatCurrency(value)} />
+                <CartesianGrid stroke={chart.grid} vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
                 <Area type="monotone" dataKey="value" name="Net Profit" stroke="#a78bfa" strokeWidth={3} fill="#a78bfa" fillOpacity={0.2} />
               </AreaChart>
             </ResponsiveContainer>

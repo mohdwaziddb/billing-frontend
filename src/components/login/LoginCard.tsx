@@ -1,5 +1,6 @@
-import { CheckCircle2, CircleAlert, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
+import { Building2, CheckCircle2, CircleAlert, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { env } from "../../config/env";
 import { ForgotPasswordModal } from "../ForgotPasswordModal";
 import { LoginBrand } from "./LoginBrand";
 
@@ -7,6 +8,13 @@ const REMEMBER_ME_KEY = "billing_frontend_remember_me";
 
 const inputBaseClass =
   "h-[56px] w-full rounded-xl border bg-white text-[15px] font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#2453d8] focus:ring-4 focus:ring-[rgba(36,83,216,0.12)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
+
+export type LoginCompanyInfo = {
+  name?: string | null;
+  logoUrl?: string | null;
+  email?: string | null;
+  phone?: string | null;
+} | null;
 
 type LoginCardProps = {
   username: string;
@@ -17,6 +25,8 @@ type LoginCardProps = {
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: () => void;
+  company?: LoginCompanyInfo;
+  brandingReady?: boolean;
   title?: string;
   subtitle?: string;
   fieldLabel?: string;
@@ -35,6 +45,8 @@ export const LoginCard = ({
   onUsernameChange,
   onPasswordChange,
   onSubmit,
+  company = null,
+  brandingReady = true,
   title = "Welcome back",
   subtitle = "Sign in to continue to your Bizio workspace.",
   fieldLabel = "Email address",
@@ -63,14 +75,52 @@ export const LoginCard = ({
     }
   };
 
+  const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
+  const companyLogoUrl =
+    company?.logoUrl != null && company.logoUrl !== ""
+      ? company.logoUrl.startsWith("http")
+        ? company.logoUrl
+        : `${apiOrigin}${company.logoUrl}`
+      : null;
+
   return (
     <>
       <div className="w-full max-w-[620px] rounded-[24px] border border-slate-200 bg-white p-8 text-left shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-12">
-        <LoginBrand />
-        <div className="mt-8 text-left">
-          <h2 className="text-[30px] font-extrabold tracking-[-0.03em] text-slate-950">{title}</h2>
-          <p className="mt-2 text-[15px] leading-7 text-slate-500">{subtitle}</p>
-        </div>
+        {!brandingReady && !company?.name ? (
+          <div className="flex items-center gap-2.5" aria-label="Loading workspace">
+            <span className="h-9 w-9 animate-pulse rounded-xl bg-slate-200" />
+            <span className="h-5 w-44 animate-pulse rounded-lg bg-slate-200" />
+          </div>
+        ) : company?.name ? (
+          <div>
+            <div className="flex items-center gap-4">
+              {companyLogoUrl ? (
+                <img
+                  src={companyLogoUrl}
+                  alt={`${company.name} logo`}
+                  className="h-16 w-16 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain shadow-[0_10px_24px_rgba(36,83,216,0.20)]"
+                />
+              ) : (
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#1f4ed8,#2b5dff)] text-white shadow-[0_10px_24px_rgba(36,83,216,0.28)]">
+                  <Building2 size={30} />
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#2453d8]">Signing in to</p>
+                <h2 className="truncate text-[26px] font-extrabold tracking-[-0.03em] text-slate-950">{company.name}</h2>
+              </div>
+            </div>
+            <p className="mt-2 text-[15px] leading-7 text-slate-500">{subtitle}</p>
+          </div>
+        ) : (
+          <>
+            <LoginBrand company={company} />
+            <div className="mt-8 text-left">
+              <h2 className="text-[30px] font-extrabold tracking-[-0.03em] text-slate-950">{title}</h2>
+              <p className="mt-2 text-[15px] leading-7 text-slate-500">{subtitle}</p>
+            </div>
+          </>
+        )}
 
         <form
           className="mt-8 space-y-6"
@@ -194,6 +244,38 @@ export const LoginCard = ({
           <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
             {bottomBox ? (
               bottomBox
+            ) : company?.name ? (
+              <>
+                <div className="flex items-center gap-3">
+                  {companyLogoUrl ? (
+                    <img src={companyLogoUrl} alt={company.name ?? "Company logo"} className="h-10 w-10 rounded-lg border border-slate-200 bg-white object-contain" />
+                  ) : (
+                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2453d8]/10 text-[#2453d8]">
+                      <Building2 size={18} />
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.10em] text-slate-400">Signing in to</p>
+                    <p className="truncate text-[15px] font-extrabold text-slate-900">{company.name}</p>
+                  </div>
+                </div>
+                {company.email || company.phone ? (
+                  <ul className="mt-2.5 space-y-2">
+                    {company.email ? (
+                      <li className="flex items-start gap-2 text-[12px] font-medium leading-5 text-slate-600">
+                        <Mail size={14} className="mt-0.5 shrink-0 text-[#2453d8]" />
+                        {company.email}
+                      </li>
+                    ) : null}
+                    {company.phone ? (
+                      <li className="flex items-start gap-2 text-[12px] font-medium leading-5 text-slate-600">
+                        <Phone size={14} className="mt-0.5 shrink-0 text-[#2453d8]" />
+                        {company.phone}
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
+              </>
             ) : (
               <>
                 <p className="text-[10px] font-extrabold uppercase tracking-[0.10em] text-slate-400">Your Bizio workspace</p>

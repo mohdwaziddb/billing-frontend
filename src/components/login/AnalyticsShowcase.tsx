@@ -310,7 +310,7 @@ const FloatingBadges = () => (
   </div>
 );
 
-export const AnalyticsShowcase = () => (
+export const AnalyticsShowcase = ({ companyName = null }: { companyName?: string | null }) => (
   <aside className="relative hidden overflow-hidden bg-[linear-gradient(165deg,#ffffff_0%,#f6f9ff_55%,#edf3ff_100%)] lg:flex lg:justify-center lg:px-6 lg:py-10 xl:px-10">
     <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#dbe7ff]/80 blur-3xl" />
     <div aria-hidden className="pointer-events-none absolute -left-20 bottom-6 h-64 w-64 rounded-full bg-[#e6eeff]/90 blur-3xl" />
@@ -321,6 +321,11 @@ export const AnalyticsShowcase = () => (
 
     <div className="relative z-10 mx-auto flex w-full max-w-[500px] flex-col justify-center">
       <LoginBrand />
+      {companyName ? (
+        <p className="mt-4 inline-flex w-fit items-center gap-2 rounded-full border border-[#d7e3ff] bg-white/80 px-3 py-1 text-[11px] font-extrabold text-[#2453d8] shadow-[0_6px_16px_rgba(36,83,216,0.08)]">
+          Signing in to {companyName}
+        </p>
+      ) : null}
       <div className="mt-5">
         <span className="inline-flex items-center rounded-full border border-[#d7e3ff] bg-white/80 px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#2453d8] shadow-[0_6px_16px_rgba(36,83,216,0.08)]">
           Business analytics platform

@@ -17,23 +17,6 @@ import {
   updateSmsSettings,
   updateWhatsAppSettings
 } from "../api/notifications";
-import {
-  createPlatformAdminEmailSettings,
-  createPlatformAdminSmsSettings,
-  createPlatformAdminWhatsAppSettings,
-  getPlatformAdminCompanies,
-  getPlatformAdminEmailSettings,
-  getPlatformAdminSmsProviders,
-  getPlatformAdminSmsSettings,
-  getPlatformAdminWhatsAppProviders,
-  getPlatformAdminWhatsAppSettings,
-  testPlatformAdminEmailSettings,
-  testPlatformAdminSmsSettings,
-  testPlatformAdminWhatsAppSettings,
-  updatePlatformAdminEmailSettings,
-  updatePlatformAdminSmsSettings,
-  updatePlatformAdminWhatsAppSettings
-} from "../api/platformAdmin";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
@@ -45,7 +28,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { notificationService } from "../services/notificationService";
-import type { PlatformAdminCompany, ProviderSettings, ProviderSettingsRequest, SmsProviderMetadata, WhatsAppProviderMetadata } from "../types/api";
+import type { ProviderSettings, ProviderSettingsRequest, SmsProviderMetadata, WhatsAppProviderMetadata } from "../types/api";
 
 type CommunicationTab = "email" | "sms" | "whatsapp";
 
@@ -91,15 +74,11 @@ const tabMeta: Record<CommunicationTab, { label: string; mode: string; defaults:
   whatsapp: { label: "WhatsApp Services", mode: "WhatsApp Messaging", defaults: whatsAppDefaults }
 };
 
-export const CommunicationSettingsPage = () => <CommunicationHubPage platformAdmin={false} />;
+export const CommunicationSettingsPage = () => <CommunicationHubPage />;
 
-export const PlatformAdminCommunicationPage = () => <CommunicationHubPage platformAdmin />;
-
-const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => {
+const CommunicationHubPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<CommunicationTab>(normalizeTab(searchParams.get("tab")));
-  const [companies, setCompanies] = useState<PlatformAdminCompany[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [records, setRecords] = useState<ProviderSettings[]>([]);
   const [editing, setEditing] = useState<ProviderSettings | null>(null);
   const [form, setForm] = useState<ProviderSettingsRequest>({ ...tabMeta[tab].defaults });
@@ -134,71 +113,41 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
     if (tab !== "sms") {
       return;
     }
-    if (platformAdmin && !selectedCompanyId) {
-      setSmsProviders([]);
-      return;
-    }
     const loadProviders = async () => {
       try {
-        const providers = platformAdmin
-          ? await getPlatformAdminSmsProviders(Number(selectedCompanyId))
-          : await getSmsProviders();
-        setSmsProviders(providers);
+        setSmsProviders(await getSmsProviders());
       } catch (error) {
         setApiError(error, "Unable to load SMS providers");
       }
     };
     void loadProviders();
-  }, [platformAdmin, selectedCompanyId, setApiError, tab]);
+  }, [setApiError, tab]);
 
   useEffect(() => {
     if (tab !== "whatsapp") {
       return;
     }
-    if (platformAdmin && !selectedCompanyId) {
-      setWhatsAppProviders([]);
-      return;
-    }
     const loadProviders = async () => {
       try {
-        const providers = platformAdmin
-          ? await getPlatformAdminWhatsAppProviders(Number(selectedCompanyId))
-          : await getWhatsAppProviders();
-        setWhatsAppProviders(providers);
+        setWhatsAppProviders(await getWhatsAppProviders());
       } catch (error) {
         setApiError(error, "Unable to load WhatsApp providers");
       }
     };
     void loadProviders();
-  }, [platformAdmin, selectedCompanyId, setApiError, tab]);
-
-  useEffect(() => {
-    if (!platformAdmin) {
-      return;
-    }
-    void getPlatformAdminCompanies({ active: true, page: 0, size: 1000 })
-      .then((response) => {
-        setCompanies(response.records);
-        setSelectedCompanyId((current) => current || (response.records[0] ? String(response.records[0].id) : ""));
-      })
-      .catch((error) => setApiError(error, "Unable to load companies"));
-  }, [platformAdmin, setApiError]);
+  }, [setApiError, tab]);
 
   const refresh = async () => {
-    if (platformAdmin && !selectedCompanyId) {
-      setRecords([]);
-      return;
-    }
     try {
       if (tab === "email") {
-        setRecords(platformAdmin ? await getPlatformAdminEmailSettings(Number(selectedCompanyId)) : await getEmailSettings());
+        setRecords(await getEmailSettings());
         return;
       }
       if (tab === "sms") {
-        setRecords(platformAdmin ? await getPlatformAdminSmsSettings(Number(selectedCompanyId)) : await getSmsSettings());
+        setRecords(await getSmsSettings());
         return;
       }
-      setRecords(platformAdmin ? await getPlatformAdminWhatsAppSettings(Number(selectedCompanyId)) : await getWhatsAppSettings());
+      setRecords(await getWhatsAppSettings());
     } catch (error) {
       setApiError(error, `Unable to load ${tabMeta[tab].label.toLowerCase()}`);
     }
@@ -206,7 +155,7 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
 
   useEffect(() => {
     void refresh();
-  }, [tab, selectedCompanyId]);
+  }, [tab]);
 
   const switchTab = (nextTab: CommunicationTab) => {
     const params = new URLSearchParams(searchParams);
@@ -215,10 +164,6 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
   };
 
   const startCreate = () => {
-    if (platformAdmin && !selectedCompanyId) {
-      notificationService.showError("Select a company first.");
-      return;
-    }
     setEditing(null);
     setForm(
       tab === "sms"
@@ -252,11 +197,11 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
     try {
       setSaving(true);
       if (tab === "email") {
-        await saveEmailProvider(platformAdmin, selectedCompanyId, editing, form);
+        await saveEmailProvider(editing, form);
       } else if (tab === "sms") {
-        await saveSmsProvider(platformAdmin, selectedCompanyId, editing, normalizeSmsForm(form));
+        await saveSmsProvider(editing, normalizeSmsForm(form));
       } else {
-        await saveWhatsAppProvider(platformAdmin, selectedCompanyId, editing, normalizeWhatsAppForm(form));
+        await saveWhatsAppProvider(editing, normalizeWhatsAppForm(form));
       }
       notificationService.showSuccess(`${tabMeta[tab].label} saved successfully.`);
       setOpen(false);
@@ -272,25 +217,13 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
     try {
       setTestingId(record.id);
       if (tab === "email") {
-        if (platformAdmin) {
-          await testPlatformAdminEmailSettings(Number(selectedCompanyId), testRecipient);
-        } else {
-          await sendTestEmail(testRecipient);
-        }
+        await sendTestEmail(testRecipient);
         notificationService.showSuccess("Test email sent successfully.");
       } else if (tab === "sms") {
-        if (platformAdmin) {
-          await testPlatformAdminSmsSettings(Number(selectedCompanyId), { mobileNumber: testMobileNumber });
-        } else {
-          await sendTestSms({ mobileNumber: testMobileNumber });
-        }
+        await sendTestSms({ mobileNumber: testMobileNumber });
         notificationService.showSuccess("Test SMS sent successfully.");
       } else {
-        if (platformAdmin) {
-          await testPlatformAdminWhatsAppSettings(Number(selectedCompanyId), { mobileNumber: testMobileNumber, message: testMessage });
-        } else {
-          await sendTestWhatsApp({ mobileNumber: testMobileNumber, message: testMessage });
-        }
+        await sendTestWhatsApp({ mobileNumber: testMobileNumber, message: testMessage });
         notificationService.showSuccess("WhatsApp message sent successfully.");
       }
     } catch (error) {
@@ -320,34 +253,16 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
       ? canSaveSmsProvider(form, smsProviders, Boolean(editing))
       : canSaveWhatsAppProvider(form, whatsAppProviders, Boolean(editing));
 
-  const selectedCompanyName = companies.find((company) => String(company.id) === selectedCompanyId)?.name ?? "";
-
   return (
     <div className="space-y-4 pb-6">
       <Header
-        title={platformAdmin ? "Communication" : "Communication Services"}
-        subtitle={platformAdmin
-          ? "Centralized communication management hub for company-wise Email, SMS, and WhatsApp providers."
-          : "Manage Email, SMS, and WhatsApp providers for your company from one communication hub."}
+        title="Communication Services"
+        subtitle="Manage Email, SMS, and WhatsApp providers for your company from one communication hub."
       />
 
       <GlassCard className="p-6 md:p-7">
         <div className="flex flex-col gap-4">
-          <CommonBreadcrumb items={platformAdmin ? [{ label: "Platform Administration" }, { label: "Communication" }] : [{ label: "Setup" }, { label: "Communication" }]} />
-
-          {platformAdmin ? (
-            <div className="max-w-md">
-              <Select
-                label="Company"
-                value={selectedCompanyId}
-                options={[
-                  { label: "Select company", value: "" },
-                  ...companies.map((company) => ({ label: company.name, value: String(company.id) }))
-                ]}
-                onChange={(event) => setSelectedCompanyId(event.target.value)}
-              />
-            </div>
-          ) : null}
+          <CommonBreadcrumb items={[{ label: "Setup" }, { label: "Communication" }]} />
 
           <div className="flex flex-wrap gap-2">
             {([
@@ -374,12 +289,6 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
           </div>
         </div>
 
-        {platformAdmin && !selectedCompanyId ? (
-          <div className="mt-6 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-            Select a company to load company-scoped communication providers.
-          </div>
-        ) : (
-          <>
             <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="grid flex-1 gap-4 md:grid-cols-3">
                 <ProviderMetric label="Total Providers" value={records.length} />
@@ -390,12 +299,6 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                 <Plus size={16} /> Add Provider
               </Button>
             </div>
-
-            {platformAdmin && selectedCompanyName ? (
-              <div className="mt-4 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                Managing communication providers for <span className="font-semibold text-slate-950">{selectedCompanyName}</span>
-              </div>
-            ) : null}
 
             {tab === "email" ? (
               <div className="mt-5 flex flex-col gap-3 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-end">
@@ -478,8 +381,6 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                 ]}
               />
             </div>
-          </>
-        )}
       </GlassCard>
 
       <Modal open={open} title={editing ? `Edit ${tabMeta[tab].label}` : `Add ${tabMeta[tab].label}`} onClose={() => setOpen(false)}>
@@ -608,7 +509,7 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                 type="button"
                 variant="secondary"
                 disabled={testingDraft || !testMobileNumber.trim() || !selectedSmsProvider}
-                onClick={() => void testSmsDraft(platformAdmin, selectedCompanyId, normalizeSmsForm(form), testMobileNumber, setTestingDraft, (error, fallbackMessage) => setApiError(error, fallbackMessage ?? "Unable to verify SMS provider connection"))}
+                onClick={() => void testSmsDraft(normalizeSmsForm(form), testMobileNumber, setTestingDraft, (error, fallbackMessage) => setApiError(error, fallbackMessage ?? "Unable to verify SMS provider connection"))}
               >
                 {testingDraft ? "Testing..." : "Test Connection"}
               </Button>
@@ -618,7 +519,7 @@ const CommunicationHubPage = ({ platformAdmin }: { platformAdmin: boolean }) => 
                 type="button"
                 variant="secondary"
                 disabled={testingDraft || !testMobileNumber.trim() || !selectedWhatsAppProvider}
-                onClick={() => void testWhatsAppDraft(platformAdmin, selectedCompanyId, normalizeWhatsAppForm(form), testMobileNumber, testMessage, setTestingDraft, (error, fallbackMessage) => setApiError(error, fallbackMessage ?? "Unable to verify WhatsApp provider connection"))}
+                onClick={() => void testWhatsAppDraft(normalizeWhatsAppForm(form), testMobileNumber, testMessage, setTestingDraft, (error, fallbackMessage) => setApiError(error, fallbackMessage ?? "Unable to verify WhatsApp provider connection"))}
               >
                 {testingDraft ? "Testing..." : "Test Connection"}
               </Button>
@@ -716,15 +617,7 @@ const emailCredential = (record: ProviderSettings) => {
     : record.smtpUsername ?? "--";
 };
 
-const saveEmailProvider = async (platformAdmin: boolean, selectedCompanyId: string, editing: ProviderSettings | null, form: ProviderSettingsRequest) => {
-  if (platformAdmin) {
-    if (editing) {
-      await updatePlatformAdminEmailSettings(Number(selectedCompanyId), editing.id, form);
-      return;
-    }
-    await createPlatformAdminEmailSettings(Number(selectedCompanyId), form);
-    return;
-  }
+const saveEmailProvider = async (editing: ProviderSettings | null, form: ProviderSettingsRequest) => {
   if (editing) {
     await updateEmailSettings(editing.id, form);
     return;
@@ -732,15 +625,7 @@ const saveEmailProvider = async (platformAdmin: boolean, selectedCompanyId: stri
   await createEmailSettings(form);
 };
 
-const saveSmsProvider = async (platformAdmin: boolean, selectedCompanyId: string, editing: ProviderSettings | null, form: ProviderSettingsRequest) => {
-  if (platformAdmin) {
-    if (editing) {
-      await updatePlatformAdminSmsSettings(Number(selectedCompanyId), editing.id, form);
-      return;
-    }
-    await createPlatformAdminSmsSettings(Number(selectedCompanyId), form);
-    return;
-  }
+const saveSmsProvider = async (editing: ProviderSettings | null, form: ProviderSettingsRequest) => {
   if (editing) {
     await updateSmsSettings(editing.id, form);
     return;
@@ -748,15 +633,7 @@ const saveSmsProvider = async (platformAdmin: boolean, selectedCompanyId: string
   await createSmsSettings(form);
 };
 
-const saveWhatsAppProvider = async (platformAdmin: boolean, selectedCompanyId: string, editing: ProviderSettings | null, form: ProviderSettingsRequest) => {
-  if (platformAdmin) {
-    if (editing) {
-      await updatePlatformAdminWhatsAppSettings(Number(selectedCompanyId), editing.id, form);
-      return;
-    }
-    await createPlatformAdminWhatsAppSettings(Number(selectedCompanyId), form);
-    return;
-  }
+const saveWhatsAppProvider = async (editing: ProviderSettings | null, form: ProviderSettingsRequest) => {
   if (editing) {
     await updateWhatsAppSettings(editing.id, form);
     return;
@@ -925,8 +802,6 @@ const buildSmsTestPayload = (form: ProviderSettingsRequest, mobileNumber: string
 };
 
 const testSmsDraft = async (
-  platformAdmin: boolean,
-  selectedCompanyId: string,
   form: ProviderSettingsRequest,
   testMobileNumber: string,
   setTestingDraft: (value: boolean) => void,
@@ -935,11 +810,7 @@ const testSmsDraft = async (
   try {
     setTestingDraft(true);
     const payload = buildSmsTestPayload(form, testMobileNumber);
-    if (platformAdmin) {
-      await testPlatformAdminSmsSettings(Number(selectedCompanyId), payload);
-    } else {
-      await sendTestSms(payload);
-    }
+    await sendTestSms(payload);
     notificationService.showSuccess("SMS provider connection verified successfully.");
   } catch (error) {
     setApiError(error, "Unable to verify SMS provider connection");
@@ -1002,8 +873,6 @@ const buildWhatsAppTestPayload = (form: ProviderSettingsRequest, mobileNumber: s
 };
 
 const testWhatsAppDraft = async (
-  platformAdmin: boolean,
-  selectedCompanyId: string,
   form: ProviderSettingsRequest,
   testMobileNumber: string,
   testMessage: string,
@@ -1013,11 +882,7 @@ const testWhatsAppDraft = async (
   try {
     setTestingDraft(true);
     const payload = buildWhatsAppTestPayload(form, testMobileNumber, testMessage);
-    if (platformAdmin) {
-      await testPlatformAdminWhatsAppSettings(Number(selectedCompanyId), payload);
-    } else {
-      await sendTestWhatsApp(payload);
-    }
+    await sendTestWhatsApp(payload);
     notificationService.showSuccess("WhatsApp provider connection verified successfully.");
   } catch (error) {
     setApiError(error, "Unable to verify WhatsApp provider connection");

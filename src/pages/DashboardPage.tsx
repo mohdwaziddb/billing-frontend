@@ -29,6 +29,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { formatAmount, formatCompactCurrency, formatCurrency } from "../lib/currency";
+import { getChartTheme } from "../lib/chartTheme";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import type { CustomerDue, DashboardCardKey, DashboardDetail, DashboardDetailRow, DashboardSummary, Invoice, MetricPoint, OwnerAnalytics, PageResponse, SalesByCategory, TopSellingProduct } from "../types/api";
@@ -517,6 +518,7 @@ export const DashboardPage = () => {
   ].filter((item) => item.value > 0), [collectedAmount, remainingAmount]);
   const chartTextColor = preferences.darkModeEnabled ? "#CBD5E1" : "#64748B";
   const chartGridColor = preferences.darkModeEnabled ? "#334155" : "#e8edf5";
+  const chartTooltipTheme = getChartTheme(preferences.darkModeEnabled);
   const grandTotalRow = useMemo(
     () => (selectedConfig && details ? buildGrandTotalRow(details.rows, selectedConfig.columns) : null),
     [details, selectedConfig]
@@ -875,7 +877,7 @@ export const DashboardPage = () => {
                 <CartesianGrid stroke={chartGridColor} strokeDasharray="4 4" vertical={false} />
                 <XAxis dataKey="label" minTickGap={24} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis width={64} tickFormatter={(tickValue: number) => formatCompactCurrency(tickValue)} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
                 <Area type="monotone" dataKey="value" stroke={CHART_COLORS.sales} strokeWidth={3} fill="url(#salesArea)" dot={{ r: 3, fill: CHART_COLORS.sales }} />
               </AreaChart>
             </ResponsiveContainer>
@@ -897,7 +899,7 @@ export const DashboardPage = () => {
                   <Pie data={topProducts} dataKey="totalSalesAmount" nameKey="productName" innerRadius={52} outerRadius={82} paddingAngle={3}>
                     {topProducts.map((_, index) => <Cell key={index} fill={CHART_COLORS.palette[index % CHART_COLORS.palette.length]} />)}
                   </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                  <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -1021,7 +1023,7 @@ export const DashboardPage = () => {
                     />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -1090,7 +1092,7 @@ export const DashboardPage = () => {
                       <Pie data={outstandingOverviewData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={82} paddingAngle={4}>
                         {outstandingOverviewData.map((item) => <Cell key={item.name} fill={item.color} />)}
                       </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
