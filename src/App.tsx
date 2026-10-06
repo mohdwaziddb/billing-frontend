@@ -1,4 +1,12 @@
+import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { apiClient } from "./api/apiClient";
+import {
+  isMaintenanceError,
+  isTenantSubdomainHost,
+  MAINTENANCE_EVENT,
+  notifyMaintenance
+} from "./lib/tenantMaintenance";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
 import { PermissionRoute } from "./components/PermissionRoute";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -30,7 +38,7 @@ import { ProductDataPortPage } from "./pages/ProductDataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { PlatformAdminCommunicationPage } from "./pages/NotificationSettingsPages";
+import { CommunicationSettingsPage } from "./pages/NotificationSettingsPages";
 import { RolePermissionsPage } from "./pages/RolePermissionsPage";
 import { SalesAnalyticsPage } from "./pages/SalesAnalyticsPage";
 import { SalesReferralsPage } from "./pages/SalesReferralsPage";
@@ -43,13 +51,104 @@ import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { PurchaseListPage } from "./pages/PurchaseListPage";
 import { StockLedgerPage } from "./pages/StockLedgerPage";
 import { InvoiceTemplatesPage } from "./pages/InvoiceTemplatesPage";
+import { MaintenancePage } from "./pages/MaintenancePage";
+
+function isAppHost(): boolean {
+  // Single-DB local dev: plain localhost opens the app login (configured DB),
+  // not the marketing page. Only the main production domain shows LandingPage.
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname.toLowerCase();
+  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com") return false;
+  return true;
+}
+
+function isLiveTenantSubdomainHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname.toLowerCase();
+  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com") return false;
+  if (host.endsWith(".biziotechnologies.com") && host.split(".").length > 2) return true;
+  return false;
+}
+
+function PlatformAdminHostGuard({ children }: { children: ReactNode }) {
+  if (typeof window !== "undefined" && isLiveTenantSubdomainHost()) {
+    window.location.href = "https://biziotechnologies.com/platform-admin/login";
+    return null;
+  }
+  return <>{children}</>;
+}
+
+const clearTenantSession = () => {
+  notifyMaintenance();
+};
+
+function useTenantMaintenance(): { maintenance: boolean; checking: boolean } {
+  const [maintenance, setMaintenance] = useState(false);
+  // While the status probe is in flight, render a blank screen so the
+  // login page never flashes on an INACTIVE tenant. URL stays untouched.
+  const [checking, setChecking] = useState(() => isTenantSubdomainHost());
+
+  useEffect(() => {
+    if (!isTenantSubdomainHost()) {
+      return;
+    }
+    const onMaintenance = () => setMaintenance(true);
+    window.addEventListener(MAINTENANCE_EVENT, onMaintenance);
+    let cancelled = false;
+    // Single status probe: the backend interceptor answers 503 for an
+    // INACTIVE tenant or a missing database before any controller runs.
+    apiClient
+      .get("/v1/company/by-domain", {
+        params: { domain: window.location.hostname },
+        skipAuthRefresh: true
+      })
+      .then(() => {
+        if (!cancelled) {
+          setChecking(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          if (isMaintenanceError(err)) {
+            clearTenantSession();
+          } else {
+            setChecking(false);
+            if ((err as any)?.response?.status === 404 && isLiveTenantSubdomainHost()) {
+              // Unknown live subdomain -> main site. Local dev (*.localhost)
+              // never redirects: an empty dev database also answers 404 here.
+              window.location.href = "https://biziotechnologies.com";
+            }
+          }
+        }
+      });
+    return () => {
+      cancelled = true;
+      window.removeEventListener(MAINTENANCE_EVENT, onMaintenance);
+    };
+  }, []);
+
+  return { maintenance, checking };
+}
 
 function App() {
+  const isApp = isAppHost();
+  const { maintenance, checking } = useTenantMaintenance();
+  if (maintenance) {
+    // Same URL, no navigation: the workspace is unavailable, nothing else renders.
+    return (
+      <Routes>
+        <Route path="*" element={<MaintenancePage />} />
+      </Routes>
+    );
+  }
+  if (checking) {
+    return <main className="min-h-screen bg-white" />;
+  }
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={isApp ? <LoginPage /> : <LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/platform-admin/login" element={<PlatformAdminLoginPage />} />
+      <Route path="/platform-admin/login" element={<PlatformAdminHostGuard><PlatformAdminLoginPage /></PlatformAdminHostGuard>} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
@@ -75,7 +174,7 @@ function App() {
           <Route path="/setup/email-templates" element={<PermissionRoute menuCode="EMAIL_TEMPLATES"><EmailTemplatePage /></PermissionRoute>} />
           <Route path="/setup/sms-templates" element={<PermissionRoute menuCode="SMS_TEMPLATES"><SmsTemplatePage /></PermissionRoute>} />
           <Route path="/setup/invoice-templates" element={<PermissionRoute menuCode="INVOICE_TEMPLATES"><InvoiceTemplatesPage /></PermissionRoute>} />
-          <Route path="/setup/communication" element={<Navigate replace to="/dashboard" />} />
+          <Route path="/setup/communication" element={<PermissionRoute menuCode="COMMUNICATION"><CommunicationSettingsPage /></PermissionRoute>} />
           <Route path="/setup/email-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/sms-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/whatsapp-settings" element={<Navigate replace to="/dashboard" />} />
@@ -101,12 +200,11 @@ function App() {
         </Route>
       </Route>
 
-      <Route element={<PlatformAdminRoute />}>
+      <Route element={<PlatformAdminHostGuard><PlatformAdminRoute /></PlatformAdminHostGuard>}>
         <Route element={<DashboardLayout />}>
           <Route path="/platform-admin" element={<PlatformAdminPage mode="dashboard" />} />
           <Route path="/platform-admin/dashboard" element={<PlatformAdminPage mode="dashboard" />} />
           <Route path="/platform-admin/companies" element={<PlatformAdminPage mode="companies" />} />
-          <Route path="/platform-admin/communication" element={<PlatformAdminCommunicationPage />} />
           <Route path="/platform-admin/company-details" element={<PlatformAdminPage mode="details" />} />
           <Route path="/platform-admin/settings" element={<PlatformAdminPage mode="settings" />} />
         </Route>

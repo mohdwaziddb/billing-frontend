@@ -20,8 +20,20 @@ export const logoutRequest = async (refreshToken: string) => {
   await apiClient.post("/v1/auth/logout", { refreshToken });
 };
 
-export const forgotPasswordRequest = async (payload: { username: string; newPassword: string }) => {
-  await apiClient.post("/v1/auth/forgot-password", payload);
+export type PasswordResetChallenge = {
+  challengeId: number | null;
+  channel: string | null;
+  maskedDestination: string | null;
+  expiresInSeconds: number | null;
+};
+
+export const requestPasswordResetOtp = async (payload: { identifier: string; channel?: string }) => {
+  const response = await apiClient.post<ApiResponse<PasswordResetChallenge>>("/v1/auth/forgot-password/request", payload);
+  return response.data.data;
+};
+
+export const confirmPasswordResetOtp = async (payload: { challengeId: number; otp: string; newPassword: string }) => {
+  await apiClient.post("/v1/auth/forgot-password/confirm", payload);
 };
 
 export const refreshTokenRequest = async (refreshToken: string) => {

@@ -4,6 +4,11 @@ import { getApiErrorMessage } from "../lib/errors";
 import { authStorage } from "../lib/storage";
 import { notificationService } from "../services/notificationService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
+import {
+  isMaintenanceError,
+  isTenantSubdomainHost,
+  notifyMaintenance
+} from "../lib/tenantMaintenance";
 import type { ApiResponse, AuthPayload, StoredAuthSession } from "../types/api";
 
 declare module "axios" {
@@ -91,7 +96,28 @@ const isAuthBypassRoute = (url?: string) => {
   ].some((route) => url.includes(route));
 };
 
+const getSubdomainCompanyCode = (): string | null => {
+  if (typeof window === "undefined") return null;
+  const host = window.location.hostname.toLowerCase();
+  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com" || host === "localhost" || host === "127.0.0.1") return null;
+  if (host.endsWith(".biziotechnologies.com")) {
+    const sub = host.split(".")[0];
+    if (sub && sub !== "www" && sub !== "biziotechnologies") return sub;
+  }
+  if (host.endsWith(".localhost")) {
+    const sub = host.split(".")[0];
+    if (sub && sub !== "localhost") return sub;
+  }
+  return null;
+};
+
 apiClient.interceptors.request.use((config) => {
+  // DATABASE-per-tenant: backend Host is always localhost:9009 in dev, so send
+  // X-Company-Code from frontend subdomain (TSM-like routing).
+  const companyCode = getSubdomainCompanyCode();
+  if (companyCode && !config.headers["X-Company-Code"]) {
+    config.headers["X-Company-Code"] = companyCode;
+  }
   if (isAuthBypassRoute(config.url)) {
     delete config.headers.Authorization;
     return config;
@@ -107,6 +133,18 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Maintenance stop: INACTIVE tenant or missing database. Park on the
+    // static screen WITHOUT changing the URL (App listens for the event);
+    // the screen itself makes no API calls, so this cannot loop.
+    if (isMaintenanceError(error) && isTenantSubdomainHost()) {
+      const onPlatformPath =
+        typeof window !== "undefined" && window.location.pathname.startsWith("/platform-admin");
+      if (!onPlatformPath) {
+        notifyMaintenance();
+      }
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config as RetryableRequestConfig | undefined;
     const status = error.response?.status;
 

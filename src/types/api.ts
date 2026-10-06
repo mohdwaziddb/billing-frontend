@@ -110,6 +110,7 @@ export type PlatformAdminDashboardSummary = {
 export type PlatformAdminCompany = {
   id: number;
   name: string;
+  code: string;
   ownerName: string | null;
   email: string;
   mobile: string;

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { sendAiMessage, type AiChartData, type AiTableData } from "../api/ai";
 import { useAuth } from "../context/AuthContext";
+import { useIsDarkMode } from "../hooks/useIsDarkMode";
+import { getChartTheme } from "../lib/chartTheme";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -32,6 +34,7 @@ const buildCopyText = (item: ChatMessage) => {
 
 export const AiAssistantWidget = () => {
   const { sessionType, user } = useAuth();
+  const chart = getChartTheme(useIsDarkMode());
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -102,7 +105,7 @@ export const AiAssistantWidget = () => {
   return (
     <>
       {open ? (
-        <div className="fixed bottom-5 right-5 z-50 flex w-[min(92vw,24rem)] flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="fixed bottom-5 right-5 z-50 flex w-[min(92vw,24rem)] flex-col overflow-hidden rounded-[22px] border border-[var(--panel-border)] bg-[var(--panel-bg)] shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
           <div className="flex items-center justify-between bg-[linear-gradient(135deg,#0f172a,#155e75)] px-4 py-3 text-white">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
@@ -129,11 +132,11 @@ export const AiAssistantWidget = () => {
             </button>
           </div>
 
-          <div ref={scrollRef} className="h-80 space-y-3 overflow-y-auto bg-slate-50 px-4 py-4">
+          <div ref={scrollRef} className="h-80 space-y-3 overflow-y-auto bg-[var(--panel-soft)] px-4 py-4">
             {messages.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-center text-sm text-slate-400">
+              <div className="flex h-full items-center justify-center text-center text-sm text-[var(--text-tertiary)]">
                 <div>
-                  <Bot size={28} className="mx-auto mb-2 text-slate-300" />
+                  <Bot size={28} className="mx-auto mb-2 opacity-60" />
                   <p>Bizio se kuch bhi poochho - invoice, customer, GST, reports...</p>
                 </div>
               </div>
@@ -145,20 +148,20 @@ export const AiAssistantWidget = () => {
                       className={
                         item.role === "user"
                           ? "whitespace-pre-wrap rounded-2xl rounded-br-md bg-[var(--theme-color)] px-3.5 py-2.5 text-sm font-medium text-[var(--theme-contrast)]"
-                          : "whitespace-pre-wrap rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800"
+                          : "whitespace-pre-wrap rounded-2xl rounded-bl-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3.5 py-2.5 text-sm text-[var(--text-primary)]"
                       }
                     >
                       {item.content}
                       {item.role === "assistant" && item.chart?.data?.length ? (
                         <div className="mt-2">
-                          <p className="mb-1 text-xs font-bold text-slate-700">{item.chart.title}</p>
+                          <p className="mb-1 text-xs font-bold text-[var(--text-primary)]">{item.chart.title}</p>
                           <div className="h-44 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                               <BarChart data={item.chart.data} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="label" tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} tickFormatter={(value: number) => formatChartAmount(value)} />
-                                <Tooltip formatter={(value: number | string) => [formatChartAmount(Number(value)), ""]} labelFormatter={(label) => `Day ${label}`} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
+                                <XAxis dataKey="label" tick={{ fontSize: 9, fill: chart.text }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 9, fill: chart.text }} axisLine={false} tickLine={false} tickFormatter={(value: number) => formatChartAmount(value)} />
+                                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number | string) => [formatChartAmount(Number(value)), ""]} labelFormatter={(label) => `Day ${label}`} />
                                 <Bar dataKey="sales" name="Sales" fill="var(--theme-color)" radius={[3, 3, 0, 0]} />
                                 <Bar dataKey="collection" name="Collection" fill="#10b981" radius={[3, 3, 0, 0]} />
                               </BarChart>
@@ -174,7 +177,7 @@ export const AiAssistantWidget = () => {
                       <button
                         type="button"
                         title="Copy to clipboard"
-                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-tertiary)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text-primary)]"
                         onClick={() => void copyMessage(item, index)}
                       >
                         {copiedIndex === index ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
@@ -187,7 +190,7 @@ export const AiAssistantWidget = () => {
             )}
             {loading ? (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-400">
+                <div className="rounded-2xl rounded-bl-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3.5 py-2.5 text-sm text-[var(--text-tertiary)]">
                   <span className="inline-flex items-center gap-2">
                     <span className="inline-flex items-center gap-1">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
@@ -197,7 +200,7 @@ export const AiAssistantWidget = () => {
                     <button
                       type="button"
                       title="Cancel this request"
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                        className="inline-flex items-center gap-1 rounded-full bg-[var(--panel-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--text-secondary)] transition hover:opacity-80"
                       onClick={cancel}
                     >
                       <X size={11} />
@@ -209,7 +212,7 @@ export const AiAssistantWidget = () => {
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2 border-t border-slate-200 bg-white px-3 py-3">
+          <div className="flex items-center gap-2 border-t border-[var(--panel-border)] bg-[var(--panel-bg)] px-3 py-3">
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
@@ -220,7 +223,7 @@ export const AiAssistantWidget = () => {
                 }
               }}
               placeholder="Message likho..."
-              className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]"
+              className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-[var(--panel-border)] bg-[var(--panel-soft)] px-3.5 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]"
             />
             <button
               type="button"
@@ -234,12 +237,12 @@ export const AiAssistantWidget = () => {
           </div>
           <style>{`
             .ai-table-root { max-height: 14rem; overflow: auto; }
-            .ai-table-root table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            .ai-table-root th, .ai-table-root td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; vertical-align: top; white-space: nowrap; }
-            .ai-table-root th { background: #f1f5f9; font-weight: 600; position: sticky; top: 0; z-index: 1; }
-            .ai-table-root tbody tr:nth-child(even) { background: #f8fafc; }
+            .ai-table-root table { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--text-primary); }
+            .ai-table-root th, .ai-table-root td { border: 1px solid var(--panel-border); padding: 6px 8px; text-align: left; vertical-align: top; white-space: nowrap; }
+            .ai-table-root th { background: var(--panel-soft); font-weight: 600; position: sticky; top: 0; z-index: 1; }
+            .ai-table-root tbody tr:nth-child(even) { background: var(--panel-soft); }
             .ai-table-root::-webkit-scrollbar { height: 8px; width: 8px; }
-            .ai-table-root::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+            .ai-table-root::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 4px; }
           `}</style>
         </div>
       ) : (

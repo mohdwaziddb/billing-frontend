@@ -1,9 +1,8 @@
-import { Bot, Building2, CheckCircle2, Eye, LoaderCircle, Power, Settings, XCircle } from "lucide-react";
+import { Bot, Building2, CheckCircle2, Eye, KeyRound, LoaderCircle, Power, Settings, XCircle } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   activatePlatformAdminCompany,
-  createPlatformAdminCompany,
   deactivatePlatformAdminCompany,
   disablePlatformAdminCompanyChatbot,
   enablePlatformAdminCompanyChatbot,
@@ -11,8 +10,8 @@ import {
   getPlatformAdminCompanyDetails,
   getPlatformAdminDashboard,
   getPlatformAdminSettings,
-  updatePlatformAdminSettings,
-  type CreatePlatformAdminCompanyPayload
+  resetSuperAdminPassword,
+  updatePlatformAdminSettings
 } from "../api/platformAdmin";
 import { Button } from "../components/Button";
 import { applyVisibleColumns, CommonColumnSelector } from "../components/CommonColumnSelector";
@@ -58,19 +57,6 @@ type CompanyColumn = {
 
 const emptyCompanyPage: PageResponse<PlatformAdminCompany> = { records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 };
 
-const companyFormInitial: CreatePlatformAdminCompanyPayload = {
-  companyName: "",
-  address: "",
-  gstNumber: "",
-  mobile: "",
-  email: "",
-  ownerName: "",
-  ownerUsername: "",
-  ownerEmail: "",
-  ownerMobile: "",
-  ownerPassword: ""
-};
-
 const settingsFormInitial = {
   platformName: "",
   platformTagline: "",
@@ -86,7 +72,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [companySearch, setCompanySearch] = useState("");
   const [companyActive, setCompanyActive] = useState<"" | "true" | "false">("");
   const [companyPage, setCompanyPage] = useState(0);
-  const [detailsCompanyId, setDetailsCompanyId] = useState<number | "">("");
+  const [detailsCompanyCode, setDetailsCompanyId] = useState<string>("");
   const [details, setDetails] = useState<PlatformAdminCompanyDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [previewDetails, setPreviewDetails] = useState<PlatformAdminCompanyDetails | null>(null);
@@ -95,18 +81,17 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [summaryCompanies, setSummaryCompanies] = useState<PageResponse<PlatformAdminCompany>>(emptyCompanyPage);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summarySearch, setSummarySearch] = useState("");
-  const [companyFormOpen, setCompanyFormOpen] = useState(false);
-  const [companyFormSaving, setCompanyFormSaving] = useState(false);
   const [settings, setSettings] = useState<PlatformAdminSettingsType | null>(null);
   const [settingsForm, setSettingsForm] = useState(settingsFormInitial);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [statusAction, setStatusAction] = useState<CompanyStatusActionState>(null);
-  const [chatbotToggleId, setChatbotToggleId] = useState<number | null>(null);
+  const [resetAction, setResetAction] = useState<{ company: PlatformAdminCompany; loading: boolean } | null>(null);
+  const [chatbotToggleId, setChatbotToggleId] = useState<string | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const { setApiError } = useApiMessage();
 
   function onViewCompany(company: PlatformAdminCompany) {
-    void loadPreviewDetails(company.id).catch((err) => setApiError(err, "Unable to load company details"));
+    void loadPreviewDetails(company.code).catch((err) => setApiError(err, "Unable to load company details"));
   }
 
   function onToggleCompany(company: PlatformAdminCompany) {
@@ -119,7 +104,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
 
   const companyOptions = useMemo(() => [
     { label: "Select company", value: "" },
-    ...companies.records.map((company) => ({ label: company.name, value: String(company.id) }))
+    ...companies.records.map((company) => ({ label: `${company.name} (${company.code})`, value: company.code }))
   ], [companies.records]);
 
   const companyColumns = useMemo(() => [
@@ -156,8 +141,13 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
             {
               label: item.chatbotEnabled ? "Disable Chatbot" : "Enable Chatbot",
               icon: <Bot size={15} />,
-              disabled: chatbotToggleId === item.id,
+              disabled: chatbotToggleId === item.code,
               onClick: () => onToggleChatbot(item)
+            },
+            {
+              label: "Reset super-admin",
+              icon: <KeyRound size={15} />,
+              onClick: () => setResetAction({ company: item, loading: false })
             }
           ]}
         />
@@ -216,19 +206,19 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     }
   };
 
-  const loadDetails = async (companyId: number) => {
+  const loadDetails = async (companyCode: string) => {
     setDetailsLoading(true);
     try {
-      setDetails(await getPlatformAdminCompanyDetails(companyId));
+      setDetails(await getPlatformAdminCompanyDetails(companyCode));
     } finally {
       setDetailsLoading(false);
     }
   };
 
-  const loadPreviewDetails = async (companyId: number) => {
+  const loadPreviewDetails = async (companyCode: string) => {
     setPreviewLoading(true);
     try {
-      setPreviewDetails(await getPlatformAdminCompanyDetails(companyId));
+      setPreviewDetails(await getPlatformAdminCompanyDetails(companyCode));
     } finally {
       setPreviewLoading(false);
     }
@@ -264,10 +254,10 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   }, [companySearch, companyActive, mode]);
 
   useEffect(() => {
-    if (mode === "details" && detailsCompanyId) {
-      void loadDetails(detailsCompanyId).catch((err) => setApiError(err, "Unable to load company details"));
+    if (mode === "details" && detailsCompanyCode) {
+      void loadDetails(detailsCompanyCode).catch((err) => setApiError(err, "Unable to load company details"));
     }
-  }, [detailsCompanyId, mode]);
+  }, [detailsCompanyCode, mode]);
 
   useEffect(() => {
     if (mode === "settings") {
@@ -285,20 +275,6 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     setSummaryCompanies(emptyCompanyPage);
     setSummarySearch("");
     setSummaryModal({ filter, title });
-  };
-
-  const saveCompany = async (payload: CreatePlatformAdminCompanyPayload) => {
-    try {
-      setCompanyFormSaving(true);
-      await createPlatformAdminCompany(trimCompanyPayload(payload));
-      setCompanyFormOpen(false);
-      notificationService.showSuccess("Company created successfully");
-      void refreshCountsAndLists(0).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
-    } catch (err) {
-      setApiError(err, "Unable to create company");
-    } finally {
-      setCompanyFormSaving(false);
-    }
   };
 
   const saveSettings = async () => {
@@ -335,10 +311,10 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     }
     try {
       if (isDeactivate) {
-        await deactivatePlatformAdminCompany(company.id);
+        await deactivatePlatformAdminCompany(company.code);
         notificationService.showSuccess("Company deactivated successfully");
       } else {
-        await activatePlatformAdminCompany(company.id);
+        await activatePlatformAdminCompany(company.code);
         notificationService.showSuccess("Company activated successfully");
       }
       setStatusAction(null);
@@ -351,15 +327,14 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     }
   };
 
-  const toggleChatbot = async (company: PlatformAdminCompany) => {
-    const isEnabling = !company.chatbotEnabled;
-    setChatbotToggleId(company.id);
+  const toggleChatbot = async (company: PlatformAdminCompany) => {    const isEnabling = !company.chatbotEnabled;
+    setChatbotToggleId(company.code);
     try {
       if (isEnabling) {
-        await enablePlatformAdminCompanyChatbot(company.id);
+        await enablePlatformAdminCompanyChatbot(company.code);
         notificationService.showSuccess("Chatbot enabled for company");
       } else {
-        await disablePlatformAdminCompanyChatbot(company.id);
+        await disablePlatformAdminCompanyChatbot(company.code);
         notificationService.showSuccess("Chatbot disabled for company");
       }
       void refreshCountsAndLists(companyPage).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
@@ -367,6 +342,18 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       setApiError(err, "Unable to update chatbot status");
     } finally {
       setChatbotToggleId(null);
+    }
+  };
+
+  const confirmResetSuperAdmin = async (company: PlatformAdminCompany, password: string) => {
+    setResetAction({ company, loading: true });
+    try {
+      await resetSuperAdminPassword(company.code, password);
+      notificationService.showSuccess("Super-admin password reset successfully");
+      setResetAction(null);
+    } catch (err) {
+      setResetAction({ company, loading: false });
+      setApiError(err, "Unable to reset super-admin password");
     }
   };
 
@@ -419,7 +406,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       {mode === "companies" ? (
         <GlassCard className="p-6 md:p-7">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <SectionHeader title="Registered Companies" subtitle="Create, inspect, activate, and suspend tenant companies from one clean operational workspace." />
+            <SectionHeader title="Registered Companies" subtitle="Inspect, activate, and suspend tenant companies from one clean operational workspace." />
             <div className="flex flex-wrap items-center gap-2 md:pt-0.5">
               <CommonColumnSelector tableName="PLATFORM_COMPANIES" availableColumns={companyColumnOptions} visibleColumns={visibleColumns} onApply={setVisibleColumns} localOnly />
               <PagePagination
@@ -434,7 +421,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
               />
             </div>
           </div>
-          <Toolbar search={companySearch} setSearch={setCompanySearch} active={companyActive} setActive={setCompanyActive} onAdd={() => setCompanyFormOpen(true)} />
+          <Toolbar search={companySearch} setSearch={setCompanySearch} active={companyActive} setActive={setCompanyActive} />
           {companiesLoading ? <LoadingPanel label="Loading companies..." /> : null}
           <CompanyTable companies={companies.records} columns={visibleCompanyColumns} />
         </GlassCard>
@@ -444,7 +431,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
         <GlassCard className="p-6 md:p-7">
           <SectionHeader title="Company Details" subtitle="Review tenant identity, ownership, activity, and operational readiness." />
           <div className="mb-5 max-w-md">
-            <Select label="Company" value={String(detailsCompanyId)} options={companyOptions} onChange={(event) => setDetailsCompanyId(event.target.value ? Number(event.target.value) : "")} />
+            <Select label="Company" value={detailsCompanyCode} options={companyOptions} onChange={(event) => setDetailsCompanyId(event.target.value)} />
           </div>
           {detailsLoading ? <LoadingPanel label="Loading company details..." /> : null}
           {details ? <CompanyDetailsView details={details} /> : <p className="text-sm font-medium text-slate-500">Select a company to view details.</p>}
@@ -491,14 +478,14 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
           }
           void loadSummaryCompanies(summaryModal.filter, page).catch((err) => setApiError(err, "Unable to load companies"));
         }}
-        onView={(company) => void loadPreviewDetails(company.id).catch((err) => setApiError(err, "Unable to load company details"))}
+        onView={(company) => void loadPreviewDetails(company.code).catch((err) => setApiError(err, "Unable to load company details"))}
       />
       <CompanyDetailsModal details={previewDetails} loading={previewLoading} onClose={() => {
         setPreviewLoading(false);
         setPreviewDetails(null);
       }} />
-      <CompanyFormModal open={companyFormOpen} loading={companyFormSaving} onClose={() => !companyFormSaving && setCompanyFormOpen(false)} onSave={saveCompany} />
       <DeactivateCompanyModal statusAction={statusAction} onCancel={() => setStatusAction(null)} onConfirm={(company) => void toggleCompany(company)} />
+      <ResetSuperAdminModal resetAction={resetAction} onCancel={() => setResetAction(null)} onConfirm={(company, password) => void confirmResetSuperAdmin(company, password)} />
     </div>
   );
 };
@@ -510,11 +497,10 @@ const SectionHeader = ({ title, subtitle }: { title: string; subtitle: string })
   </div>
 );
 
-const Toolbar = ({ search, setSearch, active, setActive, onAdd }: { search: string; setSearch: (value: string) => void; active: string; setActive: (value: "" | "true" | "false") => void; onAdd: () => void }) => (
-  <div className="mb-5 grid gap-4 md:grid-cols-[1fr_220px_auto]">
+const Toolbar = ({ search, setSearch, active, setActive }: { search: string; setSearch: (value: string) => void; active: string; setActive: (value: "" | "true" | "false") => void }) => (
+  <div className="mb-5 grid gap-4 md:grid-cols-[1fr_220px]">
     <Input label="Search Companies" value={search} onChange={(event) => setSearch(event.target.value)} />
     <Select label="Status" value={active} options={[{ label: "All", value: "" }, { label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => setActive(event.target.value as "" | "true" | "false")} />
-    <div className="flex items-end"><Button type="button" onClick={onAdd}>Create company</Button></div>
   </div>
 );
 
@@ -594,133 +580,6 @@ const CompanySummaryModal = ({
   </Modal>
 );
 
-const CompanyFormModal = ({
-  open,
-  loading,
-  onClose,
-  onSave
-}: {
-  open: boolean;
-  loading: boolean;
-  onClose: () => void;
-  onSave: (payload: CreatePlatformAdminCompanyPayload) => void;
-}) => {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [form, setForm] = useState(companyFormInitial);
-
-  useEffect(() => {
-    if (open) {
-      setStep(1);
-      setForm(companyFormInitial);
-    }
-  }, [open]);
-
-  const updateField = (key: keyof CreatePlatformAdminCompanyPayload, value: string) => {
-    setForm((current) => ({ ...current, [key]: value }));
-  };
-
-  const validateStep = (currentStep: 1 | 2) => {
-    const errors = currentStep === 1
-      ? [
-          !form.companyName.trim() && "Enter company name.",
-          !form.email.trim() && "Enter company email.",
-          form.email.trim() && !isValidEmail(form.email) && "Enter a valid company email.",
-          !form.mobile.trim() && "Enter company mobile number.",
-          !form.address.trim() && "Enter company address."
-        ]
-      : [
-          !form.ownerName.trim() && "Enter owner full name.",
-          !form.ownerUsername.trim() && "Enter owner username.",
-          !form.ownerEmail.trim() && "Enter owner email.",
-          form.ownerEmail.trim() && !isValidEmail(form.ownerEmail) && "Enter a valid owner email.",
-          !form.ownerMobile.trim() && "Enter owner mobile number.",
-          !form.ownerPassword.trim() && "Enter owner password.",
-          form.ownerPassword.trim().length > 0 && form.ownerPassword.trim().length < 8 && "Owner password must be at least 8 characters."
-        ];
-
-    const firstError = errors.find(Boolean);
-    if (firstError) {
-      notificationService.showError(firstError);
-      return false;
-    }
-    return true;
-  };
-
-  const submit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (loading) {
-      return;
-    }
-    if (step === 1) {
-      if (validateStep(1)) {
-        setStep(2);
-      }
-      return;
-    }
-    if (validateStep(2)) {
-      onSave(form);
-    }
-  };
-
-  return (
-    <Modal open={open} title="Create Company" eyebrow="Platform Companies" maxWidthClass="max-w-3xl" onClose={onClose}>
-      <form className="space-y-6" onSubmit={submit}>
-      <div className="flex items-center gap-3">
-        {stepItems.map((item) => {
-          const active = step === item.step;
-          const complete = step > item.step;
-  return (
-            <div key={item.step} className={`flex-1 rounded-2xl border px-4 py-3 ${active ? "border-[var(--theme-color)] bg-[color-mix(in_srgb,var(--theme-color)_8%,white)]" : complete ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Step {item.step}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-950">{item.title}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {step === 1 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Input label="Company Name" requiredMark value={form.companyName} onChange={(event) => updateField("companyName", event.target.value)} />
-          <Input label="Email" requiredMark type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} />
-          <Input label="Mobile" requiredMark value={form.mobile} onChange={(event) => updateField("mobile", event.target.value)} />
-          <Input label="GST" value={form.gstNumber} onChange={(event) => updateField("gstNumber", event.target.value)} />
-          <div className="md:col-span-2">
-            <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-              <span>Address <span className="text-rose-500">*</span></span>
-              <textarea className="min-h-[108px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--theme-color)_18%,transparent)]" rows={3} value={form.address} onChange={(event) => updateField("address", event.target.value)} />
-            </label>
-          </div>
-          <div className="md:col-span-2 flex justify-end">
-            <Button type="submit" disabled={loading}>
-              Continue
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          <Input label="Full Name" requiredMark value={form.ownerName} onChange={(event) => updateField("ownerName", event.target.value)} />
-          <Input label="Username" requiredMark value={form.ownerUsername} onChange={(event) => updateField("ownerUsername", event.target.value)} />
-          <Input label="Email" requiredMark type="email" value={form.ownerEmail} onChange={(event) => updateField("ownerEmail", event.target.value)} />
-          <Input label="Mobile" requiredMark value={form.ownerMobile} onChange={(event) => updateField("ownerMobile", event.target.value)} />
-          <div className="md:col-span-2">
-            <PasswordInput label="Password" requiredMark value={form.ownerPassword} onChange={(event) => updateField("ownerPassword", event.target.value)} />
-          </div>
-          <div className="md:col-span-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="ghost" disabled={loading} onClick={() => setStep(1)}>
-              Back
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? <LoaderCircle className="animate-spin" size={16} /> : null}
-              {loading ? "Creating..." : "Create company"}
-            </Button>
-          </div>
-        </div>
-      )}
-      </form>
-    </Modal>
-  );
-};
-
 const DeactivateCompanyModal = ({
   statusAction,
   onCancel,
@@ -753,8 +612,64 @@ const DeactivateCompanyModal = ({
   </Modal>
 );
 
-const LoadingPanel = ({ label }: { label: string }) => (
-  <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
+const ResetSuperAdminModal = ({
+  resetAction,
+  onCancel,
+  onConfirm
+}: {
+  resetAction: { company: PlatformAdminCompany; loading: boolean } | null;
+  onCancel: () => void;
+  onConfirm: (company: PlatformAdminCompany, password: string) => void;
+}) => {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  useEffect(() => {
+    if (resetAction) {
+      setPassword("");
+      setConfirmPassword("");
+    }
+  }, [resetAction?.company.code]);
+  const submit = () => {
+    if (password.trim().length < 8) {
+      notificationService.showError("Super-admin password must be at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      notificationService.showError("Passwords do not match.");
+      return;
+    }
+    if (resetAction?.company) {
+      onConfirm(resetAction.company, password.trim());
+    }
+  };
+  return (
+    <Modal open={Boolean(resetAction)} title="Reset super-admin password" eyebrow="Company Super Admin" maxWidthClass="max-w-lg" onClose={() => !resetAction?.loading && onCancel()}>
+      <div className="space-y-5">
+        <p className="text-sm leading-6 text-slate-600">
+          Set a new password for this company's super-admin login. The previous password stops working immediately.
+        </p>
+        {resetAction?.company ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            Company: <span className="font-semibold text-slate-950">{resetAction.company.name} ({resetAction.company.code})</span>
+          </div>
+        ) : null}
+        <PasswordInput label="New Password" requiredMark value={password} onChange={(event) => setPassword(event.target.value)} />
+        <PasswordInput label="Confirm Password" requiredMark value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" disabled={resetAction?.loading} onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={resetAction?.loading} onClick={submit}>
+            {resetAction?.loading ? <LoaderCircle className="animate-spin" size={16} /> : null}
+            {resetAction?.loading ? "Resetting..." : "Reset password"}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+const LoadingPanel = ({ label }: { label: string }) => (  <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
     <LoaderCircle className="animate-spin text-[var(--theme-color)]" size={18} />
     <span>{label}</span>
   </div>
@@ -775,7 +690,7 @@ const CompanySummaryTable = ({ companies, onView }: { companies: PlatformAdminCo
         </thead>
         <tbody>
           {companies.length ? companies.map((company) => (
-            <tr key={company.id} className="odd:bg-white even:bg-slate-50/55">
+            <tr key={company.code} className="odd:bg-white even:bg-slate-50/55">
               <td className="border-b border-slate-100 px-4 py-4 font-semibold text-slate-950">
                 <button type="button" className="text-left transition hover:text-[var(--theme-color)]" onClick={() => onView(company)}>
                   {company.name}
@@ -797,7 +712,7 @@ const CompanySummaryTable = ({ companies, onView }: { companies: PlatformAdminCo
     </div>
     <div className="grid min-h-[360px] gap-3 md:hidden">
       {companies.length ? companies.map((company) => (
-        <div key={company.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div key={company.code} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <button type="button" className="text-left text-base font-bold text-slate-950 transition hover:text-[var(--theme-color)]" onClick={() => onView(company)}>
               {company.name}
@@ -822,17 +737,6 @@ const CompactInfo = ({ label, value }: { label: string; value: string | number }
     <p className="mt-1 text-sm font-bold text-slate-950 break-words">{value}</p>
   </div>
 );
-
-const isValidEmail = (value: string) => /\S+@\S+\.\S+/.test(value.trim());
-
-const trimCompanyPayload = (payload: CreatePlatformAdminCompanyPayload): CreatePlatformAdminCompanyPayload => Object.fromEntries(
-  Object.entries(payload).map(([key, value]) => [key, value.trim()])
-) as CreatePlatformAdminCompanyPayload;
-
-const stepItems = [
-  { step: 1 as const, title: "Company Information" },
-  { step: 2 as const, title: "Owner Information" }
-];
 
 const pageMeta: Record<Mode, { title: string; subtitle: string }> = {
   dashboard: { title: "Platform Dashboard", subtitle: "Real-time company visibility across the full billing platform." },

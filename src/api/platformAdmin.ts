@@ -6,11 +6,7 @@ import type {
   PlatformAdminCompanyDetails,
   PlatformAdminCompanyOverview,
   PlatformAdminDashboardSummary,
-  PlatformAdminSettings,
-  ProviderSettings,
-  ProviderSettingsRequest,
-  SmsProviderMetadata,
-  WhatsAppProviderMetadata
+  PlatformAdminSettings
 } from "../types/api";
 
 export type PlatformAdminCompanyFilters = {
@@ -18,19 +14,6 @@ export type PlatformAdminCompanyFilters = {
   active?: boolean;
   page?: number;
   size?: number;
-};
-
-export type CreatePlatformAdminCompanyPayload = {
-  companyName: string;
-  address: string;
-  gstNumber: string;
-  mobile: string;
-  email: string;
-  ownerName: string;
-  ownerUsername: string;
-  ownerEmail: string;
-  ownerMobile: string;
-  ownerPassword: string;
 };
 
 export type UpdatePlatformAdminSettingsPayload = {
@@ -55,33 +38,33 @@ export const getPlatformAdminCompanyOverview = async (params?: Pick<PlatformAdmi
   return response.data.data;
 };
 
-export const createPlatformAdminCompany = async (payload: CreatePlatformAdminCompanyPayload) => {
-  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>("/v1/platform-admin/companies", payload);
+export const activatePlatformAdminCompany = async (companyCode: string) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyCode}/activate`);
   return response.data.data;
 };
 
-export const activatePlatformAdminCompany = async (companyId: number) => {
-  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyId}/activate`);
+export const deactivatePlatformAdminCompany = async (companyCode: string) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyCode}/deactivate`);
   return response.data.data;
 };
 
-export const deactivatePlatformAdminCompany = async (companyId: number) => {
-  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyId}/deactivate`);
+export const enablePlatformAdminCompanyChatbot = async (companyCode: string) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyCode}/chatbot/enable`);
   return response.data.data;
 };
 
-export const enablePlatformAdminCompanyChatbot = async (companyId: number) => {
-  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyId}/chatbot/enable`);
+export const disablePlatformAdminCompanyChatbot = async (companyCode: string) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyCode}/chatbot/disable`);
   return response.data.data;
 };
 
-export const disablePlatformAdminCompanyChatbot = async (companyId: number) => {
-  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyId}/chatbot/disable`);
+export const resetSuperAdminPassword = async (companyCode: string, password: string) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminCompany>>(`/v1/platform-admin/companies/${companyCode}/super-admin/reset`, { password });
   return response.data.data;
 };
 
-export const getPlatformAdminCompanyDetails = async (companyId: number) => {
-  const response = await apiClient.get<ApiResponse<PlatformAdminCompanyDetails>>(`/v1/platform-admin/companies/${companyId}`);
+export const getPlatformAdminCompanyDetails = async (companyCode: string) => {
+  const response = await apiClient.get<ApiResponse<PlatformAdminCompanyDetails>>(`/v1/platform-admin/companies/${companyCode}`);
   return response.data.data;
 };
 
@@ -95,72 +78,3 @@ export const updatePlatformAdminSettings = async (payload: UpdatePlatformAdminSe
   return response.data.data;
 };
 
-export const getPlatformAdminEmailSettings = async (companyId: number) => {
-  const response = await apiClient.get<ApiResponse<ProviderSettings[]>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings`);
-  return response.data.data;
-};
-
-export const createPlatformAdminEmailSettings = async (companyId: number, payload: ProviderSettingsRequest) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings`, payload);
-  return response.data.data;
-};
-
-export const updatePlatformAdminEmailSettings = async (companyId: number, id: number, payload: ProviderSettingsRequest) => {
-  const response = await apiClient.put<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings/${id}`, payload);
-  return response.data.data;
-};
-
-export const testPlatformAdminEmailSettings = async (companyId: number, recipientEmail: string) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/email-settings/test`, { recipientEmail });
-  return response.data.data;
-};
-
-export const getPlatformAdminSmsSettings = async (companyId: number) => {
-  const response = await apiClient.get<ApiResponse<ProviderSettings[]>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings`);
-  return response.data.data;
-};
-
-export const getPlatformAdminSmsProviders = async (companyId: number) => {
-  const response = await apiClient.get<ApiResponse<SmsProviderMetadata[]>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/providers`);
-  return response.data.data;
-};
-
-export const createPlatformAdminSmsSettings = async (companyId: number, payload: ProviderSettingsRequest) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings`, payload);
-  return response.data.data;
-};
-
-export const updatePlatformAdminSmsSettings = async (companyId: number, id: number, payload: ProviderSettingsRequest) => {
-  const response = await apiClient.put<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/${id}`, payload);
-  return response.data.data;
-};
-
-export const testPlatformAdminSmsSettings = async (companyId: number, payload: { mobileNumber: string; providerName?: string; providerType?: string; apiUrl?: string; configValues?: Record<string, string> }) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/sms-settings/test`, payload);
-  return response.data.data;
-};
-
-export const getPlatformAdminWhatsAppSettings = async (companyId: number) => {
-  const response = await apiClient.get<ApiResponse<ProviderSettings[]>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings`);
-  return response.data.data;
-};
-
-export const getPlatformAdminWhatsAppProviders = async (companyId: number) => {
-  const response = await apiClient.get<ApiResponse<WhatsAppProviderMetadata[]>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/providers`);
-  return response.data.data;
-};
-
-export const createPlatformAdminWhatsAppSettings = async (companyId: number, payload: ProviderSettingsRequest) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings`, payload);
-  return response.data.data;
-};
-
-export const updatePlatformAdminWhatsAppSettings = async (companyId: number, id: number, payload: ProviderSettingsRequest) => {
-  const response = await apiClient.put<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/${id}`, payload);
-  return response.data.data;
-};
-
-export const testPlatformAdminWhatsAppSettings = async (companyId: number, payload: { mobileNumber: string; message: string; providerName?: string; providerType?: string; apiUrl?: string; configValues?: Record<string, string> }) => {
-  const response = await apiClient.post<ApiResponse<ProviderSettings>>(`/v1/platform-admin/companies/${companyId}/communication/whatsapp-settings/test`, payload);
-  return response.data.data;
-};

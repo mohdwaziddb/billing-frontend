@@ -19,6 +19,8 @@ import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
+import { getChartTheme } from "../lib/chartTheme";
+import { useIsDarkMode } from "../hooks/useIsDarkMode";
 import { formatDate } from "../lib/format";
 import type { Customer, Expense, ExpenseCategory, Invoice, PageResponse, ProfitLossPoint, ProfitLossReport } from "../types/api";
 
@@ -74,6 +76,7 @@ const dateRangeForPreset = (preset: DatePreset) => {
 
 export const ProfitLossReportPage = () => {
   const { setApiError } = useApiMessage();
+  const chart = getChartTheme(useIsDarkMode());
   const [report, setReport] = useState<ProfitLossReport>(emptyReport);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -192,11 +195,11 @@ export const ProfitLossReportPage = () => {
           <div className="h-80">
             <ChartContainer width="100%" height="100%">
               <ChartBarChart data={report.revenueVsExpense}>
-                <ChartGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
-                <ChartXAxis dataKey="label" stroke="#94a3b8" />
-                <ChartYAxis stroke="#94a3b8" />
-                <ChartTooltip formatter={(value: number) => formatCurrency(value)} />
-                <ChartLegend />
+                <ChartGrid stroke={chart.grid} vertical={false} />
+                <ChartXAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <ChartYAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
+                <ChartTooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
+                <ChartLegend wrapperStyle={{ color: chart.legend, fontSize: 12 }} />
                 <ChartBar dataKey="revenue" name="Revenue" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
                 <ChartBar dataKey="expense" name="Expense" fill="#f97316" radius={[8, 8, 0, 0]} />
                 <ChartBar dataKey="netRevenue" name="Net Profit" fill="#10b981" radius={[8, 8, 0, 0]} />

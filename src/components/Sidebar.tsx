@@ -70,8 +70,7 @@ export const Sidebar = () => {
           children: [
             { id: -2, menuName: "Dashboard", menuIcon: "LayoutDashboard", menuRoute: "/platform-admin/dashboard", displayOrder: 1, canView: true, actions: [], children: [] },
             { id: -3, menuName: "Companies", menuIcon: "Building2", menuRoute: "/platform-admin/companies", displayOrder: 2, canView: true, actions: [], children: [] },
-            { id: -4, menuName: "Communication", menuIcon: "Mail", menuRoute: "/platform-admin/communication", displayOrder: 3, canView: true, actions: [], children: [] },
-            { id: -5, menuName: "Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 4, canView: true, actions: [], children: [] }
+            { id: -5, menuName: "Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 3, canView: true, actions: [], children: [] }
           ]
         }
       ];
@@ -240,29 +239,9 @@ const isPlatformAdminMenu = (menu: MenuPermission) => {
   );
 };
 
-const isCompanyCommunicationMenu = (menu: MenuPermission) => {
-  const name = menu.menuName.trim().toLowerCase();
-  const route = menu.menuRoute.trim().toLowerCase();
-  const code = menu.menuCode.trim().toLowerCase();
-  return (
-    code === "communication" ||
-    code === "email_settings" ||
-    code === "sms_settings" ||
-    code === "whatsapp_settings" ||
-    name === "communication" ||
-    name === "email settings" ||
-    name === "sms settings" ||
-    name === "whatsapp settings" ||
-    route === "/setup/communication" ||
-    route === "/setup/email-settings" ||
-    route === "/setup/sms-settings" ||
-    route === "/setup/whatsapp-settings"
-  );
-};
-
 const filterCompanyMenus = (menus: MenuPermission[]): MenuPermission[] =>
   menus
-    .filter((menu) => menu.canView && !isPlatformAdminMenu(menu) && !isCompanyCommunicationMenu(menu))
+    .filter((menu) => menu.canView && !isPlatformAdminMenu(menu))
     .map((menu) => ({
       ...menu,
       children: filterCompanyMenus(menu.children ?? [])
