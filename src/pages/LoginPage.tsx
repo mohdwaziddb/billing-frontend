@@ -6,6 +6,7 @@ import { LoginCard } from "../components/login/LoginCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { getApiErrorMessage } from "../lib/errors";
+import { isMaintenanceError, isTenantSubdomainHost, notifyMaintenance } from "../lib/tenantMaintenance";
 import type { ApiResponse } from "../types/api";
 
 const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
@@ -79,8 +80,16 @@ export const LoginPage = () => {
           params: { domain: window.location.hostname }
         })
         .catch((err) => {
-          if (!cancelled && err?.response?.status === 404) {
-            window.location.href = "https://biziotechnologies.com";
+          if (!cancelled && isMaintenanceError(err) && isTenantSubdomainHost()) {
+            // Same URL, no navigation: App swaps in the maintenance screen.
+            notifyMaintenance();
+          } else if (!cancelled && err?.response?.status === 404) {
+            const host = window.location.hostname.toLowerCase();
+            // Unknown live subdomain -> main site. Local dev (*.localhost)
+            // never redirects: an empty dev database also answers 404 here.
+            if (!host.endsWith(".localhost")) {
+              window.location.href = "https://biziotechnologies.com";
+            }
           }
         });
     }
@@ -97,7 +106,11 @@ export const LoginPage = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          console.warn("Login company branding unavailable:", err?.response?.status ?? err?.message ?? err);
+          if (isMaintenanceError(err) && isTenantSubdomainHost()) {
+            notifyMaintenance();
+          } else {
+            console.warn("Login company branding unavailable:", err?.response?.status ?? err?.message ?? err);
+          }
         }
       })
       .finally(() => {

@@ -1,5 +1,12 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { apiClient } from "./api/apiClient";
+import {
+  isMaintenanceError,
+  isTenantSubdomainHost,
+  MAINTENANCE_EVENT,
+  notifyMaintenance
+} from "./lib/tenantMaintenance";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
 import { PermissionRoute } from "./components/PermissionRoute";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -44,6 +51,7 @@ import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { PurchaseListPage } from "./pages/PurchaseListPage";
 import { StockLedgerPage } from "./pages/StockLedgerPage";
 import { InvoiceTemplatesPage } from "./pages/InvoiceTemplatesPage";
+import { MaintenancePage } from "./pages/MaintenancePage";
 
 function isAppHost(): boolean {
   // Single-DB local dev: plain localhost opens the app login (configured DB),
@@ -54,26 +62,88 @@ function isAppHost(): boolean {
   return true;
 }
 
-function isTenantSubdomainHost(): boolean {
+function isLiveTenantSubdomainHost(): boolean {
   if (typeof window === "undefined") return false;
   const host = window.location.hostname.toLowerCase();
-  // Platform-admin is main-domain only (biziotechnologies.com); localhost always allowed for dev.
-  if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".localhost")) return false;
   if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com") return false;
   if (host.endsWith(".biziotechnologies.com") && host.split(".").length > 2) return true;
   return false;
 }
 
 function PlatformAdminHostGuard({ children }: { children: ReactNode }) {
-  if (typeof window !== "undefined" && isTenantSubdomainHost()) {
+  if (typeof window !== "undefined" && isLiveTenantSubdomainHost()) {
     window.location.href = "https://biziotechnologies.com/platform-admin/login";
     return null;
   }
   return <>{children}</>;
 }
 
+const clearTenantSession = () => {
+  notifyMaintenance();
+};
+
+function useTenantMaintenance(): { maintenance: boolean; checking: boolean } {
+  const [maintenance, setMaintenance] = useState(false);
+  // While the status probe is in flight, render a blank screen so the
+  // login page never flashes on an INACTIVE tenant. URL stays untouched.
+  const [checking, setChecking] = useState(() => isTenantSubdomainHost());
+
+  useEffect(() => {
+    if (!isTenantSubdomainHost()) {
+      return;
+    }
+    const onMaintenance = () => setMaintenance(true);
+    window.addEventListener(MAINTENANCE_EVENT, onMaintenance);
+    let cancelled = false;
+    // Single status probe: the backend interceptor answers 503 for an
+    // INACTIVE tenant or a missing database before any controller runs.
+    apiClient
+      .get("/v1/company/by-domain", {
+        params: { domain: window.location.hostname },
+        skipAuthRefresh: true
+      })
+      .then(() => {
+        if (!cancelled) {
+          setChecking(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          if (isMaintenanceError(err)) {
+            clearTenantSession();
+          } else {
+            setChecking(false);
+            if ((err as any)?.response?.status === 404 && isLiveTenantSubdomainHost()) {
+              // Unknown live subdomain -> main site. Local dev (*.localhost)
+              // never redirects: an empty dev database also answers 404 here.
+              window.location.href = "https://biziotechnologies.com";
+            }
+          }
+        }
+      });
+    return () => {
+      cancelled = true;
+      window.removeEventListener(MAINTENANCE_EVENT, onMaintenance);
+    };
+  }, []);
+
+  return { maintenance, checking };
+}
+
 function App() {
   const isApp = isAppHost();
+  const { maintenance, checking } = useTenantMaintenance();
+  if (maintenance) {
+    // Same URL, no navigation: the workspace is unavailable, nothing else renders.
+    return (
+      <Routes>
+        <Route path="*" element={<MaintenancePage />} />
+      </Routes>
+    );
+  }
+  if (checking) {
+    return <main className="min-h-screen bg-white" />;
+  }
   return (
     <Routes>
       <Route path="/" element={isApp ? <LoginPage /> : <LandingPage />} />

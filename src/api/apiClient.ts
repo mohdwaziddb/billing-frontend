@@ -4,6 +4,11 @@ import { getApiErrorMessage } from "../lib/errors";
 import { authStorage } from "../lib/storage";
 import { notificationService } from "../services/notificationService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
+import {
+  isMaintenanceError,
+  isTenantSubdomainHost,
+  notifyMaintenance
+} from "../lib/tenantMaintenance";
 import type { ApiResponse, AuthPayload, StoredAuthSession } from "../types/api";
 
 declare module "axios" {
@@ -128,6 +133,18 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Maintenance stop: INACTIVE tenant or missing database. Park on the
+    // static screen WITHOUT changing the URL (App listens for the event);
+    // the screen itself makes no API calls, so this cannot loop.
+    if (isMaintenanceError(error) && isTenantSubdomainHost()) {
+      const onPlatformPath =
+        typeof window !== "undefined" && window.location.pathname.startsWith("/platform-admin");
+      if (!onPlatformPath) {
+        notifyMaintenance();
+      }
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config as RetryableRequestConfig | undefined;
     const status = error.response?.status;
 
