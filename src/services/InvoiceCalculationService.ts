@@ -117,19 +117,38 @@ export const InvoiceCalculationService = {
     const totalBeforeInvoiceDiscount = afterProductDiscountSubtotal;
     const invoiceDiscount = discountAmount(afterProductDiscountSubtotal, input.invoiceDiscountType, input.invoiceDiscountValue);
 
-    const rows = baseRows.map((row) => {
-      const invoiceDiscountShare = afterProductDiscountSubtotal > 0
-        ? round2(invoiceDiscount * (row.afterProductDiscount / afterProductDiscountSubtotal))
-        : 0;
+    // Largest-remainder split: per-row rounded shares must add up EXACTLY to
+    // invoiceDiscount (naive per-row round2 drifts paise across rows).
+    const rawShares = baseRows.map((row) =>
+      afterProductDiscountSubtotal > 0 ? invoiceDiscount * (row.afterProductDiscount / afterProductDiscountSubtotal) : 0
+    );
+    const flooredShares = rawShares.map((share) => Math.floor((share + Number.EPSILON) * 100) / 100);
+    let shareRemainderPaise = Math.round((invoiceDiscount - flooredShares.reduce((sum, share) => sum + share, 0)) * 100);
+    const fractionOrder = rawShares
+      .map((share, index) => ({ index, fraction: share * 100 - Math.floor((share + Number.EPSILON) * 100) }))
+      .sort((a, b) => b.fraction - a.fraction);
+    const invoiceDiscountShares = [...flooredShares];
+    for (const { index } of fractionOrder) {
+      if (shareRemainderPaise <= 0) {
+        break;
+      }
+      invoiceDiscountShares[index] = round2(invoiceDiscountShares[index] + 0.01);
+      shareRemainderPaise -= 1;
+    }
+
+    const rows = baseRows.map((row, rowIndex) => {
+      const invoiceDiscountShare = invoiceDiscountShares[rowIndex] ?? 0;
       const taxableAmount = round2(Math.max(0, row.afterProductDiscount - invoiceDiscountShare));
       const effectiveTaxPercent = row.taxable ? row.taxPercent : 0;
       const taxType = (row.taxType ?? "GST").toUpperCase();
       const treatAsGst = taxType === "GST";
+      // Display rates stay half-split rounded; AMOUNTS derive from the full
+      // rate so cgst+sgst always equals the true tax (no 1p drift on odd rates).
       const cgstRate = row.taxable && treatAsGst && sameState ? round2(effectiveTaxPercent / 2) : 0;
       const sgstRate = row.taxable && treatAsGst && sameState ? round2(effectiveTaxPercent / 2) : 0;
       const igstRate = row.taxable && (!treatAsGst || !sameState) ? effectiveTaxPercent : 0;
-      const cgstAmount = round2(taxableAmount * cgstRate / 100);
-      const sgstAmount = round2(taxableAmount * sgstRate / 100);
+      const cgstAmount = row.taxable && treatAsGst && sameState ? round2(taxableAmount * effectiveTaxPercent / 200) : 0;
+      const sgstAmount = row.taxable && treatAsGst && sameState ? round2(taxableAmount * effectiveTaxPercent / 200) : 0;
       const igstAmount = round2(taxableAmount * igstRate / 100);
       const taxAmount = round2(cgstAmount + sgstAmount + igstAmount);
       const totalAmount = round2(taxableAmount + taxAmount);

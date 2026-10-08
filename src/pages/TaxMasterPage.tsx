@@ -76,7 +76,13 @@ export const TaxMasterPage = () => {
   const canDelete = can("TAX_MASTER", "DELETE");
   const canExport = can("TAX_MASTER", "EXPORT");
   const canViewLogs = can("TAX_MASTER", "LOGS");
-  const canSaveTax = Boolean(form.taxName.trim() && form.taxCode.trim() && form.rate !== "");
+  const rateNumber = form.rate.trim() === "" ? NaN : Number(form.rate);
+  const rateError = !Number.isFinite(rateNumber)
+    ? "Enter a valid tax rate."
+    : rateNumber < 0 || rateNumber > 100
+      ? "Tax rate must be between 0 and 100."
+      : null;
+  const canSaveTax = Boolean(form.taxName.trim() && form.taxCode.trim() && rateError === null);
 
   const loadTaxes = async (nextPage = page, searchOverride = search) => {
     const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
@@ -115,12 +121,18 @@ export const TaxMasterPage = () => {
 
   const saveTax = async () => {
     clearFeedback();
+    // Re-validate here too: the Save button enablement is not a security gate
+    // (DevTools/Enter can bypass it) and a bad rate poisons every invoice.
+    if (rateError !== null) {
+      notificationService.showError(rateError);
+      return;
+    }
     setSaving(true);
     const payload: TaxMasterRequest = {
       taxName: form.taxName.trim(),
       taxCode: form.taxCode.trim(),
       taxType: form.taxType,
-      rate: Number(form.rate || 0),
+      rate: rateNumber,
       description: form.description.trim() || undefined,
       defaultTax: form.defaultTax === "true",
       active: form.active === "true"
@@ -249,7 +261,6 @@ export const TaxMasterPage = () => {
           <Table
             data={taxes}
             emptyText="No tax masters found."
-            emptyAction={canAdd ? <Button onClick={openCreate}>Add Tax</Button> : null}
             columns={[
               { key: "taxName", header: "Tax Name", render: (item) => <span className="font-semibold text-white">{item.taxName}</span> },
               { key: "taxCode", header: "Tax Code", render: (item) => item.taxCode },
@@ -292,7 +303,7 @@ export const TaxMasterPage = () => {
               { label: "Sales Tax", value: "SALES_TAX" }
             ]}
           />
-          <Input label="Rate (%)" requiredMark type="number" step="0.01" error={fieldErrors.rate} value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} />
+          <Input label="Rate (%)" requiredMark type="number" step="0.01" error={fieldErrors.rate ?? (form.rate.trim() !== "" ? rateError ?? undefined : undefined)} value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} />
           <Select
             label="Default Tax"
             placeholder={null}

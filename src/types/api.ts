@@ -80,6 +80,8 @@ export type UserProfile = {
   active: boolean;
   createdAt?: string | null;
   company: CompanySummary | null;
+  /** True only for tenant super-admin sessions (backend additive flag). */
+  superAdmin?: boolean;
 };
 
 export type AuthPayload = {

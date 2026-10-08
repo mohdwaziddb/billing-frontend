@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { type FieldErrors, useForm } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getProductCategories } from "../api/productCategories";
@@ -58,6 +58,9 @@ export const ProductFormPage = () => {
     reset,
     watch,
     setValue,
+    getValues,
+    control,
+    formState,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues
@@ -73,12 +76,20 @@ export const ProductFormPage = () => {
       .catch((err: any) => setApiError(err, "Unable to load product categories"));
   }, [setApiError]);
 
+  // Live dirty snapshot: a slow edit-fetch must never wipe typed values.
+  const formStateRef = useRef(formState);
+  formStateRef.current = formState;
+
   useEffect(() => {
     if (!productId) {
       return;
     }
+    let cancelled = false;
     void getProduct(Number(productId))
       .then((product) => {
+        if (cancelled) {
+          return;
+        }
         setSelectedSubCategory(product.subCategoryId
           ? {
               id: product.subCategoryId,
@@ -93,7 +104,7 @@ export const ProductFormPage = () => {
               updatedBy: null
             }
           : null);
-        reset({
+        const server: FormValues = {
           name: product.name,
           categoryId: product.categoryId ? String(product.categoryId) : "",
           subCategoryId: product.subCategoryId ? String(product.subCategoryId) : "",
@@ -104,14 +115,29 @@ export const ProductFormPage = () => {
           taxable: product.taxable ? "true" : "false",
           taxMasterId: product.taxMasterId ? String(product.taxMasterId) : "",
           active: product.active ? "true" : "false"
-        });
+        };
+        const dirty = formStateRef.current.dirtyFields ?? {};
+        const current = getValues();
+        const merged = Object.fromEntries(
+          (Object.keys(server) as Array<keyof FormValues>).map((key) => [
+            key,
+            dirty[key] ? current[key] : server[key]
+          ])
+        ) as FormValues;
+        reset(merged);
       })
-      .catch((err: any) => setApiError(err, "Unable to load product details"));
-  }, [productId, reset, setApiError]);
+      .catch((err: any) => {
+        if (!cancelled) {
+          setApiError(err, "Unable to load product details");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [productId, reset, setApiError, getValues]);
 
   const watchedValues = watch();
   const watchedCategoryId = watch("categoryId");
-  const watchedSubCategoryId = watch("subCategoryId");
   const watchedTaxable = watch("taxable");
 
   const categoryOptions = useMemo(
@@ -127,14 +153,22 @@ export const ProductFormPage = () => {
     [taxMasters]
   );
 
+  // Request id: rapid category A->B switches must not let late A-responses
+  // overwrite B's sub-category list (would save wrong category pairing).
+  const subCategoryRequest = useRef(0);
+
   useEffect(() => {
     if (!watchedCategoryId) {
       setSubCategories([]);
       setValue("subCategoryId", "");
       return;
     }
+    const requestId = ++subCategoryRequest.current;
     void getProductSubCategories({ active: true, categoryId: Number(watchedCategoryId), size: 1000 })
       .then((subCategoryData) => {
+        if (requestId !== subCategoryRequest.current) {
+          return;
+        }
         const activeSubCategories = subCategoryData.filter((subCategory) => subCategory.active);
         const shouldPreserveSelected =
           selectedSubCategory
@@ -142,7 +176,11 @@ export const ProductFormPage = () => {
           && !activeSubCategories.some((subCategory) => subCategory.id === selectedSubCategory.id);
         setSubCategories(shouldPreserveSelected ? [...activeSubCategories, selectedSubCategory] : activeSubCategories);
       })
-      .catch((err: any) => setApiError(err, "Unable to load product sub categories"));
+      .catch((err: any) => {
+        if (requestId === subCategoryRequest.current) {
+          setApiError(err, "Unable to load product sub categories");
+        }
+      });
   }, [selectedSubCategory, setApiError, setValue, watchedCategoryId]);
 
   const canSaveProduct = Boolean(
@@ -186,9 +224,6 @@ export const ProductFormPage = () => {
     notificationService.showError(firstFormErrorMessage(validationErrors, "Please fill all required product fields before saving."));
   };
 
-  const categoryRegister = register("categoryId", { required: "Product category is required" });
-  const subCategoryRegister = register("subCategoryId", { required: "Product sub category is required" });
-
   return (
     <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
       <Header
@@ -224,35 +259,52 @@ export const ProductFormPage = () => {
                 error={errors.name?.message}
                 {...register("name", { required: "Product name is required" })}
               />
-              <Select
-                label="Product Category"
-                requiredMark
-                placeholder={categoryOptions.length ? "Select Product Category" : "No active categories found"}
-                error={errors.categoryId?.message}
-                hint="Only active product categories are available."
-                disabled={!categoryOptions.length}
-                options={categoryOptions}
-                value={watchedCategoryId}
-                {...categoryRegister}
-                onChange={(event) => {
-                  categoryRegister.onChange(event);
-                  setSelectedSubCategory(null);
-                  setValue("subCategoryId", "");
-                }}
+              {/* Controlled: shown option always equals submitted value. */}
+              <Controller
+                name="categoryId"
+                control={control}
+                rules={{ required: "Product category is required" }}
+                render={({ field }) => (
+                  <Select
+                    label="Product Category"
+                    requiredMark
+                    placeholder={categoryOptions.length ? "Select Product Category" : "No active categories found"}
+                    error={errors.categoryId?.message}
+                    hint="Only active product categories are available."
+                    disabled={!categoryOptions.length}
+                    options={categoryOptions}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => {
+                      field.onChange(event.target.value);
+                      setSelectedSubCategory(null);
+                      setValue("subCategoryId", "");
+                    }}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
-              <Select
-                label="Product Sub Category"
-                requiredMark
-                placeholder={subCategoryOptions.length ? "Select Product Sub Category" : "No active sub categories found"}
-                error={errors.subCategoryId?.message}
-                hint="Sub categories load from the selected category."
-                disabled={!watchedCategoryId || !subCategoryOptions.length}
-                options={subCategoryOptions}
-                value={watchedSubCategoryId}
-                {...subCategoryRegister}
-                onChange={(event) => {
-                  subCategoryRegister.onChange(event);
-                }}
+              <Controller
+                name="subCategoryId"
+                control={control}
+                rules={{ required: "Product sub category is required" }}
+                render={({ field }) => (
+                  <Select
+                    label="Product Sub Category"
+                    requiredMark
+                    placeholder={subCategoryOptions.length ? "Select Product Sub Category" : "No active sub categories found"}
+                    error={errors.subCategoryId?.message}
+                    hint="Sub categories load from the selected category."
+                    disabled={!watchedCategoryId || !subCategoryOptions.length}
+                    options={subCategoryOptions}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
               <Input
                 label="SKU"
@@ -271,24 +323,44 @@ export const ProductFormPage = () => {
                 error={errors.hsnCode?.message}
                 {...register("hsnCode")}
               />
-              <Select
-                label="Taxable"
-                placeholder={null}
-                options={[
-                  { label: "Yes", value: "true" },
-                  { label: "No", value: "false" }
-                ]}
-                {...register("taxable")}
+              <Controller
+                name="taxable"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Taxable"
+                    placeholder={null}
+                    options={[
+                      { label: "Yes", value: "true" },
+                      { label: "No", value: "false" }
+                    ]}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
-              <Select
-                label="Status"
-                placeholder={null}
-                error={errors.active?.message}
-                options={[
-                  { label: "Active", value: "true" },
-                  { label: "Inactive", value: "false" }
-                ]}
-                {...register("active")}
+              <Controller
+                name="active"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Status"
+                    placeholder={null}
+                    error={errors.active?.message}
+                    options={[
+                      { label: "Active", value: "true" },
+                      { label: "Inactive", value: "false" }
+                    ]}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
             </div>
           </section>
@@ -304,17 +376,28 @@ export const ProductFormPage = () => {
                   validate: (value) => value === "" || Number(value) >= 0 || "Minimum stock must be 0 or more"
                 })}
               />
-              <Select
-                label="Tax Master"
-                requiredMark={watchedTaxable === "true"}
-                placeholder={taxOptions.length ? "Select Tax Master" : "No active taxes found"}
-                error={errors.taxMasterId?.message}
-                hint={watchedTaxable === "true" ? "GST breakup will be decided automatically during invoice creation." : "Non-taxable products do not require a tax master."}
-                disabled={watchedTaxable !== "true"}
-                options={taxOptions}
-                {...register("taxMasterId", {
+              <Controller
+                name="taxMasterId"
+                control={control}
+                rules={{
                   validate: (value) => watchedTaxable !== "true" || Boolean(value) || "Tax master is required for taxable products"
-                })}
+                }}
+                render={({ field }) => (
+                  <Select
+                    label="Tax Master"
+                    requiredMark={watchedTaxable === "true"}
+                    placeholder={taxOptions.length ? "Select Tax Master" : "No active taxes found"}
+                    error={errors.taxMasterId?.message}
+                    hint={watchedTaxable === "true" ? "GST breakup will be decided automatically during invoice creation." : "Non-taxable products do not require a tax master."}
+                    disabled={watchedTaxable !== "true"}
+                    options={taxOptions}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
               <div className="md:col-span-2 rounded-2xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-slate-300">
                 Purchase rate, selling rate, and stock quantity are now derived from inventory batches. Use `Purchases` whenever inventory is replenished.

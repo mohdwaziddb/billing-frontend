@@ -20,6 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { formatDate, formatDateTime } from "../lib/format";
+import { sanitizeHtml } from "../lib/sanitizeHtml";
 import { notificationService } from "../services/notificationService";
 import type { AuditLog, Invoice, Payment, Profitability } from "../types/api";
 
@@ -207,8 +208,10 @@ export const InvoiceDetailPage = () => {
         notificationService.showError("Unable to open print invoice right now.");
         return;
       }
+      // Sanitize server-rendered HTML before document.write so a compromised
+      // template cannot execute scripts in the app origin during printing.
       doc.open();
-      doc.write(html);
+      doc.write(sanitizeHtml(html));
       doc.close();
     } catch (error) {
       setApiError(error, "Unable to print invoice");

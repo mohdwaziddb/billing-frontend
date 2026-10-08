@@ -41,13 +41,62 @@ const shouldSuppressError = (message: string, error?: unknown) => {
   return false;
 };
 
+/**
+ * Strip credential material before anything reaches console/toast state.
+ * apiClient passes full axios errors (config.headers.Authorization Bearer
+ * token, refreshToken bodies) — logging those raw prints live session
+ * tokens to any open DevTools console.
+ */
+const sanitizeForLog = (error: unknown): unknown => {
+  if (!error || typeof error !== "object") {
+    return error;
+  }
+  const axiosError = error as {
+    config?: Record<string, unknown>;
+    response?: { data?: unknown; status?: unknown };
+    message?: unknown;
+  };
+  if (!axiosError.config && !axiosError.response) {
+    return error;
+  }
+  const config = axiosError.config ? { ...axiosError.config } : undefined;
+  if (config) {
+    const headers = (config.headers ?? {}) as Record<string, unknown>;
+    const cleanHeaders = { ...headers };
+    for (const key of Object.keys(cleanHeaders)) {
+      if (key.toLowerCase() === "authorization") {
+        cleanHeaders[key] = "[REDACTED]";
+      }
+    }
+    config.headers = cleanHeaders;
+    const data = config.data as unknown;
+    if (typeof data === "string") {
+      config.data = data.replace(/"(refreshToken|password|otp|newPassword)"\s*:\s*"[^"]*"/g, '"$1":"[REDACTED]"');
+    } else if (data && typeof data === "object") {
+      const cleanData = { ...(data as Record<string, unknown>) };
+      for (const key of ["refreshToken", "password", "otp", "newPassword"]) {
+        if (key in cleanData) {
+          cleanData[key] = "[REDACTED]";
+        }
+      }
+      config.data = cleanData;
+    }
+  }
+  return {
+    message: axiosError.message,
+    status: axiosError.response?.status,
+    data: axiosError.response?.data,
+    config
+  };
+};
+
 const emit = (type: NotificationType, message: string, error?: unknown) => {
   if (type === "error" && shouldSuppressError(message, error)) {
     return;
   }
   const notification = { id: nextId++, type, message, error };
   if (type === "error" && error) {
-    console.error(message, error);
+    console.error(message, sanitizeForLog(error));
   }
   listeners.forEach((listener) => listener(notification));
 };

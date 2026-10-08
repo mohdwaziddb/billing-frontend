@@ -249,7 +249,6 @@ export const ProductSubCategoryPage = () => {
           <Table
             data={subCategories}
             emptyText="No product sub categories found."
-            emptyAction={canAdd ? <Button onClick={openCreate}>Add Sub Category</Button> : null}
             columns={[
               { key: "categoryName", header: "Category Name", render: (item) => <span className="font-semibold text-white">{item.categoryName}</span> },
               { key: "subCategoryName", header: "Sub Category Name", render: (item) => <span className="font-semibold text-white">{item.subCategoryName}</span> },

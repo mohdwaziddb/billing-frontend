@@ -34,7 +34,7 @@ export const LandingNavbar = ({
             )}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-[1.2rem] font-black tracking-[-0.04em] text-slate-950">{productName}</p>
+            <p className="truncate text-2xl font-black tracking-[-0.04em] text-slate-950">{productName}</p>
             <p className="truncate text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Finance operating platform</p>
           </div>
         </Link>
@@ -48,12 +48,12 @@ export const LandingNavbar = ({
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            to="/login"
+          <a
+            href="#contact"
             className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
           >
-            Login
-          </Link>
+            Contact Us
+          </a>
           <a
             href="#contact"
             className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#1f4ed8,#2563eb,#67e8f9)] px-5 py-2.5 text-sm font-black text-white shadow-[0_18px_36px_rgba(37,99,235,0.24)]"
@@ -91,9 +91,9 @@ export const LandingNavbar = ({
                 {label}
               </a>
             ))}
-            <Link to="/login" className="rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">
-              Login
-            </Link>
+            <a href="#contact" onClick={() => setOpen(false)} className="rounded-2xl border border-slate-200 px-4 py-3 text-center text-sm font-bold text-slate-700">
+              Contact Us
+            </a>
           </div>
         </div>
       </motion.div>

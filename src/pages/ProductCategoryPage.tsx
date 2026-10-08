@@ -214,7 +214,6 @@ export const ProductCategoryPage = () => {
           <Table
             data={categories}
             emptyText="No product categories found."
-            emptyAction={canAdd ? <Button onClick={openCreate}>Add Category</Button> : null}
             columns={[
             { key: "category", header: "Category Name", render: (item) => <span className="font-semibold text-white">{item.categoryName}</span> },
             { key: "description", header: "Description", render: (item) => item.description ?? "--" },

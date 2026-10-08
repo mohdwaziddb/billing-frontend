@@ -2,6 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
 import { env } from "../config/env";
 import { getApiErrorMessage } from "../lib/errors";
 import { authStorage } from "../lib/storage";
+import { getSubdomainCompanyCode } from "../lib/hosts";
 import { notificationService } from "../services/notificationService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
 import {
@@ -96,21 +97,6 @@ const isAuthBypassRoute = (url?: string) => {
   ].some((route) => url.includes(route));
 };
 
-const getSubdomainCompanyCode = (): string | null => {
-  if (typeof window === "undefined") return null;
-  const host = window.location.hostname.toLowerCase();
-  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com" || host === "localhost" || host === "127.0.0.1") return null;
-  if (host.endsWith(".biziotechnologies.com")) {
-    const sub = host.split(".")[0];
-    if (sub && sub !== "www" && sub !== "biziotechnologies") return sub;
-  }
-  if (host.endsWith(".localhost")) {
-    const sub = host.split(".")[0];
-    if (sub && sub !== "localhost") return sub;
-  }
-  return null;
-};
-
 apiClient.interceptors.request.use((config) => {
   // DATABASE-per-tenant: backend Host is always localhost:9009 in dev, so send
   // X-Company-Code from frontend subdomain (TSM-like routing).
@@ -195,9 +181,17 @@ apiClient.interceptors.response.use(
     isRefreshing = true;
 
     try {
+      // Tenant routing is header-based: the refresh call must carry the same
+      // X-Company-Code or multi-DB routing lands in the wrong database.
+      const refreshHeaders: Record<string, string> = {};
+      const refreshCompanyCode = getSubdomainCompanyCode();
+      if (refreshCompanyCode) {
+        refreshHeaders["X-Company-Code"] = refreshCompanyCode;
+      }
       const refreshResponse = await refreshClient.post<ApiResponse<AuthPayload>>(
         "/v1/auth/refresh",
-        { refreshToken: session.auth.refreshToken }
+        { refreshToken: session.auth.refreshToken },
+        { headers: refreshHeaders }
       );
       const nextAuth = refreshResponse.data.data;
       authStorage.set({ type: "user", auth: nextAuth });

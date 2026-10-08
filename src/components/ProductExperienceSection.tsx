@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowRight, BarChart3, Filter, Plus, ReceiptText, Search, UsersRound, WalletCards } from "lucide-react";
-import { Link } from "react-router-dom";
+import { BarChart3, Filter, Plus, ReceiptText, Search, UsersRound, WalletCards } from "lucide-react";
 
 const BLUE = "#2453D8";
 const NAVY = "#0F172A";
@@ -11,7 +10,6 @@ const DANGER = "#EF4444";
 type PreviewCard = {
   title: string;
   description: string;
-  route: string;
   preview: React.ReactNode;
 };
 
@@ -249,25 +247,21 @@ const cards: PreviewCard[] = [
   {
     title: "Dashboard",
     description: "See all important business numbers in one place.",
-    route: "/dashboard",
     preview: <DashboardPreview />
   },
   {
     title: "Customers",
     description: "Manage customer details and transaction history.",
-    route: "/customers",
     preview: <CustomersPreview />
   },
   {
     title: "Invoices",
     description: "Create and manage invoices with ease.",
-    route: "/invoices",
     preview: <InvoicesPreview />
   },
   {
     title: "Collections",
     description: "Record collections and track payment status.",
-    route: "/payments",
     preview: <CollectionsPreview />
   }
 ];
@@ -290,10 +284,12 @@ export const ProductExperienceSection = () => {
         </div>
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => (
-            <Link
+            // Plain anchor without href: renders exactly like the old Link
+            // (same <a> element + classes) but can never navigate anywhere —
+            // landing visitors have no tenant yet. No Click.
+            <a
               key={card.title}
-              to={card.route}
-              className="group block overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#2453D8]/35 hover:shadow-[0_24px_50px_rgba(15,23,42,0.14)]"
+              className="group block cursor-default overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#2453D8]/35 hover:shadow-[0_24px_50px_rgba(15,23,42,0.14)]"
             >
               <div className="border-b border-[#E2E8F0] bg-slate-50/70 p-2.5">
                 <div className="transition-transform duration-300 group-hover:scale-[1.01]">{card.preview}</div>
@@ -301,14 +297,10 @@ export const ProductExperienceSection = () => {
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-[15px] font-bold text-[#111827]">{card.title}</h3>
-                  <span className="flex items-center gap-1 text-xs font-semibold text-[#2453D8] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                    View
-                    <ArrowRight size={14} />
-                  </span>
                 </div>
                 <p className="mt-1 text-sm leading-5 text-[#64748B]">{card.description}</p>
               </div>
-            </Link>
+            </a>
           ))}
         </div>
       </div>

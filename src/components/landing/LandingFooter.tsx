@@ -1,10 +1,11 @@
 import { Linkedin, Mail, Phone, Twitter } from "lucide-react";
+import { CONTACT } from "../../config/contact";
 
 export const LandingFooter = () => (
   <footer className="border-t border-white/70 bg-white/84 backdrop-blur-2xl">
     <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-10 md:px-6 lg:grid-cols-[1.1fr_0.8fr_1fr]">
       <div>
-        <p className="text-xl font-black tracking-[-0.04em] text-slate-950">Bizio</p>
+        <p className="text-2xl font-black tracking-[-0.04em] text-slate-950">Bizio Technologies</p>
         <p className="mt-4 max-w-md text-sm leading-7 text-slate-600">
           A premium billing and finance operations experience for teams that want structure, speed, and a stronger commercial command layer.
         </p>
@@ -21,13 +22,13 @@ export const LandingFooter = () => (
       <div className="grid gap-4">
         <p className="text-sm font-black uppercase tracking-[0.22em] text-slate-400">Connect</p>
         <div className="grid gap-2.5">
-          <a href="tel:+919891785824" className="flex items-center gap-2 text-sm font-bold text-slate-600 transition hover:text-slate-950">
+          <a href={CONTACT.phoneTel} className="flex items-center gap-2 text-sm font-bold text-slate-600 transition hover:text-slate-950">
             <Phone size={16} className="shrink-0" />
-            +91 98917 85824
+            {CONTACT.phoneDisplay}
           </a>
-          <a href="mailto:biziotechnologies@gmail.com" className="flex items-center gap-2 break-all text-sm font-bold text-slate-600 transition hover:text-slate-950">
+          <a href={CONTACT.emailHref} className="flex items-center gap-2 break-all text-sm font-bold text-slate-600 transition hover:text-slate-950">
             <Mail size={16} className="shrink-0" />
-            biziotechnologies@gmail.com
+            {CONTACT.email}
           </a>
         </div>
         <div className="flex gap-3">
@@ -47,7 +48,7 @@ export const LandingFooter = () => (
     <div className="border-t border-slate-100">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-5 text-sm text-slate-500 md:flex-row md:items-center md:justify-between md:px-6">
         <p>&copy; 2026 Bizio. All rights reserved.</p>
-        <p>Landing page redesign with preserved `/login` access.</p>
+        <p>Tenant login lives on your subdomain.</p>
       </div>
     </div>
   </footer>

@@ -443,14 +443,14 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
           <SectionHeader title="Platform Settings" subtitle="Update the branding values and platform-owner credentials stored in the platform settings table." />
           <div className="grid gap-4 md:grid-cols-2">
             <Input label="Platform Name" value={settingsForm.platformName} onChange={(event) => setSettingsForm((current) => ({ ...current, platformName: event.target.value }))} />
-            <Input label="Username" requiredMark value={settingsForm.username} onChange={(event) => setSettingsForm((current) => ({ ...current, username: event.target.value }))} />
+            <Input label="Username" requiredMark autoComplete="off" value={settingsForm.username} onChange={(event) => setSettingsForm((current) => ({ ...current, username: event.target.value }))} />
             <div className="md:col-span-2">
               <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
                 <span>Platform Tagline</span>
                 <textarea className="min-h-[108px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--theme-color)_18%,transparent)]" rows={3} value={settingsForm.platformTagline} onChange={(event) => setSettingsForm((current) => ({ ...current, platformTagline: event.target.value }))} />
               </label>
             </div>
-            <PasswordInput label="New Password" value={settingsForm.password} onChange={(event) => setSettingsForm((current) => ({ ...current, password: event.target.value }))} />
+            <PasswordInput label="New Password" autoComplete="new-password" value={settingsForm.password} onChange={(event) => setSettingsForm((current) => ({ ...current, password: event.target.value }))} />
             <div className="flex items-end">
               <Button type="button" disabled={settingsSaving} onClick={() => void saveSettings()}>
                 {settingsSaving ? <LoaderCircle className="animate-spin" size={16} /> : <Settings size={16} />} Save settings
@@ -653,8 +653,8 @@ const ResetSuperAdminModal = ({
             Company: <span className="font-semibold text-slate-950">{resetAction.company.name} ({resetAction.company.code})</span>
           </div>
         ) : null}
-        <PasswordInput label="New Password" requiredMark value={password} onChange={(event) => setPassword(event.target.value)} />
-        <PasswordInput label="Confirm Password" requiredMark value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
+        <PasswordInput label="New Password" requiredMark autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        <PasswordInput label="Confirm Password" requiredMark autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="ghost" disabled={resetAction?.loading} onClick={onCancel}>
             Cancel

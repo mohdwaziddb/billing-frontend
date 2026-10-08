@@ -170,10 +170,10 @@ export const CommonColumnSelector = ({
     <div ref={selectorRef} className="relative">
       <button
         type="button"
-        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-[var(--theme-color)] hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-slate-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 transition hover:border-[var(--theme-color)] hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
         onClick={() => setOpen((current) => !current)}
       >
-        <Columns3 size={16} />
+        <Columns3 size={15} />
         Select Column
       </button>
       {open ? (

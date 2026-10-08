@@ -5,6 +5,7 @@ import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -30,6 +31,8 @@ export const SmsTemplatePage = () => {
   const [editingTemplate, setEditingTemplate] = useState<SmsTemplate | null>(null);
   const [form, setForm] = useState<SmsTemplateRequest>(defaultForm);
   const [preview, setPreview] = useState<EmailPreview | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SmsTemplate | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
   const canSaveTemplate = Boolean(form.templateName.trim() && form.templateBody.trim());
@@ -73,6 +76,21 @@ export const SmsTemplatePage = () => {
     }
   };
 
+  const removeTemplate = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteSmsTemplate(deleteTarget.id);
+      setDeleteTarget(null);
+      await loadTemplates(templatePage.page);
+    } catch (err: any) {
+      setApiError(err, "Unable to delete SMS template");
+    } finally {
+      setDeleting(false);
+    }
+  };
   const openPreview = async (template: SmsTemplate) => {
     try {
       setPreview(await previewSmsTemplate(template.id, sampleVariables));
@@ -121,7 +139,7 @@ export const SmsTemplatePage = () => {
                   <ActionDropdown actions={[
                     { label: "Preview", icon: <Eye size={15} />, onClick: () => void openPreview(item) },
                     { label: "Edit", icon: <Pencil size={15} />, hidden: !can("SMS_TEMPLATES", "EDIT"), onClick: () => openEdit(item) },
-                    { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("SMS_TEMPLATES", "DELETE"), danger: true, onClick: () => void deleteSmsTemplate(item.id).then(() => loadTemplates(templatePage.page)) }
+                    { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("SMS_TEMPLATES", "DELETE"), danger: true, onClick: () => setDeleteTarget(item) }
                   ]} />
                 )
               }
@@ -164,6 +182,14 @@ export const SmsTemplatePage = () => {
       <Modal open={Boolean(preview)} title="SMS Preview" onClose={() => setPreview(null)}>
         {preview ? <PreviewSurface className="text-sm leading-6">{preview.emailBody}</PreviewSurface> : null}
       </Modal>
+      <CommonDeleteModal
+        open={Boolean(deleteTarget)}
+        loading={deleting}
+        title="Delete SMS Template"
+        description={deleteTarget ? `Delete "${deleteTarget.templateName}"? This cannot be undone.` : undefined}
+        onCancel={() => !deleting && setDeleteTarget(null)}
+        onConfirm={() => void removeTemplate()}
+      />
     </div>
   );
 };

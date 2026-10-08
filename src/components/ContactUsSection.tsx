@@ -23,11 +23,11 @@ const CONTACT_CARDS = [
 export const ContactUsSection = () => (
   <section id="contact" className="scroll-mt-24 bg-[#f8faff] py-6 sm:py-8" aria-labelledby="contact-heading">
     <div className="mx-auto max-w-[1040px] px-4 text-center sm:px-6">
-      <p className="text-[11px] font-extrabold uppercase tracking-[.18em] text-[#2453d8]">Contact Us</p>
-      <h2 id="contact-heading" className="mt-1 text-[26px] font-extrabold leading-tight tracking-[-0.03em] text-slate-950 sm:text-[32px]">
+      <p className="text-sm font-extrabold uppercase tracking-[.18em] text-[#2453d8]">Contact Us</p>
+      <h2 id="contact-heading" className="mt-1 text-3xl font-extrabold leading-tight tracking-[-0.03em] text-slate-950 sm:text-4xl">
         Let&apos;s talk about your business
       </h2>
-      <p className="mx-auto mt-2 max-w-2xl text-[12px] leading-6 text-slate-500 sm:text-[13px]">
+      <p className="mx-auto mt-2 max-w-2xl text-[15px] leading-7 text-slate-500">
         Have a question about Bizio or want to know how it can help you track your sales, collections and
         outstanding payments? Get in touch with us.
       </p>
@@ -45,11 +45,11 @@ export const ContactUsSection = () => (
                   <Icon size={17} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[9px] font-extrabold uppercase tracking-[.18em] text-slate-400">{label}</p>
-                  <p className="mt-1 whitespace-nowrap text-[13px] font-extrabold text-slate-950 sm:text-sm">{value}</p>
+                  <p className="text-[11px] font-extrabold uppercase tracking-[.18em] text-slate-400">{label}</p>
+                  <p className="mt-1 whitespace-nowrap text-[15px] font-extrabold text-slate-950">{value}</p>
                 </div>
               </div>
-              <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-[#2453d8] opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100">
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[#2453d8] opacity-70 transition group-hover:translate-x-0.5 group-hover:opacity-100">
                 {cta}
                 <ArrowRight size={12} />
               </span>

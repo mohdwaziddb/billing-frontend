@@ -1,7 +1,9 @@
 import { applyThemeColor, DEFAULT_THEME_COLOR, normalizeHexColor } from "../lib/theme";
+import { tenantKeySuffix } from "../lib/hosts";
 import type { CompanyTheme, UserPreference } from "../types/api";
 
-const THEME_BOOTSTRAP_KEY = "billing_frontend_theme_bootstrap";
+// Tenant-suffixed so one tenant's theme never flashes on another's login.
+const THEME_BOOTSTRAP_KEY = `billing_frontend_theme_bootstrap${tenantKeySuffix()}`;
 
 export type ThemeBootstrapState = {
   themeColor: string;

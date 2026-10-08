@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { type FieldErrors, useForm } from "react-hook-form";
+import { useEffect, useRef, useState } from "react";
+import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createCustomer, getCustomer, getCustomers, updateCustomer } from "../api/customers";
@@ -42,6 +42,9 @@ export const CustomerFormPage = () => {
     reset,
     setValue,
     watch,
+    getValues,
+    control,
+    formState,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues: {
@@ -75,13 +78,22 @@ export const CustomerFormPage = () => {
       });
   }, []);
 
+  // Live snapshot of dirty state: a slow edit-fetch must never wipe what the
+  // user already typed. Merged below (server value only for pristine fields).
+  const formStateRef = useRef(formState);
+  formStateRef.current = formState;
+
   useEffect(() => {
     if (!customerId) {
       return;
     }
 
+    let cancelled = false;
     void getCustomer(Number(customerId)).then((customer) => {
-      reset({
+      if (cancelled) {
+        return;
+      }
+      const server: FormValues = {
         name: customer.name,
         mobile: customer.mobile,
         email: customer.email ?? "",
@@ -94,9 +106,21 @@ export const CustomerFormPage = () => {
         gstNo: customer.gstin ?? customer.gstNo ?? "",
         gstRegistered: customer.gstRegistered ? "true" : "false",
         active: customer.active ? "true" : "false"
-      });
+      };
+      const dirty = formStateRef.current.dirtyFields ?? {};
+      const current = getValues();
+      const merged = Object.fromEntries(
+        (Object.keys(server) as Array<keyof FormValues>).map((key) => [
+          key,
+          dirty[key] ? current[key] : server[key]
+        ])
+      ) as FormValues;
+      reset(merged);
     });
-  }, [customerId, reset]);
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, reset, getValues]);
 
   const onSubmit = async (values: FormValues) => {
     clearFeedback();
@@ -213,30 +237,51 @@ export const CustomerFormPage = () => {
                 error={fieldErrors.gstNo ?? errors.gstNo?.message}
                 {...register("gstNo")}
               />
-              <Select
-                label="GST Registered"
-                placeholder={null}
-                options={[
-                  { label: "No", value: "false" },
-                  { label: "Yes", value: "true" }
-                ]}
-                {...register("gstRegistered", {
-                  onChange: (event) => {
-                    if (event.target.value !== "true") {
-                      setValue("gstNo", "", { shouldDirty: true, shouldValidate: true });
-                    }
-                  }
-                })}
+              {/* Controlled: shown option always equals submitted value. */}
+              <Controller
+                name="gstRegistered"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="GST Registered"
+                    placeholder={null}
+                    options={[
+                      { label: "No", value: "false" },
+                      { label: "Yes", value: "true" }
+                    ]}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      field.onChange(next);
+                      if (next !== "true") {
+                        setValue("gstNo", "", { shouldDirty: true, shouldValidate: true });
+                      }
+                    }}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
-              <Select
-                label="Status"
-                placeholder="Select Status"
-                error={fieldErrors.active}
-                options={[
-                  { label: "Active", value: "true" },
-                  { label: "Inactive", value: "false" }
-                ]}
-                {...register("active")}
+              <Controller
+                name="active"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Status"
+                    placeholder="Select Status"
+                    error={fieldErrors.active}
+                    options={[
+                      { label: "Active", value: "true" },
+                      { label: "Inactive", value: "false" }
+                    ]}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
             </div>
           </section>
@@ -250,21 +295,28 @@ export const CustomerFormPage = () => {
                 {...register("address")}
               />
               <Input label="City" {...register("city")} />
-              <Select
-                label="State"
-                placeholder={states.length ? "Select State" : "Loading States"}
-                options={[{ label: "Select State", value: "" }, ...states.map((state) => ({ label: state.stateName, value: String(state.id) }))]}
-                {...register("stateId", {
-                  onChange: (event) => {
-                    const selected = states.find((item) => String(item.id) === event.target.value);
-                    reset({
-                      ...watch(),
-                      stateId: event.target.value,
-                      state: selected?.stateName ?? "",
-                      country: selected?.countryName ?? watch().country
-                    });
-                  }
-                })}
+              <Controller
+                name="stateId"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="State"
+                    placeholder={states.length ? "Select State" : "Loading States"}
+                    options={[{ label: "Select State", value: "" }, ...states.map((state) => ({ label: state.stateName, value: String(state.id) }))]}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      field.onChange(next);
+                      const selected = states.find((item) => String(item.id) === next);
+                      setValue("stateId", next, { shouldDirty: true });
+                      setValue("state", selected?.stateName ?? "", { shouldDirty: true });
+                      setValue("country", selected?.countryName ?? watch().country, { shouldDirty: true });
+                    }}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
               <input type="hidden" {...register("state")} />
               <Input label="Country" {...register("country")} />

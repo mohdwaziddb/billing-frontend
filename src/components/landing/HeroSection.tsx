@@ -1,5 +1,4 @@
 import { ArrowRight, BadgeCheck, PlayCircle, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
 import { motion } from "../../lib/framerMotionCompat";
 import { Float, Reveal } from "./LandingMotion";
 
@@ -37,13 +36,13 @@ export const HeroSection = () => (
         </p>
 
         <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-          <Link
-            to="/login"
+          <a
+            href="#contact"
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#1f4ed8,#2563eb,#38bdf8)] px-7 py-4 text-sm font-black text-white shadow-[0_26px_56px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5"
           >
             Enter Bizio
             <ArrowRight size={16} />
-          </Link>
+          </a>
           <a
             href="#showcase"
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/92 px-7 py-4 text-sm font-black text-slate-700 shadow-[0_18px_36px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:text-slate-950"

@@ -64,7 +64,9 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
     : null;
   const headerTitle = title;
   const profileName = sessionType === "platform-admin" ? "Platform Admin" : (user?.fullName ?? "Owner");
-  const profileRole = sessionType === "platform-admin" ? "Platform Administrator" : (user?.role ?? "OWNER");
+  // Tenant super-admin sessions carry role OWNER for full rights — show the
+  // explicit SUPER ADMIN label so nobody confuses it with a normal owner login.
+  const profileRole = sessionType === "platform-admin" ? "Platform Administrator" : (user?.superAdmin ? "Super Admin" : (user?.role ?? "OWNER"));
   const profileEmail = sessionType === "platform-admin" ? (platformAdmin?.username ?? "Platform Admin") : (user?.email ?? user?.role ?? "User");
   const profileInitial = sessionType === "platform-admin" ? "P" : (user?.fullName ?? "O").slice(0, 1).toUpperCase();
 

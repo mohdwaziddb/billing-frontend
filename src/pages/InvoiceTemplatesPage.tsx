@@ -12,6 +12,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
+import { sanitizeHtml } from "../lib/sanitizeHtml";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { notificationService } from "../services/notificationService";
@@ -281,7 +282,8 @@ export const InvoiceTemplatesPage = () => {
                   <iframe
                     ref={iframeRef}
                     title={previewName || "Invoice template preview"}
-                    srcDoc={previewHtml}
+                    srcDoc={sanitizeHtml(previewHtml)}
+                    sandbox="allow-print"
                     className="preview-surface rounded-[24px] border-0 bg-white"
                     style={{
                       width: iframeWidth,

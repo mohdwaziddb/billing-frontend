@@ -12,6 +12,7 @@ import { Input } from "../../../components/Input";
 import { Modal } from "../../../components/Modal";
 import { Select } from "../../../components/Select";
 import { PreviewSurface } from "../../../components/PreviewSurface";
+import { sanitizeHtml } from "../../../lib/sanitizeHtml";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
 import { DEFAULT_PAGE_SIZE } from "../../../components/Pagination";
@@ -396,7 +397,7 @@ export const OutstandingCustomersReminderPage = () => {
                   <div>
                     <p className="text-sm font-semibold text-slate-700">Email Body</p>
                     <PreviewSurface className="mt-1 min-h-[220px] rounded-xl px-3 py-2 text-sm leading-6">
-                      <div dangerouslySetInnerHTML={{ __html: emailPreview.emailBody }} />
+                      <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(emailPreview.emailBody) }} />
                     </PreviewSurface>
                   </div>
                 </div>

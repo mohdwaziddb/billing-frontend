@@ -386,7 +386,12 @@ select:-webkit-autofill {
   color: var(--preview-text) !important;
 }
 
-.billing-card .text-white {
+/* Light-mode guard: plain white text directly on a light card is unreadable,
+   so force it dark — BUT never inside buttons/links, which carry their own
+   (usually dark/colored) background and mean white text literally.
+   Without the :not() guard, every primary button inside any card/modal
+   (e.g. modal "Send Email") rendered dark-on-blue and unreadable. */
+.billing-card .text-white:not(button):not(a) {
   color: #071330;
 }
 

@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { CONTACT } from "../../config/contact";
 import {
   Activity,
   ArrowUpRight,
@@ -271,8 +272,8 @@ export const contactCards: Array<{
   value: string;
   icon: LucideIcon;
 }> = [
-  { label: "Email", value: "biziotechnologies@gmail.com", icon: Mail },
-  { label: "Phone", value: "+91 98917 85824", icon: Phone },
+  { label: "Email", value: CONTACT.email, icon: Mail },
+  { label: "Phone", value: CONTACT.phoneDisplay, icon: Phone },
   { label: "Coverage", value: "Billing, CRM, inventory, analytics", icon: LayoutTemplate },
   { label: "Response", value: "Business-hour reply support", icon: BellRing }
 ];

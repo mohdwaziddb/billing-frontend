@@ -90,7 +90,8 @@ export const Sidebar = () => {
   const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
   const companyLogoUrl = company?.logoUrl ? (company.logoUrl.startsWith("http") ? company.logoUrl : `${apiOrigin}${company.logoUrl}`) : null;
   const title = sessionType === "platform-admin" ? (platform.platformName || "Platform Admin") : (company?.name ?? "Workspace");
-  const subtitle = sessionType === "platform-admin" ? "Platform Administrator" : (user?.role ?? "User");
+  // Same rule as Header: super-admin sessions show SUPER ADMIN, not OWNER.
+  const subtitle = sessionType === "platform-admin" ? "Platform Administrator" : (user?.superAdmin ? "Super Admin" : (user?.role ?? "User"));
 
   return (
     <aside className={`flex w-full flex-col rounded-[24px] bg-[linear-gradient(180deg,var(--theme-dark),color-mix(in_srgb,var(--theme-dark)_76%,#020617))] p-4 text-white shadow-[0_22px_55px_rgba(7,19,48,0.18)] transition-all duration-300 lg:h-full lg:max-h-[calc(100vh-2.5rem)] ${collapsed ? "lg:w-[92px] lg:px-3" : "lg:w-[292px]"}`}>

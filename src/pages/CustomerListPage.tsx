@@ -241,7 +241,6 @@ export const CustomerListPage = () => {
           <Table
             data={customers}
             emptyText="No customers match the current filters."
-            emptyAction={can("CUSTOMERS", "ADD") ? <Link to="/customers/new"><Button>Add customer</Button></Link> : null}
             columns={[...visibleCustomerColumns, customerActionColumn]}
           />
         </div>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Inbox } from "lucide-react";
 
 type Column<T> = {
   key: string;
@@ -66,7 +67,10 @@ export const Table = <T,>({
             <tr>
               <td className="h-[320px] px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={columns.length + (rowSelection ? 1 : 0)}>
                 <div className="flex h-full flex-col items-center justify-center gap-3">
-                  <p className="font-medium">{emptyText}</p>
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400">
+                    <Inbox size={26} />
+                  </span>
+                  <p className="text-sm font-semibold text-slate-500">{emptyText}</p>
                   {emptyAction ? <div>{emptyAction}</div> : null}
                 </div>
               </td>

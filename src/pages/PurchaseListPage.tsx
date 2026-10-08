@@ -14,6 +14,7 @@ import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import { PagePagination } from "../components/PagePagination";
 import { Select } from "../components/Select";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
@@ -27,6 +28,7 @@ const emptyLine = { productId: "", qty: "1", purchaseRate: "", sellingRate: "" }
 const defaultSupplierName = "Opening Balance";
 
 export const PurchaseListPage = () => {
+  const { can } = useAuth();
   const { setApiError, clearMessage } = useApiMessage();
   const [purchasePage, setPurchasePage] = useState<PageResponse<Purchase>>(emptyPage);
   const [products, setProducts] = useState<Product[]>([]);
@@ -117,18 +119,31 @@ export const PurchaseListPage = () => {
 
   const submit = async () => {
     clearMessage();
+    // Re-validate here (not just on the disabled button): DevTools/Enter can
+    // bypass a disabled button and send NaN/fractional/negative payloads.
+    const parsedItems = form.items.map((item) => ({
+      productId: Number(item.productId),
+      qty: Number(item.qty),
+      purchaseRate: Number(item.purchaseRate),
+      sellingRate: Number(item.sellingRate)
+    }));
+    const itemsValid = parsedItems.length > 0 && parsedItems.every(
+      (item) => Number.isInteger(item.productId) && item.productId > 0
+        && Number.isFinite(item.qty) && item.qty > 0 && Number.isInteger(item.qty)
+        && Number.isFinite(item.purchaseRate) && item.purchaseRate >= 0
+        && Number.isFinite(item.sellingRate) && item.sellingRate >= item.purchaseRate
+    );
+    if (!form.purchaseDate || !itemsValid) {
+      notificationService.showError("Enter a valid date, product, whole quantity and rates (selling >= purchase) for every item.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload: PurchaseRequest = {
         purchaseDate: form.purchaseDate,
         supplierName: form.supplierName.trim() || undefined,
         remarks: form.remarks.trim() || undefined,
-        items: form.items.map((item) => ({
-          productId: Number(item.productId),
-          qty: Number(item.qty),
-          purchaseRate: Number(item.purchaseRate),
-          sellingRate: Number(item.sellingRate)
-        }))
+        items: parsedItems
       };
       await createPurchase(payload);
       notificationService.showSuccess(CommonSuccessMessageUtil.created("Purchase"));
@@ -212,7 +227,9 @@ export const PurchaseListPage = () => {
                 <ActionDropdown
                   actions={[
                     { label: "View", icon: <Eye size={15} />, onClick: () => void openView(item.id) },
-                    ...(item.active ? [{ label: "Delete", icon: <Trash2 size={15} />, danger: true, onClick: () => setDeleteTarget(item) }] : [])
+                    // Backend also enforces PURCHASES/DELETE; hiding here keeps
+                    // view-only users from even seeing the option.
+                    ...(item.active && can("PURCHASES", "DELETE") ? [{ label: "Delete", icon: <Trash2 size={15} />, danger: true, onClick: () => setDeleteTarget(item) }] : [])
                   ]}
                 />
               )

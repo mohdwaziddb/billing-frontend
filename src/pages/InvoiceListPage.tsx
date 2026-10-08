@@ -196,6 +196,7 @@ export const InvoiceListPage = () => {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [exportRows, setExportRows] = useState<Invoice[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<Invoice | null>(null);
   const [logTarget, setLogTarget] = useState<Invoice | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [restoringId, setRestoringId] = useState<number | null>(null);
@@ -355,10 +356,14 @@ export const InvoiceListPage = () => {
     }
   };
 
-  const handleRestore = async (invoice: Invoice) => {
+  const handleRestore = async () => {
+    if (!restoreTarget) {
+      return;
+    }
     try {
-      setRestoringId(invoice.id);
-      await restoreInvoice(invoice.id);
+      setRestoringId(restoreTarget.id);
+      await restoreInvoice(restoreTarget.id);
+      setRestoreTarget(null);
       await loadInvoices(page);
       await loadExportRows();
       notificationService.showSuccess(CommonSuccessMessageUtil.updated("Invoice"));
@@ -528,7 +533,7 @@ export const InvoiceListPage = () => {
           </div>
         </div>
         <div className="flex-1">
-          <InvoiceTable invoices={invoices} logCounts={logCounts} canDelete={can("INVOICES", "DELETE")} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={(invoice) => void handleRestore(invoice)} onShowLogs={setLogTarget} />
+          <InvoiceTable invoices={invoices} logCounts={logCounts} canDelete={can("INVOICES", "DELETE")} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} canAdd={can("CREATE_INVOICE", "ADD")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={setRestoreTarget} onShowLogs={setLogTarget} />
         </div>
       </GlassCard>
 
@@ -558,12 +563,25 @@ export const InvoiceListPage = () => {
             />
           </div>
           </div>
-          <InvoiceTable invoices={modalInvoices} logCounts={logCounts} canDelete={false} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={(invoice) => void handleRestore(invoice)} onShowLogs={setLogTarget} />
+          <InvoiceTable invoices={modalInvoices} logCounts={logCounts} canDelete={false} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={setRestoreTarget} onShowLogs={setLogTarget} />
         </div>
       </Modal>
 
       <AuditLogModal open={Boolean(logTarget)} moduleName="Invoice" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.invoiceNo} Logs` : "Invoice Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
+      <Modal open={Boolean(restoreTarget)} title="Restore Invoice" onClose={() => restoringId === null && setRestoreTarget(null)}>
+        <p className="text-sm leading-6 text-slate-600">
+          Restore invoice <span className="font-bold text-slate-950">{restoreTarget?.invoiceNo}</span>? It will become active again with its payments intact.
+        </p>
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" disabled={restoringId !== null} onClick={() => setRestoreTarget(null)}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={restoringId !== null} onClick={() => void handleRestore()}>
+            {restoringId !== null ? "Restoring..." : "Restore"}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -572,7 +590,6 @@ const InvoiceTable = ({ invoices, logCounts, canDelete, canRestore, canViewLogs 
   <Table
     data={invoices}
     emptyText="No invoices match the selected filters."
-    emptyAction={canAdd ? <Link to="/create-invoice"><Button>Create Invoice</Button></Link> : null}
     columns={[
       { key: "invoice", header: "Invoice No", render: (item) => <span className="font-semibold text-white">{item.invoiceNo}</span> },
       { key: "date", header: "Date", render: (item) => formatDate(item.invoiceDate) },

@@ -1,6 +1,6 @@
 import { Download, Edit3, History, Plus, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { type FieldErrors, useForm } from "react-hook-form";
+import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { createCompanyUser, deactivateCompanyUser, getCompanyUsersPage, getRoles, updateCompanyUser } from "../api/users";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -98,6 +98,7 @@ export const UserManagementPage = () => {
     handleSubmit,
     reset,
     watch,
+    control,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues: {
@@ -376,7 +377,6 @@ export const UserManagementPage = () => {
           <Table
             data={users}
             emptyText="No company users found."
-            emptyAction={can("USERS", "ADD") ? <Button type="button" onClick={openCreateModal}><Plus size={16} />Add user</Button> : null}
             columns={[
             {
               key: "name",
@@ -448,6 +448,7 @@ export const UserManagementPage = () => {
           <Input
             label="Username"
             requiredMark
+            autoComplete="off"
             error={fieldErrors.username ?? errors.username?.message}
             {...register("username", { required: "Username is required" })}
           />
@@ -468,6 +469,9 @@ export const UserManagementPage = () => {
           <PasswordInput
             label={editingUser ? "New Password" : "Password"}
             requiredMark={!editingUser}
+            // "new-password" stops password managers from autofilling the
+            // super-admin/other saved credentials into this create/edit form.
+            autoComplete={editingUser ? "off" : "new-password"}
             hint={editingUser ? "Leave blank to keep the current password." : undefined}
             error={fieldErrors.password ?? errors.password?.message}
             {...register("password", {
@@ -475,23 +479,47 @@ export const UserManagementPage = () => {
               minLength: { value: 8, message: "Password must be at least 8 characters" }
             })}
           />
-          <Select
-            label="Role"
-            requiredMark
-            placeholder={null}
-            error={fieldErrors.role}
-            options={roles.filter(Boolean).map(toRoleOption)}
-            {...register("role", { required: "Role is required" })}
+          {/* Controlled via Controller so the SHOWN option always equals the
+              SUBMITTED value (custom Select keeps its own display state —
+              plain register showed "Owner" while submitting "USER"). */}
+          <Controller
+            name="role"
+            control={control}
+            rules={{ required: "Role is required" }}
+            render={({ field }) => (
+              <Select
+                label="Role"
+                requiredMark
+                placeholder={null}
+                error={fieldErrors.role}
+                options={roles.filter(Boolean).map(toRoleOption)}
+                name={field.name}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                onBlur={field.onBlur}
+                ref={field.ref}
+              />
+            )}
           />
-          <Select
-            label="Status"
-            placeholder={null}
-            error={fieldErrors.active}
-            options={[
-              { label: "Active", value: "true" },
-              { label: "Inactive", value: "false" }
-            ]}
-            {...register("active")}
+          <Controller
+            name="active"
+            control={control}
+            render={({ field }) => (
+              <Select
+                label="Status"
+                placeholder={null}
+                error={fieldErrors.active}
+                options={[
+                  { label: "Active", value: "true" },
+                  { label: "Inactive", value: "false" }
+                ]}
+                name={field.name}
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                onBlur={field.onBlur}
+                ref={field.ref}
+              />
+            )}
           />
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row md:col-span-2">

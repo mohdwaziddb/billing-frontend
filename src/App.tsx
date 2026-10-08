@@ -1,9 +1,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { apiClient } from "./api/apiClient";
+import { PLATFORM_ADMIN_LOGIN_URL } from "./config/site";
+import {
+  currentHostname,
+  isLiveHost,
+  isMainHost,
+  isTenantSubdomainHost,
+  mainSiteHomeUrl
+} from "./lib/hosts";
 import {
   isMaintenanceError,
-  isTenantSubdomainHost,
   MAINTENANCE_EVENT,
   notifyMaintenance
 } from "./lib/tenantMaintenance";
@@ -53,26 +60,22 @@ import { StockLedgerPage } from "./pages/StockLedgerPage";
 import { InvoiceTemplatesPage } from "./pages/InvoiceTemplatesPage";
 import { MaintenancePage } from "./pages/MaintenancePage";
 
+// All host decisions come from the single shared helper in lib/hosts.
+// isAppHost: main hosts show LandingPage, everything else is tenant app space.
+// isLiveTenantSubdomainHost: platform-admin lives on the main domain only;
+// local tenant subdomains must NEVER redirect to the live site.
 function isAppHost(): boolean {
-  // Single-DB local dev: plain localhost opens the app login (configured DB),
-  // not the marketing page. Only the main production domain shows LandingPage.
-  if (typeof window === "undefined") return false;
-  const host = window.location.hostname.toLowerCase();
-  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com") return false;
-  return true;
+  return !isMainHost();
 }
 
 function isLiveTenantSubdomainHost(): boolean {
-  if (typeof window === "undefined") return false;
-  const host = window.location.hostname.toLowerCase();
-  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com") return false;
-  if (host.endsWith(".biziotechnologies.com") && host.split(".").length > 2) return true;
-  return false;
+  const host = currentHostname();
+  return isLiveHost(host) && isTenantSubdomainHost(host);
 }
 
 function PlatformAdminHostGuard({ children }: { children: ReactNode }) {
   if (typeof window !== "undefined" && isLiveTenantSubdomainHost()) {
-    window.location.href = "https://biziotechnologies.com/platform-admin/login";
+    window.location.href = PLATFORM_ADMIN_LOGIN_URL;
     return null;
   }
   return <>{children}</>;
@@ -113,10 +116,12 @@ function useTenantMaintenance(): { maintenance: boolean; checking: boolean } {
             clearTenantSession();
           } else {
             setChecking(false);
-            if ((err as any)?.response?.status === 404 && isLiveTenantSubdomainHost()) {
-              // Unknown live subdomain -> main site. Local dev (*.localhost)
-              // never redirects: an empty dev database also answers 404 here.
-              window.location.href = "https://biziotechnologies.com";
+            // Unknown tenant subdomain -> own main site. This probe only runs on
+            // tenant hosts, so any 404 here means ghost tenant. Live goes to
+            // the live main site, local goes to the local main (landing).
+            // Main hosts never reach here (no probe there) so no loop possible.
+            if ((err as any)?.response?.status === 404) {
+              window.location.href = mainSiteHomeUrl();
             }
           }
         }

@@ -1,6 +1,9 @@
 import type { StoredAuthSession } from "../types/api";
+import { tenantKeySuffix } from "./hosts";
 
-const AUTH_KEY = "billing_frontend_auth";
+// Tenant-suffixed on subdomain hosts (":test"), shared on main hosts.
+// Old unsuffixed sessions are simply not found -> user logs in again once.
+const AUTH_KEY = `billing_frontend_auth${tenantKeySuffix()}`;
 const PLATFORM_ADMIN_COLUMN_PREFS_KEY = "billing_frontend_platform_admin_column_prefs";
 
 export const authStorage = {

@@ -609,7 +609,8 @@ export const CreateInvoicePage = () => {
           if (lineBase <= 0) {
             return 0;
           }
-          return Math.min(100, (Math.max(0, value) / lineBase) * 100);
+          // Round to 2dp: backend rounds the same way, so line totals match.
+          return Math.round((Math.min(100, (Math.max(0, value) / lineBase) * 100) + Number.EPSILON) * 100) / 100;
         })()
       }))
     };
@@ -688,13 +689,26 @@ export const CreateInvoicePage = () => {
             </div>
 
             <div className="mb-4 grid gap-3 md:grid-cols-2 xl:max-w-[700px]">
-              <Input
-                label="Invoice Date"
-                requiredMark
-                type="date"
-                disabled={!canProceedWithInvoice}
-                error={errors.invoiceDate?.message}
-                {...register("invoiceDate", { required: "Invoice date is required" })}
+              {/* Controlled: Input type=date delegates to custom DatePicker whose
+                  internal display state plain register() cannot track. */}
+              <Controller
+                name="invoiceDate"
+                control={control}
+                rules={{ required: "Invoice date is required" }}
+                render={({ field }) => (
+                  <Input
+                    label="Invoice Date"
+                    requiredMark
+                    type="date"
+                    disabled={!canProceedWithInvoice}
+                    error={errors.invoiceDate?.message}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
               <Controller
                 control={control}
@@ -1083,8 +1097,21 @@ export const CreateInvoicePage = () => {
                   type="number"
                   step="0.01"
                   disabled={!canProceedWithInvoice}
-                  error={summaryIssues.find((issue) => issue.toLowerCase().includes("invoice discount"))}
-                  {...register("discountAmount")}
+                  error={errors.discountAmount?.message ?? summaryIssues.find((issue) => issue.toLowerCase().includes("invoice discount"))}
+                  {...register("discountAmount", {
+                    // Reject garbage text ("abc") instead of silently coercing to 0.
+                    validate: (value) => {
+                      const raw = String(value ?? "").trim();
+                      if (!raw) {
+                        return true;
+                      }
+                      const parsed = Number(raw);
+                      if (!Number.isFinite(parsed)) {
+                        return "Enter a valid discount number.";
+                      }
+                      return parsed >= 0 || "Discount cannot be negative.";
+                    }
+                  })}
                 />
                 <Input
                   label="Paid Amount"
@@ -1092,8 +1119,19 @@ export const CreateInvoicePage = () => {
                   type="number"
                   step="0.01"
                   disabled={!canProceedWithInvoice}
-                  error={summaryIssues.find((issue) => issue.toLowerCase().includes("paid amount"))}
+                  error={errors.paidAmount?.message ?? summaryIssues.find((issue) => issue.toLowerCase().includes("paid amount"))}
                   {...register("paidAmount", {
+                    validate: (value) => {
+                      const raw = String(value ?? "").trim();
+                      if (!raw) {
+                        return true;
+                      }
+                      const parsed = Number(raw);
+                      if (!Number.isFinite(parsed)) {
+                        return "Enter a valid paid amount.";
+                      }
+                      return parsed >= 0 || "Paid amount cannot be negative.";
+                    },
                     onChange: () => {
                       autoFillPaidAmountRef.current = false;
                     }

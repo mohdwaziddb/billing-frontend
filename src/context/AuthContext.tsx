@@ -6,6 +6,7 @@ import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
 import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest } from "../api/auth";
 import { authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
+import { tenantKeySuffix } from "../lib/hosts";
 import { sessionCache } from "../lib/sessionCache";
 import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
@@ -42,7 +43,7 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const AUTH_BOOTSTRAP_CACHE_KEY = "billing_frontend_auth_bootstrap";
+const AUTH_BOOTSTRAP_CACHE_KEY = `billing_frontend_auth_bootstrap${tenantKeySuffix()}`;
 const PUBLIC_THEME_ROUTES = new Set(["/", "/login", "/platform-admin/login"]);
 
 type AuthBootstrapCache = {
@@ -124,16 +125,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const accessToken = session.auth.accessToken;
-    const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
-    if (cached?.accessToken === accessToken) {
-      setUser(cached.user);
-      setPermissions(cached.permissions);
-      setTheme(cached.theme);
-      setPlatform(cached.platform);
-      setPreferences(cached.preferences);
-      ThemeBootstrapService.remember(cached.theme, cached.preferences);
-      return;
-    }
+    // Reload ALWAYS fetches fresh (no cache-first read): company name, logo
+    // and theme must reflect server truth after every reload. The cache below
+    // is still WRITTEN (other flows merge into it), just never trusted blindly.
+    // No focus triggers, no throttle — reload means the user asked for fresh.
 
     if (!bootstrapPromise || bootstrapPromiseToken !== accessToken) {
       bootstrapPromiseToken = accessToken;

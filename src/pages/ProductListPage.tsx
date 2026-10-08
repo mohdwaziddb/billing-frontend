@@ -325,7 +325,6 @@ export const ProductListPage = () => {
           <Table
             data={products}
             emptyText="No products match the current filters."
-            emptyAction={can("PRODUCTS", "ADD") ? <Link to="/products/new"><Button>Add product</Button></Link> : null}
             rowSelection={can("PRODUCTS", "DELETE") ? {
               selectedRowIds: bulkSelection.selectedIds,
               onToggleRow: bulkSelection.toggleRow,

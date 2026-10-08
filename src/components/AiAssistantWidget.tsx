@@ -5,6 +5,7 @@ import { sendAiMessage, type AiChartData, type AiTableData } from "../api/ai";
 import { useAuth } from "../context/AuthContext";
 import { useIsDarkMode } from "../hooks/useIsDarkMode";
 import { getChartTheme } from "../lib/chartTheme";
+import { sanitizeHtml } from "../lib/sanitizeHtml";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -24,8 +25,10 @@ const buildCopyText = (item: ChatMessage) => {
     });
   }
   if (item.role === "assistant" && item.table?.html) {
+    // Parse sanitized HTML only so LLM prompt-injection cannot execute scripts
+    // or event handlers when extracting copy text.
     const holder = document.createElement("div");
-    holder.innerHTML = item.table.html;
+    holder.innerHTML = sanitizeHtml(item.table.html);
     const tableText = (holder.textContent || "").replace(/\s+/g, " ").trim();
     text += `\n\n${item.table.title ? `${item.table.title}\n` : ""}${tableText}`;
   }
@@ -170,7 +173,7 @@ export const AiAssistantWidget = () => {
                         </div>
                       ) : null}
                       {item.role === "assistant" && item.table?.html ? (
-                        <div className="ai-table-root mt-2 max-w-full" dangerouslySetInnerHTML={{ __html: item.table.html }} />
+                        <div className="ai-table-root mt-2 max-w-full" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.table.html) }} />
                       ) : null}
                     </div>
                     <div className={`mt-1 flex ${item.role === "user" ? "justify-end" : "justify-start"}`}>

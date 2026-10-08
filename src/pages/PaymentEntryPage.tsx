@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { type FieldErrors, useForm } from "react-hook-form";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCustomers } from "../api/customers";
@@ -45,7 +45,9 @@ export const PaymentEntryPage = () => {
     watch,
     handleSubmit,
     setValue,
+    getValues,
     reset,
+    control,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
     defaultValues: {
@@ -58,16 +60,24 @@ export const PaymentEntryPage = () => {
     }
   });
 
+  // Guards so async data never overwrites what the user typed:
+  // - lastAutoAmount: only replace amount while it still holds our auto value
+  // - lastInvoiceId: ignore effect re-runs from invoices refetch identity
+  // - prefilledInvoiceId: ?invoiceId prefill runs once per invoice
+  const lastAutoAmount = useRef<string | null>(null);
+  const lastInvoiceId = useRef<string>("");
+  const prefilledInvoiceId = useRef<string | null>(null);
+
   useEffect(() => {
     void Promise.all([getCustomers({ active: true, size: 1000 }), getInvoices({ size: 1000 }), getPaymentModes({ active: true, size: 1000 })]).then(([customerData, invoiceData, modeData]) => {
       setCustomers(customerData.filter((customer) => customer.active));
       setInvoices(invoiceData);
       setPaymentModes(modeData);
-      if (modeData[0]) {
+      if (modeData[0] && !getValues("mode")) {
         setValue("mode", modeData[0].modeCode, { shouldValidate: true });
       }
     });
-  }, [setValue]);
+  }, [setValue, getValues]);
 
   const selectedCustomerId = watch("customerId");
   const selectedInvoiceId = watch("invoiceId");
@@ -98,22 +108,37 @@ export const PaymentEntryPage = () => {
     if (!invoiceId || invoices.length === 0) {
       return;
     }
+    // Run once per invoice: re-runs from invoices refetch must not clobber typing.
+    if (prefilledInvoiceId.current === invoiceId) {
+      return;
+    }
 
     const invoice = invoices.find((item) => String(item.id) === invoiceId);
     if (!invoice) {
       return;
     }
 
+    prefilledInvoiceId.current = invoiceId;
     setValue("customerId", String(invoice.customerId), { shouldValidate: true });
     setValue("invoiceId", String(invoice.id), { shouldValidate: true });
-    setValue("amount", String(invoice.balanceAmount), { shouldValidate: true });
+    if (!getValues("amount")) {
+      const balance = String(invoice.balanceAmount);
+      setValue("amount", balance, { shouldValidate: true });
+      lastAutoAmount.current = balance;
+    }
+    lastInvoiceId.current = String(invoice.id);
     setLockedInvoice(invoice);
-  }, [invoices, searchParams, setValue]);
+  }, [invoices, searchParams, setValue, getValues]);
 
   useEffect(() => {
     if (!selectedInvoiceId) {
       return;
     }
+    // Same invoice id (e.g. invoices list refetched) -> do nothing, keep typing.
+    if (selectedInvoiceId === lastInvoiceId.current) {
+      return;
+    }
+    lastInvoiceId.current = selectedInvoiceId;
 
     const invoice = invoices.find((item) => String(item.id) === selectedInvoiceId);
     if (!invoice) {
@@ -121,8 +146,14 @@ export const PaymentEntryPage = () => {
     }
 
     setValue("customerId", String(invoice.customerId), { shouldValidate: true });
-    setValue("amount", String(invoice.balanceAmount), { shouldValidate: true });
-  }, [invoices, selectedInvoiceId, setValue]);
+    // Never overwrite a manually typed amount — only fill empty/auto values.
+    const currentAmount = getValues("amount");
+    if (!currentAmount || currentAmount === lastAutoAmount.current) {
+      const balance = String(invoice.balanceAmount);
+      setValue("amount", balance, { shouldValidate: true });
+      lastAutoAmount.current = balance;
+    }
+  }, [invoices, selectedInvoiceId, setValue, getValues]);
 
   const onSubmit = async (values: FormValues) => {
     clearMessage();
@@ -158,6 +189,9 @@ export const PaymentEntryPage = () => {
         remarks: ""
       });
       setLockedInvoice(null);
+      lastAutoAmount.current = null;
+      lastInvoiceId.current = "";
+      prefilledInvoiceId.current = null;
     } catch (err: any) {
       setApiError(err, "Unable to record payment");
     }
@@ -192,26 +226,49 @@ export const PaymentEntryPage = () => {
         <form id="payment-form" className="grid gap-4 lg:grid-cols-3" onSubmit={handleSubmit(onSubmit, onInvalid)}>
           <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="text-sm font-bold uppercase text-slate-500">Customer Information</h3>
-            <Select
-              label="Customer"
-              requiredMark
-              placeholder="Select Customer"
-              error={errors.customerId?.message}
-              options={customers.map((customer) => ({ label: customer.name, value: customer.id }))}
-              disabled={Boolean(lockedInvoice)}
-              {...register("customerId", { required: "Customer is required" })}
+            {/* Controlled: shown option always equals submitted value (async
+                options + setValue autofill used to desync the display). */}
+            <Controller
+              name="customerId"
+              control={control}
+              rules={{ required: "Customer is required" }}
+              render={({ field }) => (
+                <Select
+                  label="Customer"
+                  requiredMark
+                  placeholder="Select Customer"
+                  error={errors.customerId?.message}
+                  options={customers.map((customer) => ({ label: customer.name, value: customer.id }))}
+                  disabled={Boolean(lockedInvoice)}
+                  name={field.name}
+                  value={field.value}
+                  onChange={(event) => field.onChange(event.target.value)}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </section>
 
           <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
             <h3 className="text-sm font-bold uppercase text-slate-500">Invoice Information</h3>
-            <Select
-              label="Invoice"
-              placeholder="Select Invoice"
-              hint="Optional if you are recording an unapplied customer payment."
-              options={invoiceOptions}
-              disabled={Boolean(lockedInvoice)}
-              {...register("invoiceId")}
+            <Controller
+              name="invoiceId"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Invoice"
+                  placeholder="Select Invoice"
+                  hint="Optional if you are recording an unapplied customer payment."
+                  options={invoiceOptions}
+                  disabled={Boolean(lockedInvoice)}
+                  name={field.name}
+                  value={field.value}
+                  onChange={(event) => field.onChange(event.target.value)}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
           </section>
 
@@ -234,20 +291,42 @@ export const PaymentEntryPage = () => {
                   }
                 })}
               />
-              <Input
-                label="Payment date"
-                requiredMark
-                type="date"
-                error={errors.paymentDate?.message}
-                {...register("paymentDate", { required: "Payment date is required" })}
+              <Controller
+                name="paymentDate"
+                control={control}
+                rules={{ required: "Payment date is required" }}
+                render={({ field }) => (
+                  <Input
+                    label="Payment date"
+                    requiredMark
+                    type="date"
+                    error={errors.paymentDate?.message}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
-              <Select
-                label="Mode"
-                requiredMark
-                placeholder="Select Mode"
-                error={errors.mode?.message}
-                options={paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))}
-                {...register("mode", { required: "Payment mode is required" })}
+              <Controller
+                name="mode"
+                control={control}
+                rules={{ required: "Payment mode is required" }}
+                render={({ field }) => (
+                  <Select
+                    label="Mode"
+                    requiredMark
+                    placeholder="Select Mode"
+                    error={errors.mode?.message}
+                    options={paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
               <Input label="Notes" {...register("remarks")} />
             </div>

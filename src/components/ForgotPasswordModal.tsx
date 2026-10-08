@@ -112,8 +112,20 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
   const { clearMessage, setApiError } = useApiMessage();
   const isBrand = tone === "brand";
+
+  useEffect(() => {
+    if (cooldownLeft <= 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => setCooldownLeft((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldownLeft]);
+
+  const isStrongPassword = (value: string) =>
+    value.length >= 8 && /[A-Za-z]/.test(value) && /[0-9]/.test(value);
 
   useEffect(() => {
     if (open) {
@@ -137,6 +149,10 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
   const sendOtp = async (event: React.FormEvent) => {
     event.preventDefault();
     clearMessage();
+    if (cooldownLeft > 0) {
+      notificationService.showError(`Please wait ${cooldownLeft}s before requesting a new OTP.`);
+      return;
+    }
     const value = identifier.trim();
     if (!value) {
       notificationService.showError("Enter your email, mobile number or username first.");
@@ -145,6 +161,8 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
     try {
       setSaving(true);
       const challenge = await requestPasswordResetOtp({ identifier: value, channel: channel || undefined });
+      // 60s resend cooldown (mirrors backend) to stop OTP spam/flooding.
+      setCooldownLeft(60);
       if (challenge?.challengeId == null) {
         notificationService.showSuccess("If an account exists for this identifier, an OTP has been sent.");
         close();
@@ -171,6 +189,10 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
     }
     if (otp.trim().length < 4) {
       notificationService.showError("Enter the OTP you received.");
+      return;
+    }
+    if (!isStrongPassword(newPassword)) {
+      notificationService.showError("Password must be at least 8 characters with a letter and a number.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -377,11 +399,11 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
           <div className="flex items-center justify-between">
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || cooldownLeft > 0}
               className="rounded text-sm font-bold text-[#2453d8] transition hover:text-[#1d47bd] disabled:cursor-not-allowed"
               onClick={sendOtp}
             >
-              Resend OTP
+              {cooldownLeft > 0 ? `Resend OTP in ${cooldownLeft}s` : "Resend OTP"}
             </button>
             {isBrand ? (
               <div className="flex gap-3">

@@ -6,25 +6,11 @@ import { LoginCard } from "../components/login/LoginCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { getApiErrorMessage } from "../lib/errors";
+import { currentHostname, getSubdomainCompanyCode, mainSiteHomeUrl } from "../lib/hosts";
 import { isMaintenanceError, isTenantSubdomainHost, notifyMaintenance } from "../lib/tenantMaintenance";
 import type { ApiResponse } from "../types/api";
 
 const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
-
-function getSubdomainCompany(): string | null {
-  if (typeof window === "undefined") return null;
-  const host = window.location.hostname.toLowerCase();
-  if (host === "biziotechnologies.com" || host === "www.biziotechnologies.com" || host === "localhost" || host === "127.0.0.1") return null;
-  if (host.endsWith(".biziotechnologies.com")) {
-    const sub = host.split(".")[0];
-    if (sub && sub !== "www" && sub !== "biziotechnologies") return sub;
-  }
-  if (host.endsWith(".localhost")) {
-    const sub = host.split(".")[0];
-    if (sub && sub !== "localhost") return sub;
-  }
-  return null;
-}
 
 type LoginCompany = {
   name?: string | null;
@@ -48,8 +34,19 @@ export const LoginPage = () => {
   const [error, setError] = useState("");
   const [company, setCompany] = useState<LoginCompany>(null);
   const [brandingReady, setBrandingReady] = useState(false);
+  const [byDomainMissing, setByDomainMissing] = useState(false);
+  const [brandingMissing, setBrandingMissing] = useState(false);
   const { clearMessage, setApiError } = useApiMessage();
   const canSubmit = Boolean(form.username.trim() && form.password.trim());
+  // Ghost-tenant guard: on a tenant subdomain where NEITHER probe finds the
+  // workspace (unknown code — backend answers 404 instead of falling back to
+  // the default DB), block sign-in so the user never logs into the wrong DB.
+  const unknownWorkspace =
+    isTenantSubdomainHost() && byDomainMissing && brandingMissing;
+  const effectiveCanSubmit = unknownWorkspace ? false : canSubmit;
+  const effectiveError = unknownWorkspace
+    ? "This workspace was not found. Please check your subdomain."
+    : error;
 
   useEffect(() => {
     if (!auth?.accessToken) {
@@ -70,7 +67,7 @@ export const LoginPage = () => {
 
   useEffect(() => {
     let cancelled = false;
-    const companyCode = getSubdomainCompany();
+    const companyCode = getSubdomainCompanyCode();
     // X-Company-Code header is attached automatically by the apiClient
     // interceptor from the frontend subdomain (same helper logic).
     // 1) Subdomain validation: unknown subdomain -> main site (existing behavior).
@@ -84,12 +81,11 @@ export const LoginPage = () => {
             // Same URL, no navigation: App swaps in the maintenance screen.
             notifyMaintenance();
           } else if (!cancelled && err?.response?.status === 404) {
-            const host = window.location.hostname.toLowerCase();
-            // Unknown live subdomain -> main site. Local dev (*.localhost)
-            // never redirects: an empty dev database also answers 404 here.
-            if (!host.endsWith(".localhost")) {
-              window.location.href = "https://biziotechnologies.com";
-            }
+            setByDomainMissing(true);
+            // Unknown tenant subdomain -> own main site (live main site on
+            // live, local landing on local). Safety net below (workspace
+            // message + disabled sign-in) stays in case navigation is blocked.
+            window.location.href = mainSiteHomeUrl(currentHostname());
           }
         });
     }
@@ -101,6 +97,9 @@ export const LoginPage = () => {
         if (!cancelled && info && info.name) {
           setCompany({ name: info.name, logoUrl: info.logoUrl ?? null, email: info.email ?? null, phone: info.phone ?? null });
         } else if (!cancelled) {
+          // No branding AND (see above) no by-domain row on a tenant subdomain
+          // means ghost tenant — never show another DB's branding here.
+          setBrandingMissing(true);
           console.warn("Login company branding unavailable: /v1/company/current returned no company");
         }
       })
@@ -109,6 +108,7 @@ export const LoginPage = () => {
           if (isMaintenanceError(err) && isTenantSubdomainHost()) {
             notifyMaintenance();
           } else {
+            setBrandingMissing(true);
             console.warn("Login company branding unavailable:", err?.response?.status ?? err?.message ?? err);
           }
         }
@@ -124,6 +124,11 @@ export const LoginPage = () => {
   }, []);
 
   const submit = async () => {
+    // Defense in depth: even if the button is forced, never attempt login
+    // for an unknown workspace (backend would 404 the ghost tenant anyway).
+    if (unknownWorkspace) {
+      return;
+    }
     try {
       setLoading(true);
       setError("");
@@ -145,16 +150,18 @@ export const LoginPage = () => {
       style={{ fontFamily: "Manrope, Inter, system-ui, sans-serif" }}
     >
       <div className="grid flex-1 lg:grid-cols-2">
-        <AnalyticsShowcase companyName={brandingReady ? company?.name ?? null : null} />
+        <AnalyticsShowcase />
         <main className="relative flex items-center justify-center px-4 py-10 sm:px-8 lg:py-12">
           <LoginCard
             username={form.username}
             password={form.password}
             loading={loading}
-            canSubmit={canSubmit}
-            error={error}
+            canSubmit={effectiveCanSubmit}
+            error={effectiveError}
             company={company}
             brandingReady={brandingReady}
+            // Forgot-password hidden for now (validation later) — 1 line revert to restore.
+            showForgotPassword={false}
             subtitle={company?.name ? `Sign in to continue to ${company.name}.` : undefined}
             onUsernameChange={(value) => {
               setForm((current) => ({ ...current, username: value }));

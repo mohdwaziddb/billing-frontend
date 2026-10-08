@@ -117,6 +117,7 @@ export const PaymentListPage = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportRows, setExportRows] = useState<Payment[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
+  const [restoreTarget, setRestoreTarget] = useState<Payment | null>(null);
   const [logTarget, setLogTarget] = useState<Payment | null>(null);
   const [reminderTarget, setReminderTarget] = useState<Payment | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -230,10 +231,14 @@ export const PaymentListPage = () => {
     }
   };
 
-  const handleRestore = async (payment: Payment) => {
+  const handleRestore = async () => {
+    if (!restoreTarget) {
+      return;
+    }
     try {
-      setRestoringId(payment.id);
-      await restorePayment(payment.id);
+      setRestoringId(restoreTarget.id);
+      await restorePayment(restoreTarget.id);
+      setRestoreTarget(null);
       await loadPayments(page);
       await loadExportRows();
       notificationService.showSuccess(CommonSuccessMessageUtil.updated("Payment"));
@@ -414,12 +419,26 @@ export const PaymentListPage = () => {
             canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
             restoringId={restoringId}
             onDelete={setDeleteTarget}
-            onRestore={(payment) => void handleRestore(payment)}
+            onRestore={setRestoreTarget}
             onShowLogs={setLogTarget}
             onSendReminder={openReminder}
           />
         </div>
       </GlassCard>
+
+      <Modal open={Boolean(restoreTarget)} title="Restore Payment" onClose={() => restoringId === null && setRestoreTarget(null)}>
+        <p className="text-sm leading-6 text-slate-600">
+          Restore this payment? It will become active again and re-apply to its invoice.
+        </p>
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" disabled={restoringId !== null} onClick={() => setRestoreTarget(null)}>
+            Cancel
+          </Button>
+          <Button type="button" disabled={restoringId !== null} onClick={() => void handleRestore()}>
+            {restoringId !== null ? "Restoring..." : "Restore"}
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={Boolean(activeSummary)} title={summaryTitle(activeSummary)} onClose={() => setActiveSummary(null)}>
         <div className="space-y-5">
@@ -456,7 +475,7 @@ export const PaymentListPage = () => {
             canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
             restoringId={restoringId}
             onDelete={setDeleteTarget}
-            onRestore={(payment) => void handleRestore(payment)}
+            onRestore={setRestoreTarget}
             onShowLogs={setLogTarget}
             onSendReminder={openReminder}
           />
@@ -553,7 +572,6 @@ const PaymentTable = ({
   <Table
     data={payments}
     emptyText="No payments match the selected filters."
-    emptyAction={canAdd ? <Link to="/payments/new"><Button>Add Payment</Button></Link> : null}
     columns={[
       ...columns,
       {

@@ -4,6 +4,7 @@ import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -24,6 +25,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatDate } from "../lib/format";
+import { sanitizeHtml, sanitizeLinkUrl } from "../lib/sanitizeHtml";
 import { notificationService } from "../services/notificationService";
 import type { EmailPreview, EmailTemplate, EmailTemplateRequest, PageResponse } from "../types/api";
 
@@ -52,6 +54,8 @@ export const EmailTemplatePage = () => {
   const [form, setForm] = useState<EmailTemplateRequest>(defaultForm);
   const [preview, setPreview] = useState<EmailPreview | null>(null);
   const [previewTitle, setPreviewTitle] = useState("Email Preview");
+  const [deleteTarget, setDeleteTarget] = useState<EmailTemplate | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const { can } = useAuth();
   const { clearMessage, setApiError } = useApiMessage();
@@ -117,9 +121,10 @@ export const EmailTemplatePage = () => {
     syncEditor();
     clearMessage();
     try {
+      const rawBody = editorRef.current?.innerHTML ?? form.emailBody;
       const payload = {
         ...form,
-        emailBody: editorRef.current?.innerHTML ?? form.emailBody
+        emailBody: sanitizeHtml(rawBody)
       };
       if (editingTemplate) {
         await updateEmailTemplate(editingTemplate.id, payload);
@@ -135,14 +140,21 @@ export const EmailTemplatePage = () => {
     }
   };
 
-  const removeTemplate = async (template: EmailTemplate) => {
+  const removeTemplate = async () => {
+    if (!deleteTarget) {
+      return;
+    }
     clearMessage();
+    setDeleting(true);
     try {
-      await deleteEmailTemplate(template.id);
+      await deleteEmailTemplate(deleteTarget.id);
       notificationService.showSuccess("Email template deleted successfully.");
+      setDeleteTarget(null);
       await loadTemplates(templatePage.page);
     } catch (err: any) {
       setApiError(err, "Unable to delete email template");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -202,7 +214,6 @@ export const EmailTemplatePage = () => {
           <Table
             data={templatePage.records}
             emptyText={loading ? "Loading email templates..." : "No email templates found."}
-            emptyAction={can("EMAIL_TEMPLATES", "ADD") ? <Button type="button" onClick={openCreate}>Add Email Template</Button> : null}
             columns={[
               {
                 key: "template",
@@ -226,7 +237,7 @@ export const EmailTemplatePage = () => {
                     actions={[
                       { label: "Preview", icon: <Eye size={15} />, onClick: () => void openPreview(item) },
                       { label: "Edit", icon: <Pencil size={15} />, hidden: !can("EMAIL_TEMPLATES", "EDIT"), onClick: () => openEdit(item) },
-                      { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("EMAIL_TEMPLATES", "DELETE"), danger: true, onClick: () => void removeTemplate(item) }
+                      { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("EMAIL_TEMPLATES", "DELETE"), danger: true, onClick: () => setDeleteTarget(item) }
                     ]}
                   />
                 )
@@ -266,9 +277,12 @@ export const EmailTemplatePage = () => {
                     variant="ghost"
                     className="min-h-9 px-3 py-2"
                     onClick={() => {
-                      const url = window.prompt("Enter link URL");
-                      if (url) {
-                        runEditorCommand("createLink", url);
+                      const url = window.prompt("Enter link URL (https://...)");
+                      const safeUrl = sanitizeLinkUrl(url);
+                      if (safeUrl) {
+                        runEditorCommand("createLink", safeUrl);
+                      } else if (url) {
+                        notificationService.showError("Only http/https links are allowed.");
                       }
                     }}
                   >
@@ -281,7 +295,7 @@ export const EmailTemplatePage = () => {
                   contentEditable
                   suppressContentEditableWarning
                   className="min-h-[260px] w-full overflow-y-auto px-4 py-3 text-sm leading-6 text-slate-900 outline-none"
-                  dangerouslySetInnerHTML={{ __html: form.emailBody }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.emailBody) }}
                   onInput={syncEditor}
                 />
               </div>
@@ -332,11 +346,19 @@ export const EmailTemplatePage = () => {
             </PreviewSurface>
             <PreviewSurface>
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Email Body</p>
-              <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: preview.emailBody }} />
+              <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: sanitizeHtml(preview.emailBody) }} />
             </PreviewSurface>
           </div>
         ) : null}
       </Modal>
+      <CommonDeleteModal
+        open={Boolean(deleteTarget)}
+        loading={deleting}
+        title="Delete Email Template"
+        description={deleteTarget ? `Delete "${deleteTarget.templateName}"? This cannot be undone.` : undefined}
+        onCancel={() => !deleting && setDeleteTarget(null)}
+        onConfirm={() => void removeTemplate()}
+      />
     </div>
   );
 };
