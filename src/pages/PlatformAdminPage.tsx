@@ -1,17 +1,25 @@
-import { Bot, Building2, CheckCircle2, Eye, KeyRound, LoaderCircle, Power, Settings, XCircle } from "lucide-react";
+import { Bot, Building2, CheckCircle2, Download, Eye, KeyRound, LoaderCircle, Power, RefreshCw, Settings, XCircle } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   activatePlatformAdminCompany,
   deactivatePlatformAdminCompany,
   disablePlatformAdminCompanyChatbot,
+  downloadDumpFile,
   enablePlatformAdminCompanyChatbot,
+  getDumpDatabases,
+  getDumpHistory,
+  getDumpInstances,
+  getDumpStats,
   getPlatformAdminCompanies,
   getPlatformAdminCompanyDetails,
   getPlatformAdminDashboard,
   getPlatformAdminSettings,
+  queueDumpRequest,
+  readDumpDownloadError,
   resetSuperAdminPassword,
-  updatePlatformAdminSettings
+  updatePlatformAdminSettings,
+  validateDumpDatabase
 } from "../api/platformAdmin";
 import { Button } from "../components/Button";
 import { applyVisibleColumns, CommonColumnSelector } from "../components/CommonColumnSelector";
@@ -31,9 +39,32 @@ import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatDateTime } from "../lib/format";
 import { notificationService } from "../services/notificationService";
-import type { PageResponse, PlatformAdminCompany, PlatformAdminCompanyDetails, PlatformAdminDashboardSummary, PlatformAdminSettings as PlatformAdminSettingsType } from "../types/api";
+import type { PageResponse, PlatformAdminCompany, PlatformAdminCompanyDetails, PlatformAdminDashboardSummary, PlatformAdminDumpMode, PlatformAdminDumpRequest, PlatformAdminDumpStats, PlatformAdminSettings as PlatformAdminSettingsType } from "../types/api";
 
-type Mode = "dashboard" | "companies" | "details" | "settings";
+type Mode = "dashboard" | "companies" | "details" | "settings" | "dumps";
+
+type DumpFormState = {
+  instance: string;
+  database: string;
+  mode: PlatformAdminDumpMode;
+  tables: string;
+};
+
+const dumpFormInitial: DumpFormState = { instance: "", database: "", mode: "FULL", tables: "" };
+
+const formatDumpBytes = (bytes: number) => {
+  if (!bytes || bytes <= 0) {
+    return "--";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toFixed(value >= 100 ? 0 : 1)} ${units[unit]}`;
+};
 
 type SummaryCardFilter = "all" | "active" | "inactive";
 
@@ -88,6 +119,19 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [resetAction, setResetAction] = useState<{ company: PlatformAdminCompany; loading: boolean } | null>(null);
   const [chatbotToggleId, setChatbotToggleId] = useState<string | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [dumpInstances, setDumpInstances] = useState<string[]>([]);
+  const [dumpDatabases, setDumpDatabases] = useState<Array<{ companyCode: string | null; databaseName: string; dbHost: string; status: string }>>([]);
+  const [dumpForm, setDumpForm] = useState<DumpFormState>(dumpFormInitial);
+  const [dumpValidating, setDumpValidating] = useState(false);
+  const [dumpValidationMessage, setDumpValidationMessage] = useState("");
+  const [dumpQueueing, setDumpQueueing] = useState(false);
+  const [dumpHistory, setDumpHistory] = useState<PlatformAdminDumpRequest[]>([]);
+  const [dumpHistoryLoading, setDumpHistoryLoading] = useState(false);
+  const [dumpStats, setDumpStats] = useState<PlatformAdminDumpStats | null>(null);
+  const [dumpDateFilter, setDumpDateFilter] = useState("");
+  const [dumpDownloadingId, setDumpDownloadingId] = useState<number | null>(null);
+  const [dumpExpandedErrorId, setDumpExpandedErrorId] = useState<number | null>(null);
+  const dumpActiveCount = dumpHistory.filter((item) => item.status === "QUEUED" || item.status === "RUNNING").length;
   const { setApiError } = useApiMessage();
 
   function onViewCompany(company: PlatformAdminCompany) {
@@ -266,6 +310,26 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   }, [mode]);
 
   useEffect(() => {
+    if (mode === "dumps") {
+      setDumpHistoryLoading(true);
+      void Promise.all([
+        loadDumpLookups().catch((err) => setApiError(err, "Unable to load dump options")),
+        loadDumpHistory().catch((err) => setApiError(err, "Unable to load dump history"))
+      ]).finally(() => setDumpHistoryLoading(false));
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "dumps" || dumpActiveCount === 0) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void loadDumpHistory().catch(() => undefined);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [mode, dumpActiveCount]);
+
+  useEffect(() => {
     if (summaryModal) {
       void loadSummaryCompanies(summaryModal.filter, 0).catch((err) => setApiError(err, "Unable to load companies"));
     }
@@ -354,6 +418,81 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     } catch (err) {
       setResetAction({ company, loading: false });
       setApiError(err, "Unable to reset super-admin password");
+    }
+  };
+
+  const dumpTablesList = (value: string) => value.split(",").map((item) => item.trim()).filter((item) => item.length > 0);
+
+  const loadDumpLookups = async () => {
+    const [instances, databases] = await Promise.all([getDumpInstances(), getDumpDatabases()]);
+    setDumpInstances(instances);
+    setDumpDatabases(databases);
+    setDumpForm((current) => ({
+      ...current,
+      instance: current.instance || instances[0] || ""
+    }));
+  };
+
+  const loadDumpHistory = async () => {
+    const [history, stats] = await Promise.all([
+      getDumpHistory({ date: dumpDateFilter || undefined }),
+      getDumpStats()
+    ]);
+    setDumpHistory(history);
+    setDumpStats(stats);
+  };
+
+  const validateDumpForm = async () => {
+    const database = dumpForm.database.trim();
+    if (!database) {
+      notificationService.showError("Enter a database name first");
+      return;
+    }
+    setDumpValidating(true);
+    setDumpValidationMessage("");
+    try {
+      await validateDumpDatabase(database, dumpTablesList(dumpForm.tables));
+      setDumpValidationMessage(`Database '${database}' is valid and ready for dump.`);
+      notificationService.showSuccess("Database validated successfully");
+    } catch (err) {
+      setDumpValidationMessage("");
+      setApiError(err, "Database validation failed");
+    } finally {
+      setDumpValidating(false);
+    }
+  };
+
+  const queueDumpForm = async () => {
+    const database = dumpForm.database.trim();
+    if (!database) {
+      notificationService.showError("Enter a database name first");
+      return;
+    }
+    if (dumpForm.mode !== "FULL" && dumpTablesList(dumpForm.tables).length === 0) {
+      notificationService.showError("Enter comma-separated table names for Include/Exclude mode");
+      return;
+    }
+    setDumpQueueing(true);
+    try {
+      await queueDumpRequest({ database, mode: dumpForm.mode, tables: dumpTablesList(dumpForm.tables) });
+      notificationService.showSuccess(`Dump queued for '${database}'`);
+      await loadDumpHistory().catch((err) => setApiError(err, "Unable to load dump history"));
+    } catch (err) {
+      setApiError(err, "Unable to queue dump request");
+    } finally {
+      setDumpQueueing(false);
+    }
+  };
+
+  const downloadDump = async (item: PlatformAdminDumpRequest) => {
+    setDumpDownloadingId(item.id);
+    try {
+      const fileName = await downloadDumpFile(item.id);
+      notificationService.showSuccess(`Downloaded ${fileName}`);
+    } catch (err) {
+      notificationService.showError(await readDumpDownloadError(err));
+    } finally {
+      setDumpDownloadingId(null);
     }
   };
 
@@ -463,6 +602,198 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
             </div>
           ) : null}
         </GlassCard>
+      ) : null}
+
+      {mode === "dumps" ? (
+        <div className="space-y-4">
+          <GlassCard className="px-6 py-4">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Today</span>
+              <span><span className="font-bold text-slate-950">{dumpStats?.totalDumps ?? 0}</span> <span className="text-slate-500">Total</span></span>
+              <span><span className="font-bold text-emerald-600">{dumpStats?.completed ?? 0}</span> <span className="text-slate-500">Completed</span></span>
+              <span><span className="font-bold text-amber-600">{dumpStats?.inProgress ?? 0}</span> <span className="text-slate-500">In Progress</span></span>
+              <span><span className="font-bold text-rose-600">{dumpStats?.failed ?? 0}</span> <span className="text-slate-500">Failed</span></span>
+              <span><span className="font-bold text-violet-600">{dumpStats?.activeUsers ?? 0}</span> <span className="text-slate-500">Active Users</span></span>
+              <span className="ml-auto text-xs text-slate-500">
+                {(dumpStats?.perUser ?? []).length === 0
+                  ? "No dumps today"
+                  : (dumpStats?.perUser ?? []).map((row) => `${row.username || "Unknown"} (${row.dumps})`).join(" • ")}
+              </span>
+            </div>
+          </GlassCard>
+          <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <GlassCard className="p-6 md:p-7">
+            <SectionHeader title="New Dump Request" subtitle="Configure and queue a database dump." />
+            <div className="space-y-4">
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500"><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--theme-color)] text-[10px] text-white">1</span>Select MySQL server</p>
+                <Select
+                  value={dumpForm.instance}
+                  options={dumpInstances.map((host) => ({ label: host, value: host }))}
+                  onChange={(event) => setDumpForm((current) => ({ ...current, instance: event.target.value }))}
+                />
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500"><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--theme-color)] text-[10px] text-white">2</span>Database name</p>
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <Input
+                      placeholder="e.g. gyanbharti"
+                      list="dump-database-suggestions"
+                      value={dumpForm.database}
+                      onChange={(event) => {
+                        setDumpForm((current) => ({ ...current, database: event.target.value }));
+                        setDumpValidationMessage("");
+                      }}
+                    />
+                    <datalist id="dump-database-suggestions">
+                      {dumpDatabases.map((db) => (
+                        <option key={db.databaseName} value={db.databaseName}>
+                          {db.companyCode ? `${db.companyCode} (${db.status})` : "catalog"}
+                        </option>
+                      ))}
+                    </datalist>
+                  </div>
+                  <Button type="button" variant="secondary" disabled={dumpValidating || !dumpForm.database.trim()} onClick={() => void validateDumpForm()}>
+                    {dumpValidating ? <LoaderCircle className="animate-spin" size={15} /> : null} Validate
+                  </Button>
+                </div>
+                {dumpValidationMessage ? <p className="mt-2 text-xs font-semibold text-emerald-600">{dumpValidationMessage}</p> : null}
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500"><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--theme-color)] text-[10px] text-white">3</span>Dump mode</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["INCLUDE", "EXCLUDE", "FULL"] as const).map((dumpMode) => (
+                    <button
+                      key={dumpMode}
+                      type="button"
+                      onClick={() => setDumpForm((current) => ({ ...current, mode: dumpMode }))}
+                      className={`rounded-2xl border px-2 py-3 text-center transition ${dumpForm.mode === dumpMode ? "border-[var(--theme-color)] bg-[color-mix(in_srgb,var(--theme-color)_8%,white)]" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                    >
+                      <p className="text-xs font-bold text-slate-800">{dumpMode === "FULL" ? "Full Dump" : dumpMode === "INCLUDE" ? "Include" : "Exclude"}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">{dumpMode === "FULL" ? "Entire database" : dumpMode === "INCLUDE" ? "Specific tables only" : "All except selected"}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {dumpForm.mode !== "FULL" ? (
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Table names</p>
+                  <textarea
+                    className="min-h-[84px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)]"
+                    placeholder="orders, users, products (comma-separated)"
+                    rows={3}
+                    value={dumpForm.tables}
+                    onChange={(event) => setDumpForm((current) => ({ ...current, tables: event.target.value }))}
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500">Separate table names with commas. Each will be validated server-side.</p>
+                </div>
+              ) : null}
+              <Button type="button" disabled={dumpQueueing || !dumpForm.database.trim()} onClick={() => void queueDumpForm()} className="w-full">
+                {dumpQueueing ? <LoaderCircle className="animate-spin" size={16} /> : null} Queue Dump Request
+              </Button>
+            </div>
+          </GlassCard>
+
+          <GlassCard className="p-6 md:p-7">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <SectionHeader title="Dump History" subtitle="Your recent dump requests." />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                  <span className={`h-2 w-2 rounded-full ${dumpActiveCount > 0 ? "animate-pulse bg-emerald-500" : "bg-slate-300"}`} /> Live
+                </span>
+                <Input
+                  type="date"
+                  aria-label="Filter by date"
+                  value={dumpDateFilter}
+                  onChange={(event) => setDumpDateFilter(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={dumpHistoryLoading}
+                  onClick={() => {
+                    setDumpHistoryLoading(true);
+                    void loadDumpHistory()
+                      .catch((err) => setApiError(err, "Unable to load dump history"))
+                      .finally(() => setDumpHistoryLoading(false));
+                  }}
+                >
+                  <RefreshCw size={15} /> Refresh
+                </Button>
+              </div>
+            </div>
+            {dumpHistoryLoading ? <LoadingPanel label="Loading dump history..." /> : null}
+            <Table
+              data={dumpHistory}
+              emptyText="No dump requests yet. Use the form on the left to get started."
+              columns={[
+                {
+                  key: "database",
+                  header: "Database",
+                  render: (item) => (
+                    <div className="min-w-[160px]">
+                      <p className="font-semibold text-slate-950">{item.databaseName}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{item.mode} • {item.companyCode ?? "catalog"}</p>
+                    </div>
+                  )
+                },
+                {
+                  key: "status",
+                  header: "Status",
+                  render: (item) => (
+                    <div>
+                      <StatusBadge label={item.status} />
+                      {item.status === "FAILED" && item.error ? (
+                        <button
+                          type="button"
+                          title={item.error}
+                          onClick={() => setDumpExpandedErrorId((current) => (current === item.id ? null : item.id))}
+                          className={`mt-1 block max-w-[220px] text-left text-[11px] text-rose-600 hover:underline ${dumpExpandedErrorId === item.id ? "whitespace-pre-wrap break-words" : "truncate"}`}
+                        >
+                          {item.error}
+                        </button>
+                      ) : null}
+                    </div>
+                  )
+                },
+                {
+                  key: "size",
+                  header: "Size",
+                  render: (item) => <span className="whitespace-nowrap">{item.hasFile ? formatDumpBytes(item.fileSize) : "--"}</span>
+                },
+                {
+                  key: "requested",
+                  header: "Requested",
+                  render: (item) => (
+                    <div className="min-w-[150px]">
+                      <p className="text-xs font-semibold text-slate-700">{item.requestedBy ?? "--"}</p>
+                      <p className="text-[11px] text-slate-500">{formatDateTime(item.createdAt)}</p>
+                    </div>
+                  )
+                },
+                {
+                  key: "actions",
+                  header: "File",
+                  render: (item) => item.status === "COMPLETED" && item.hasFile ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={dumpDownloadingId === item.id}
+                      onClick={() => void downloadDump(item)}
+                    >
+                      {dumpDownloadingId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <Download size={15} />} Download
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-slate-400">{item.status === "COMPLETED" ? "Expired" : "--"}</span>
+                  )
+                }
+              ]}
+            />
+          </GlassCard>
+
+          </div>
+        </div>
       ) : null}
 
       <CompanySummaryModal
@@ -742,5 +1073,6 @@ const pageMeta: Record<Mode, { title: string; subtitle: string }> = {
   dashboard: { title: "Platform Dashboard", subtitle: "Real-time company visibility across the full billing platform." },
   companies: { title: "Companies", subtitle: "Tenant lifecycle management for the SaaS platform." },
   details: { title: "Company Details", subtitle: "Company-level ownership, activity, and access diagnostics." },
-  settings: { title: "Platform Settings", subtitle: "Credentials and platform-level branding values." }
+  settings: { title: "Platform Settings", subtitle: "Credentials and platform-level branding values." },
+  dumps: { title: "Dump Manager", subtitle: "Queued MySQL dumps for tenant databases and billing_common." }
 };

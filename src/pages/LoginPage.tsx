@@ -6,7 +6,7 @@ import { LoginCard } from "../components/login/LoginCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { getApiErrorMessage } from "../lib/errors";
-import { currentHostname, getSubdomainCompanyCode, mainSiteHomeUrl } from "../lib/hosts";
+import { currentHostname, getSubdomainCompanyCode, isLiveHost, isMainHost, mainSiteHomeUrl } from "../lib/hosts";
 import { isMaintenanceError, isTenantSubdomainHost, notifyMaintenance } from "../lib/tenantMaintenance";
 import type { ApiResponse } from "../types/api";
 
@@ -37,6 +37,10 @@ export const LoginPage = () => {
   const [byDomainMissing, setByDomainMissing] = useState(false);
   const [brandingMissing, setBrandingMissing] = useState(false);
   const { clearMessage, setApiError } = useApiMessage();
+  // Defense in depth (route guard lives in App.tsx): tenant login NEVER
+  // renders on the live main host — local main hosts keep working for dev.
+  const isLiveMainHost =
+    typeof window !== "undefined" && isLiveHost(currentHostname()) && isMainHost(currentHostname());
   const canSubmit = Boolean(form.username.trim() && form.password.trim());
   // Ghost-tenant guard: on a tenant subdomain where NEITHER probe finds the
   // workspace (unknown code — backend answers 404 instead of falling back to
@@ -122,6 +126,16 @@ export const LoginPage = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (isLiveMainHost) {
+      window.location.href = "/";
+    }
+  }, [isLiveMainHost]);
+
+  if (isLiveMainHost) {
+    return null;
+  }
 
   const submit = async () => {
     // Defense in depth: even if the button is forced, never attempt login

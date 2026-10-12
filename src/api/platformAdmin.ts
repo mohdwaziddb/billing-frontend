@@ -6,6 +6,11 @@ import type {
   PlatformAdminCompanyDetails,
   PlatformAdminCompanyOverview,
   PlatformAdminDashboardSummary,
+  PlatformAdminDumpMode,
+  PlatformAdminDumpRequest,
+  PlatformAdminDumpStats,
+  PlatformAdminDumpValidation,
+  PlatformAdminKnownDatabase,
   PlatformAdminSettings
 } from "../types/api";
 
@@ -76,5 +81,67 @@ export const getPlatformAdminSettings = async () => {
 export const updatePlatformAdminSettings = async (payload: UpdatePlatformAdminSettingsPayload) => {
   const response = await apiClient.put<ApiResponse<PlatformAdminSettings>>("/v1/platform-admin/settings", payload);
   return response.data.data;
+};
+
+export const getDumpInstances = async () => {
+  const response = await apiClient.get<ApiResponse<string[]>>("/v1/platform-admin/dumps/instances");
+  return response.data.data;
+};
+
+export const getDumpDatabases = async () => {
+  const response = await apiClient.get<ApiResponse<PlatformAdminKnownDatabase[]>>("/v1/platform-admin/dumps/databases");
+  return response.data.data;
+};
+
+export const validateDumpDatabase = async (database: string, tables: string[]) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminDumpValidation>>("/v1/platform-admin/dumps/validate", { database, tables });
+  return response.data.data;
+};
+
+export const queueDumpRequest = async (payload: { database: string; mode: PlatformAdminDumpMode; tables: string[] }) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminDumpRequest>>("/v1/platform-admin/dumps", payload);
+  return response.data.data;
+};
+
+export const getDumpHistory = async (params?: { date?: string; status?: string }) => {
+  const response = await apiClient.get<ApiResponse<PlatformAdminDumpRequest[]>>("/v1/platform-admin/dumps", { params });
+  return response.data.data;
+};
+
+export const getDumpStats = async () => {
+  const response = await apiClient.get<ApiResponse<PlatformAdminDumpStats>>("/v1/platform-admin/dumps/stats");
+  return response.data.data;
+};
+
+export const downloadDumpFile = async (id: number) => {
+  const response = await apiClient.get(`/v1/platform-admin/dumps/${id}/file`, { responseType: "blob" });
+  const disposition: string = response.headers?.["content-disposition"] ?? "";
+  const match = /filename="?([^"]+)"?/.exec(disposition);
+  const fileName = match?.[1] ?? `dump_${id}.sql`;
+  const url = window.URL.createObjectURL(new Blob([response.data as BlobPart], { type: "application/sql" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+  return fileName;
+};
+
+/** Blob error bodies (file download failures) carry JSON — extract its message. */
+export const readDumpDownloadError = async (err: unknown): Promise<string> => {
+  const data = (err as { response?: { data?: unknown } })?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text()) as { message?: unknown };
+      if (typeof parsed.message === "string" && parsed.message.length > 0) {
+        return parsed.message;
+      }
+    } catch {
+      // fall through to default message
+    }
+  }
+  return "Unable to download dump file";
 };
 

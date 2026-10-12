@@ -137,6 +137,10 @@ function useTenantMaintenance(): { maintenance: boolean; checking: boolean } {
 
 function App() {
   const isApp = isAppHost();
+  // Tenant login lives on tenant subdomains only. On the LIVE main host
+  // (biziotechnologies.com) /login must not render — redirect to landing.
+  // Local main hosts (localhost) keep working for single-DB dev.
+  const isLiveMain = typeof window !== "undefined" && isLiveHost() && isMainHost();
   const { maintenance, checking } = useTenantMaintenance();
   if (maintenance) {
     // Same URL, no navigation: the workspace is unavailable, nothing else renders.
@@ -152,7 +156,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={isApp ? <LoginPage /> : <LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={isLiveMain ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/platform-admin/login" element={<PlatformAdminHostGuard><PlatformAdminLoginPage /></PlatformAdminHostGuard>} />
 
       <Route element={<ProtectedRoute />}>
@@ -212,6 +216,7 @@ function App() {
           <Route path="/platform-admin/companies" element={<PlatformAdminPage mode="companies" />} />
           <Route path="/platform-admin/company-details" element={<PlatformAdminPage mode="details" />} />
           <Route path="/platform-admin/settings" element={<PlatformAdminPage mode="settings" />} />
+          <Route path="/platform-admin/dumps" element={<PlatformAdminPage mode="dumps" />} />
         </Route>
       </Route>
 

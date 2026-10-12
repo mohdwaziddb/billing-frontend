@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronLeft,
   CreditCard,
+  DatabaseBackup,
   FilePlus2,
   FileText,
   LayoutDashboard,
@@ -34,6 +35,7 @@ const iconMap: Record<string, LucideIcon> = {
   Boxes,
   Building2,
   CreditCard,
+  DatabaseBackup,
   FilePlus2,
   FileText,
   LayoutDashboard,
@@ -70,7 +72,8 @@ export const Sidebar = () => {
           children: [
             { id: -2, menuName: "Dashboard", menuIcon: "LayoutDashboard", menuRoute: "/platform-admin/dashboard", displayOrder: 1, canView: true, actions: [], children: [] },
             { id: -3, menuName: "Companies", menuIcon: "Building2", menuRoute: "/platform-admin/companies", displayOrder: 2, canView: true, actions: [], children: [] },
-            { id: -5, menuName: "Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 3, canView: true, actions: [], children: [] }
+            { id: -5, menuName: "Settings", menuIcon: "Settings", menuRoute: "/platform-admin/settings", displayOrder: 3, canView: true, actions: [], children: [] },
+            { id: -6, menuName: "Dump Manager", menuIcon: "DatabaseBackup", menuRoute: "/platform-admin/dumps", displayOrder: 4, canView: true, actions: [], children: [] }
           ]
         }
       ];

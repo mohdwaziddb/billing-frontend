@@ -162,6 +162,52 @@ export type PlatformAdminSettings = {
   username: string;
 };
 
+export type PlatformAdminDumpMode = "FULL" | "INCLUDE" | "EXCLUDE";
+
+export type PlatformAdminDumpStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED";
+
+export type PlatformAdminDumpRequest = {
+  id: number;
+  companyCode: string | null;
+  databaseName: string;
+  dbHost: string;
+  mode: PlatformAdminDumpMode;
+  tables: string | null;
+  status: PlatformAdminDumpStatus;
+  requestedBy: string | null;
+  hasFile: boolean;
+  fileSize: number;
+  error: string | null;
+  createdAt: string | null;
+  finishedAt: string | null;
+};
+
+export type PlatformAdminDumpValidation = {
+  database: string;
+  isCommon: boolean;
+  host: string;
+  databaseExists: boolean | null;
+  missingTables: string[];
+  tablesChecked: boolean;
+  valid: boolean;
+};
+
+export type PlatformAdminDumpStats = {
+  totalDumps: number;
+  completed: number;
+  failed: number;
+  inProgress: number;
+  activeUsers: number;
+  perUser: Array<{ username: string; dumps: number }>;
+};
+
+export type PlatformAdminKnownDatabase = {
+  companyCode: string | null;
+  databaseName: string;
+  dbHost: string;
+  status: string;
+};
+
 export type DashboardSummary = {
   startDate: string | null;
   endDate: string | null;
