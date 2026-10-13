@@ -87,23 +87,23 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label
     ? createPortal(
         <div
           ref={panelRef}
-          className="fixed z-[1100] w-80 rounded-2xl border border-slate-200 bg-white p-3 text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.18)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="fixed z-[1100] w-80 rounded-2xl border border-slate-200 bg-white p-3 text-slate-800 shadow-[0_24px_70px_rgba(15,23,42,0.18)]"
           style={{
             left: Math.min(buttonRef.current.getBoundingClientRect().left, window.innerWidth - 332),
             top: Math.min(buttonRef.current.getBoundingClientRect().bottom + 8, window.innerHeight - 390)
           }}
         >
           <div className="mb-3 flex items-center gap-2">
-            <button type="button" className="grid h-9 w-9 place-items-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}>
+            <button type="button" className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 hover:bg-slate-100" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}>
               <ChevronLeft size={17} />
             </button>
-            <select className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-semibold dark:border-slate-700 dark:bg-slate-900" value={viewDate.getMonth()} onChange={(event) => setViewDate(new Date(viewDate.getFullYear(), Number(event.target.value), 1))}>
+            <select className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-semibold text-slate-800" value={viewDate.getMonth()} onChange={(event) => setViewDate(new Date(viewDate.getFullYear(), Number(event.target.value), 1))}>
               {Array.from({ length: 12 }, (_, month) => <option key={month} value={month}>{new Date(2025, month, 1).toLocaleString("en-IN", { month: "long" })}</option>)}
             </select>
-            <select className="w-24 rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-semibold dark:border-slate-700 dark:bg-slate-900" value={viewDate.getFullYear()} onChange={(event) => setViewDate(new Date(Number(event.target.value), viewDate.getMonth(), 1))}>
+            <select className="w-24 rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-semibold text-slate-800" value={viewDate.getFullYear()} onChange={(event) => setViewDate(new Date(Number(event.target.value), viewDate.getMonth(), 1))}>
               {Array.from({ length: 81 }, (_, index) => viewDate.getFullYear() - 40 + index).map((year) => <option key={year} value={year}>{year}</option>)}
             </select>
-            <button type="button" className="grid h-9 w-9 place-items-center rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}>
+            <button type="button" className="grid h-9 w-9 place-items-center rounded-xl text-slate-600 hover:bg-slate-100" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}>
               <ChevronRight size={17} />
             </button>
           </div>
@@ -119,7 +119,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label
                 <button
                   key={iso}
                   type="button"
-                  className={clsx("h-9 rounded-xl text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]", selected ? "bg-[var(--theme-color)] text-white" : muted ? "text-slate-300 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800")}
+                  className={clsx("h-9 rounded-xl text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]", selected ? "bg-[var(--theme-color)] text-white" : muted ? "text-slate-300 hover:bg-slate-50" : "text-slate-700 hover:bg-slate-100")}
                   onClick={() => chooseDate(day)}
                 >
                   {day.getDate()}

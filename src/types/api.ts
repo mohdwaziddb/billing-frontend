@@ -164,7 +164,7 @@ export type PlatformAdminSettings = {
 
 export type PlatformAdminDumpMode = "FULL" | "INCLUDE" | "EXCLUDE";
 
-export type PlatformAdminDumpStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED";
+export type PlatformAdminDumpStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
 
 export type PlatformAdminDumpRequest = {
   id: number;
@@ -177,9 +177,18 @@ export type PlatformAdminDumpRequest = {
   requestedBy: string | null;
   hasFile: boolean;
   fileSize: number;
+  fileName: string | null;
   error: string | null;
   createdAt: string | null;
+  startedAt: string | null;
   finishedAt: string | null;
+};
+
+export type PlatformAdminDumpHistoryPage = {
+  records: PlatformAdminDumpRequest[];
+  total: number;
+  page: number;
+  size: number;
 };
 
 export type PlatformAdminDumpValidation = {

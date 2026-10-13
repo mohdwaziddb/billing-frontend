@@ -6,6 +6,7 @@ import type {
   PlatformAdminCompanyDetails,
   PlatformAdminCompanyOverview,
   PlatformAdminDashboardSummary,
+  PlatformAdminDumpHistoryPage,
   PlatformAdminDumpMode,
   PlatformAdminDumpRequest,
   PlatformAdminDumpStats,
@@ -103,8 +104,23 @@ export const queueDumpRequest = async (payload: { database: string; mode: Platfo
   return response.data.data;
 };
 
-export const getDumpHistory = async (params?: { date?: string; status?: string }) => {
-  const response = await apiClient.get<ApiResponse<PlatformAdminDumpRequest[]>>("/v1/platform-admin/dumps", { params });
+export const getDumpHistory = async (params?: { date?: string; status?: string; page?: number; size?: number }) => {
+  const response = await apiClient.get<ApiResponse<PlatformAdminDumpHistoryPage>>("/v1/platform-admin/dumps", { params });
+  return response.data.data;
+};
+
+export const cancelDumpRequest = async (id: number) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminDumpRequest>>(`/v1/platform-admin/dumps/${id}/cancel`);
+  return response.data.data;
+};
+
+export const retryDumpRequest = async (id: number) => {
+  const response = await apiClient.post<ApiResponse<PlatformAdminDumpRequest>>(`/v1/platform-admin/dumps/${id}/retry`);
+  return response.data.data;
+};
+
+export const deleteDumpRequest = async (id: number) => {
+  const response = await apiClient.delete<ApiResponse<{ deleted: boolean; id: number }>>(`/v1/platform-admin/dumps/${id}`);
   return response.data.data;
 };
 

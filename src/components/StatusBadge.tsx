@@ -14,7 +14,8 @@ export const StatusBadge = ({ label }: { label?: string | null }) => {
         normalized === "ACTIVE" && "status-badge-active",
         normalized === "INACTIVE" && "status-badge-muted",
         normalized === "UNKNOWN" && "status-badge-muted",
-        !["PAID", "PARTIAL", "UNPAID", "SENT", "FAILED", "PENDING", "ACTIVE", "INACTIVE", "UNKNOWN", "DELETED"].includes(normalized) &&
+        normalized === "CANCELLED" && "status-badge-muted",
+        !["PAID", "PARTIAL", "UNPAID", "SENT", "FAILED", "PENDING", "ACTIVE", "INACTIVE", "UNKNOWN", "DELETED", "CANCELLED"].includes(normalized) &&
           "status-badge-active"
       )}
     >

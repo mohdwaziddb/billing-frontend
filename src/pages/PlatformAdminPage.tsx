@@ -1,4 +1,4 @@
-import { Bot, Building2, CheckCircle2, Download, Eye, KeyRound, LoaderCircle, Power, RefreshCw, Settings, XCircle } from "lucide-react";
+import { Bot, Building2, CheckCircle2, Database, Download, Eye, FileText, KeyRound, LoaderCircle, Power, RefreshCw, RotateCcw, Settings, Square, Trash2, XCircle } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -15,13 +15,17 @@ import {
   getPlatformAdminCompanyDetails,
   getPlatformAdminDashboard,
   getPlatformAdminSettings,
+  cancelDumpRequest,
+  deleteDumpRequest,
   queueDumpRequest,
   readDumpDownloadError,
+  retryDumpRequest,
   resetSuperAdminPassword,
   updatePlatformAdminSettings,
   validateDumpDatabase
 } from "../api/platformAdmin";
 import { Button } from "../components/Button";
+import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { applyVisibleColumns, CommonColumnSelector } from "../components/CommonColumnSelector";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { GlassCard } from "../components/GlassCard";
@@ -37,7 +41,7 @@ import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatDuration, formatTime } from "../lib/format";
 import { notificationService } from "../services/notificationService";
 import type { PageResponse, PlatformAdminCompany, PlatformAdminCompanyDetails, PlatformAdminDashboardSummary, PlatformAdminDumpMode, PlatformAdminDumpRequest, PlatformAdminDumpStats, PlatformAdminSettings as PlatformAdminSettingsType } from "../types/api";
 
@@ -126,11 +130,17 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [dumpValidationMessage, setDumpValidationMessage] = useState("");
   const [dumpQueueing, setDumpQueueing] = useState(false);
   const [dumpHistory, setDumpHistory] = useState<PlatformAdminDumpRequest[]>([]);
+  const [dumpHistoryTotal, setDumpHistoryTotal] = useState(0);
+  const [dumpPage, setDumpPage] = useState(0);
+  const [dumpPageSize, setDumpPageSize] = useState(10);
   const [dumpHistoryLoading, setDumpHistoryLoading] = useState(false);
+  const [dumpActionId, setDumpActionId] = useState<number | null>(null);
   const [dumpStats, setDumpStats] = useState<PlatformAdminDumpStats | null>(null);
-  const [dumpDateFilter, setDumpDateFilter] = useState("");
+  const [dumpDateFilter, setDumpDateFilter] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [dumpStatusFilter, setDumpStatusFilter] = useState("");
   const [dumpDownloadingId, setDumpDownloadingId] = useState<number | null>(null);
   const [dumpExpandedErrorId, setDumpExpandedErrorId] = useState<number | null>(null);
+  const [dumpDeleteTarget, setDumpDeleteTarget] = useState<PlatformAdminDumpRequest | null>(null);
   const dumpActiveCount = dumpHistory.filter((item) => item.status === "QUEUED" || item.status === "RUNNING").length;
   const { setApiError } = useApiMessage();
 
@@ -327,7 +337,8 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       void loadDumpHistory().catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [mode, dumpActiveCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, dumpActiveCount, dumpStatusFilter, dumpDateFilter]);
 
   useEffect(() => {
     if (summaryModal) {
@@ -433,12 +444,15 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     }));
   };
 
-  const loadDumpHistory = async () => {
+  const loadDumpHistory = async (page = dumpPage, size = dumpPageSize) => {
     const [history, stats] = await Promise.all([
-      getDumpHistory({ date: dumpDateFilter || undefined }),
+      getDumpHistory({ date: dumpDateFilter || undefined, status: dumpStatusFilter || undefined, page, size }),
       getDumpStats()
     ]);
-    setDumpHistory(history);
+    setDumpHistory(history.records);
+    setDumpHistoryTotal(history.total);
+    setDumpPage(history.page);
+    setDumpPageSize(history.size);
     setDumpStats(stats);
   };
 
@@ -494,6 +508,64 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     } finally {
       setDumpDownloadingId(null);
     }
+  };
+
+  const stopDump = async (item: PlatformAdminDumpRequest) => {
+    setDumpActionId(item.id);
+    try {
+      await cancelDumpRequest(item.id);
+      notificationService.showSuccess(`Dump #${item.id} stopped`);
+      await loadDumpHistory().catch((err) => setApiError(err, "Unable to load dump history"));
+    } catch (err) {
+      setApiError(err, "Unable to stop dump");
+    } finally {
+      setDumpActionId(null);
+    }
+  };
+
+  const retryDump = async (item: PlatformAdminDumpRequest) => {
+    setDumpActionId(item.id);
+    try {
+      await retryDumpRequest(item.id);
+      notificationService.showSuccess(`Dump queued again for '${item.databaseName}'`);
+      await loadDumpHistory().catch((err) => setApiError(err, "Unable to load dump history"));
+    } catch (err) {
+      setApiError(err, "Unable to retry dump");
+    } finally {
+      setDumpActionId(null);
+    }
+  };
+
+  const deleteDumpRow = async (item: PlatformAdminDumpRequest) => {
+    setDumpActionId(item.id);
+    try {
+      await deleteDumpRequest(item.id);
+      notificationService.showSuccess(`Dump #${item.id} deleted`);
+      await loadDumpHistory().catch((err) => setApiError(err, "Unable to load dump history"));
+    } catch (err) {
+      setApiError(err, "Unable to delete dump");
+    } finally {
+      setDumpActionId(null);
+    }
+  };
+
+  const dumpTotalPages = Math.max(1, Math.ceil(dumpHistoryTotal / Math.max(1, dumpPageSize)));
+  const dumpPageNumbers = (() => {
+    const pages: number[] = [];
+    const start = Math.max(0, Math.min(dumpPage - 2, dumpTotalPages - 5));
+    const end = Math.min(dumpTotalPages, start + 5);
+    for (let page = start; page < end; page += 1) {
+      pages.push(page);
+    }
+    return pages;
+  })();
+
+  const gotoDumpPage = (page: number) => {
+    const target = Math.max(0, Math.min(dumpTotalPages - 1, page));
+    setDumpHistoryLoading(true);
+    void loadDumpHistory(target, dumpPageSize)
+      .catch((err) => setApiError(err, "Unable to load dump history"))
+      .finally(() => setDumpHistoryLoading(false));
   };
 
   return (
@@ -606,93 +678,104 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
 
       {mode === "dumps" ? (
         <div className="space-y-4">
-          <GlassCard className="px-6 py-4">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-              <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Today</span>
-              <span><span className="font-bold text-slate-950">{dumpStats?.totalDumps ?? 0}</span> <span className="text-slate-500">Total</span></span>
-              <span><span className="font-bold text-emerald-600">{dumpStats?.completed ?? 0}</span> <span className="text-slate-500">Completed</span></span>
-              <span><span className="font-bold text-amber-600">{dumpStats?.inProgress ?? 0}</span> <span className="text-slate-500">In Progress</span></span>
-              <span><span className="font-bold text-rose-600">{dumpStats?.failed ?? 0}</span> <span className="text-slate-500">Failed</span></span>
-              <span><span className="font-bold text-violet-600">{dumpStats?.activeUsers ?? 0}</span> <span className="text-slate-500">Active Users</span></span>
-              <span className="ml-auto text-xs text-slate-500">
-                {(dumpStats?.perUser ?? []).length === 0
-                  ? "No dumps today"
-                  : (dumpStats?.perUser ?? []).map((row) => `${row.username || "Unknown"} (${row.dumps})`).join(" • ")}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="flex items-center gap-4 rounded-2xl bg-blue-50 p-5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600"><Database size={22} /></span>
+              <span>
+                <span className="block text-2xl font-extrabold text-blue-600">{dumpStats?.totalDumps ?? 0}</span>
+                <span className="text-sm font-medium text-slate-500">Total Dumps</span>
               </span>
             </div>
-          </GlassCard>
-          <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
+            <div className="flex items-center gap-4 rounded-2xl bg-emerald-50 p-5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><CheckCircle2 size={22} /></span>
+              <span>
+                <span className="block text-2xl font-extrabold text-emerald-600">{dumpStats?.completed ?? 0}</span>
+                <span className="text-sm font-medium text-slate-500">Completed</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-4 rounded-2xl bg-amber-50 p-5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600"><LoaderCircle size={22} /></span>
+              <span>
+                <span className="block text-2xl font-extrabold text-amber-600">{dumpStats?.inProgress ?? 0}</span>
+                <span className="text-sm font-medium text-slate-500">In Progress</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-4 rounded-2xl bg-rose-50 p-5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600"><XCircle size={22} /></span>
+              <span>
+                <span className="block text-2xl font-extrabold text-rose-600">{dumpStats?.failed ?? 0}</span>
+                <span className="text-sm font-medium text-slate-500">Failed</span>
+              </span>
+            </div>
+          </div>
+          <div className="space-y-4">
           <GlassCard className="p-6 md:p-7">
             <SectionHeader title="New Dump Request" subtitle="Configure and queue a database dump." />
-            <div className="space-y-4">
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500"><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--theme-color)] text-[10px] text-white">1</span>Select MySQL server</p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+              <p className="whitespace-nowrap rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
+                Server: <span className="text-slate-950">{(dumpForm.instance || dumpInstances[0]) ?? "localhost:3306"}</span>
+              </p>
+              {dumpInstances.length > 1 ? (
+                <div className="w-full lg:max-w-[220px]">
+                  <Select
+                    aria-label="Select MySQL server"
+                    value={dumpForm.instance}
+                    options={dumpInstances.map((host) => ({ label: host, value: host }))}
+                    onChange={(event) => setDumpForm((current) => ({ ...current, instance: event.target.value }))}
+                  />
+                </div>
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <Input
+                  aria-label="Database name"
+                  placeholder="Database name (e.g. gyanbharti)"
+                  list="dump-database-suggestions"
+                  value={dumpForm.database}
+                  onChange={(event) => {
+                    setDumpForm((current) => ({ ...current, database: event.target.value }));
+                    setDumpValidationMessage("");
+                  }}
+                />
+                <datalist id="dump-database-suggestions">
+                  {dumpDatabases.map((db) => (
+                    <option key={db.databaseName} value={db.databaseName}>
+                      {db.companyCode ? `${db.companyCode} (${db.status})` : "catalog"}
+                    </option>
+                  ))}
+                </datalist>
+              </div>
+              <div className="w-full lg:max-w-[190px]">
                 <Select
-                  value={dumpForm.instance}
-                  options={dumpInstances.map((host) => ({ label: host, value: host }))}
-                  onChange={(event) => setDumpForm((current) => ({ ...current, instance: event.target.value }))}
+                  aria-label="Dump mode"
+                  value={dumpForm.mode}
+                  options={[
+                    { label: "Full Dump", value: "FULL" },
+                    { label: "Include tables", value: "INCLUDE" },
+                    { label: "Exclude tables", value: "EXCLUDE" }
+                  ]}
+                  onChange={(event) => setDumpForm((current) => ({ ...current, mode: event.target.value as PlatformAdminDumpMode }))}
                 />
               </div>
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500"><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--theme-color)] text-[10px] text-white">2</span>Database name</p>
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <Input
-                      placeholder="e.g. gyanbharti"
-                      list="dump-database-suggestions"
-                      value={dumpForm.database}
-                      onChange={(event) => {
-                        setDumpForm((current) => ({ ...current, database: event.target.value }));
-                        setDumpValidationMessage("");
-                      }}
-                    />
-                    <datalist id="dump-database-suggestions">
-                      {dumpDatabases.map((db) => (
-                        <option key={db.databaseName} value={db.databaseName}>
-                          {db.companyCode ? `${db.companyCode} (${db.status})` : "catalog"}
-                        </option>
-                      ))}
-                    </datalist>
-                  </div>
-                  <Button type="button" variant="secondary" disabled={dumpValidating || !dumpForm.database.trim()} onClick={() => void validateDumpForm()}>
-                    {dumpValidating ? <LoaderCircle className="animate-spin" size={15} /> : null} Validate
-                  </Button>
-                </div>
-                {dumpValidationMessage ? <p className="mt-2 text-xs font-semibold text-emerald-600">{dumpValidationMessage}</p> : null}
-              </div>
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500"><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--theme-color)] text-[10px] text-white">3</span>Dump mode</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["INCLUDE", "EXCLUDE", "FULL"] as const).map((dumpMode) => (
-                    <button
-                      key={dumpMode}
-                      type="button"
-                      onClick={() => setDumpForm((current) => ({ ...current, mode: dumpMode }))}
-                      className={`rounded-2xl border px-2 py-3 text-center transition ${dumpForm.mode === dumpMode ? "border-[var(--theme-color)] bg-[color-mix(in_srgb,var(--theme-color)_8%,white)]" : "border-slate-200 bg-white hover:border-slate-300"}`}
-                    >
-                      <p className="text-xs font-bold text-slate-800">{dumpMode === "FULL" ? "Full Dump" : dumpMode === "INCLUDE" ? "Include" : "Exclude"}</p>
-                      <p className="mt-0.5 text-[11px] text-slate-500">{dumpMode === "FULL" ? "Entire database" : dumpMode === "INCLUDE" ? "Specific tables only" : "All except selected"}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
               {dumpForm.mode !== "FULL" ? (
-                <div>
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Table names</p>
-                  <textarea
-                    className="min-h-[84px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)]"
+                <div className="min-w-0 flex-1">
+                  <Input
+                    aria-label="Table names"
                     placeholder="orders, users, products (comma-separated)"
-                    rows={3}
                     value={dumpForm.tables}
                     onChange={(event) => setDumpForm((current) => ({ ...current, tables: event.target.value }))}
                   />
-                  <p className="mt-1 text-[11px] text-slate-500">Separate table names with commas. Each will be validated server-side.</p>
                 </div>
               ) : null}
-              <Button type="button" disabled={dumpQueueing || !dumpForm.database.trim()} onClick={() => void queueDumpForm()} className="w-full">
-                {dumpQueueing ? <LoaderCircle className="animate-spin" size={16} /> : null} Queue Dump Request
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" disabled={dumpValidating || !dumpForm.database.trim()} onClick={() => void validateDumpForm()}>
+                  {dumpValidating ? <LoaderCircle className="animate-spin" size={15} /> : null} Validate
+                </Button>
+                <Button type="button" disabled={dumpQueueing || !dumpForm.database.trim()} onClick={() => void queueDumpForm()}>
+                  {dumpQueueing ? <LoaderCircle className="animate-spin" size={16} /> : null} Queue Dump Request
+                </Button>
+              </div>
             </div>
+            {dumpValidationMessage ? <p className="mt-2 text-xs font-semibold text-emerald-600">{dumpValidationMessage}</p> : null}
           </GlassCard>
 
           <GlassCard className="p-6 md:p-7">
@@ -702,11 +785,36 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
                 <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
                   <span className={`h-2 w-2 rounded-full ${dumpActiveCount > 0 ? "animate-pulse bg-emerald-500" : "bg-slate-300"}`} /> Live
                 </span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {[
+                    { label: "All", value: "" },
+                    { label: "Completed", value: "COMPLETED" },
+                    { label: "Failed", value: "FAILED" },
+                    { label: "Running", value: "RUNNING" },
+                    { label: "Queued", value: "QUEUED" },
+                    { label: "Cancelled", value: "CANCELLED" }
+                  ].map((chip) => (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => {
+                        setDumpStatusFilter(chip.value);
+                        setDumpPage(0);
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${dumpStatusFilter === chip.value ? "bg-[var(--theme-color)] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
                 <Input
                   type="date"
                   aria-label="Filter by date"
                   value={dumpDateFilter}
-                  onChange={(event) => setDumpDateFilter(event.target.value)}
+                  onChange={(event) => {
+                    setDumpDateFilter(event.target.value);
+                    setDumpPage(0);
+                  }}
                 />
                 <Button
                   type="button"
@@ -725,14 +833,19 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
             </div>
             {dumpHistoryLoading ? <LoadingPanel label="Loading dump history..." /> : null}
             <Table
-              data={dumpHistory}
+              data={dumpHistory.map((item, index) => ({ ...item, rowNumber: dumpPage * dumpPageSize + index + 1 }))}
               emptyText="No dump requests yet. Use the form on the left to get started."
               columns={[
+                {
+                  key: "index",
+                  header: "#",
+                  render: (item) => <span className="text-slate-500">{item.rowNumber}</span>
+                },
                 {
                   key: "database",
                   header: "Database",
                   render: (item) => (
-                    <div className="min-w-[160px]">
+                    <div className="min-w-[140px]">
                       <p className="font-semibold text-slate-950">{item.databaseName}</p>
                       <p className="mt-0.5 text-xs text-slate-500">{item.mode} • {item.companyCode ?? "catalog"}</p>
                     </div>
@@ -744,7 +857,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
                   render: (item) => (
                     <div>
                       <StatusBadge label={item.status} />
-                      {item.status === "FAILED" && item.error ? (
+                      {(item.status === "FAILED" || item.status === "CANCELLED") && item.error ? (
                         <button
                           type="button"
                           title={item.error}
@@ -773,28 +886,155 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
                   )
                 },
                 {
-                  key: "actions",
+                  key: "started",
+                  header: "Started",
+                  render: (item) => <span className="whitespace-nowrap text-xs text-slate-600">{item.startedAt ? formatTime(item.startedAt) : "--"}</span>
+                },
+                {
+                  key: "duration",
+                  header: "Duration",
+                  render: (item) => (
+                    <span className="whitespace-nowrap text-xs text-slate-600">
+                      {item.startedAt ? formatDuration(item.startedAt, item.finishedAt) : "--"}
+                    </span>
+                  )
+                },
+                {
+                  key: "file",
                   header: "File",
-                  render: (item) => item.status === "COMPLETED" && item.hasFile ? (
-                    <Button
+                  render: (item) => item.status === "COMPLETED" && item.hasFile && item.fileName ? (
+                    <button
                       type="button"
-                      variant="secondary"
-                      disabled={dumpDownloadingId === item.id}
+                      title={`Download ${item.fileName}`}
                       onClick={() => void downloadDump(item)}
+                      className="flex max-w-[180px] items-center gap-1.5 text-left text-xs font-semibold text-blue-600 hover:underline"
                     >
-                      {dumpDownloadingId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <Download size={15} />} Download
-                    </Button>
+                      <FileText size={14} className="shrink-0" />
+                      <span className="truncate">{item.fileName}</span>
+                    </button>
                   ) : (
-                    <span className="text-xs text-slate-400">{item.status === "COMPLETED" ? "Expired" : "--"}</span>
+                    <span className="text-xs text-slate-400">--</span>
+                  )
+                },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  render: (item) => (
+                    <span className="flex items-center gap-1">
+                      {(item.status === "QUEUED" || item.status === "RUNNING") && !item.hasFile ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon-sm"
+                          title={`Stop dump #${item.id}`}
+                          aria-label={`Stop dump #${item.id}`}
+                          disabled={dumpActionId === item.id}
+                          onClick={() => void stopDump(item)}
+                        >
+                          {dumpActionId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <Square size={14} />}
+                        </Button>
+                      ) : null}
+                      {(item.status === "FAILED" || item.status === "CANCELLED") && !item.hasFile ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon-sm"
+                          title={`Retry dump for ${item.databaseName}`}
+                          aria-label={`Retry dump for ${item.databaseName}`}
+                          disabled={dumpActionId === item.id}
+                          onClick={() => void retryDump(item)}
+                        >
+                          {dumpActionId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <RotateCcw size={15} />}
+                        </Button>
+                      ) : null}
+                      {dumpActionId !== item.id && (item.status === "COMPLETED" || item.status === "FAILED" || item.status === "CANCELLED") ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          title={`Delete dump #${item.id}`}
+                          aria-label={`Delete dump #${item.id}`}
+                          disabled={dumpActionId === item.id}
+                          onClick={() => setDumpDeleteTarget(item)}
+                        >
+                          <Trash2 size={15} className="text-rose-500" />
+                        </Button>
+                      ) : null}
+                      {dumpActionId === item.id && item.status !== "COMPLETED" ? (
+                        <LoaderCircle className="animate-spin text-slate-400" size={15} />
+                      ) : null}
+                    </span>
                   )
                 }
               ]}
             />
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+                Show
+                <select
+                  aria-label="Entries per page"
+                  value={dumpPageSize}
+                  onChange={(event) => {
+                    const size = Number(event.target.value) || 10;
+                    setDumpPageSize(size);
+                    setDumpPage(0);
+                    setDumpHistoryLoading(true);
+                    void loadDumpHistory(0, size)
+                      .catch((err) => setApiError(err, "Unable to load dump history"))
+                      .finally(() => setDumpHistoryLoading(false));
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none"
+                >
+                  {[10, 25, 50].map((size) => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+                entries
+              </label>
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="secondary" size="icon-sm" aria-label="Previous page" disabled={dumpPage <= 0} onClick={() => gotoDumpPage(dumpPage - 1)}>
+                  ‹
+                </Button>
+                {dumpPageNumbers.map((page) => (
+                  <Button
+                    key={page}
+                    type="button"
+                    variant={page === dumpPage ? "primary" : "secondary"}
+                    size="icon-sm"
+                    aria-label={`Page ${page + 1}`}
+                    onClick={() => gotoDumpPage(page)}
+                  >
+                    {page + 1}
+                  </Button>
+                ))}
+                <Button type="button" variant="secondary" size="icon-sm" aria-label="Next page" disabled={dumpPage >= dumpTotalPages - 1} onClick={() => gotoDumpPage(dumpPage + 1)}>
+                  ›
+                </Button>
+              </div>
+            </div>
           </GlassCard>
 
           </div>
         </div>
       ) : null}
+
+      <CommonDeleteModal
+        open={dumpDeleteTarget !== null}
+        loading={dumpDeleteTarget !== null && dumpActionId === dumpDeleteTarget.id}
+        title="Delete dump request?"
+        description={dumpDeleteTarget === null
+          ? "Do you want to delete this dump request?"
+          : `Dump #${dumpDeleteTarget.id} (${dumpDeleteTarget.databaseName}) and its file will be permanently deleted. This cannot be undone.`}
+        onCancel={() => setDumpDeleteTarget(null)}
+        onConfirm={() => {
+          const target = dumpDeleteTarget;
+          if (target === null) {
+            return;
+          }
+          setDumpDeleteTarget(null);
+          void deleteDumpRow(target);
+        }}
+      />
 
       <CompanySummaryModal
         state={summaryModal}
@@ -1074,5 +1314,5 @@ const pageMeta: Record<Mode, { title: string; subtitle: string }> = {
   companies: { title: "Companies", subtitle: "Tenant lifecycle management for the SaaS platform." },
   details: { title: "Company Details", subtitle: "Company-level ownership, activity, and access diagnostics." },
   settings: { title: "Platform Settings", subtitle: "Credentials and platform-level branding values." },
-  dumps: { title: "Dump Manager", subtitle: "Queued MySQL dumps for tenant databases and billing_common." }
+  dumps: { title: "Dump Manager", subtitle: "MySQL database dumps on demand." }
 };
