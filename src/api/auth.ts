@@ -27,12 +27,16 @@ export type PasswordResetChallenge = {
   expiresInSeconds: number | null;
 };
 
-export const requestPasswordResetOtp = async (payload: { identifier: string; channel?: string }) => {
+export const requestPasswordResetOtp = async (payload: { identifier: string }) => {
   const response = await apiClient.post<ApiResponse<PasswordResetChallenge>>("/v1/auth/forgot-password/request", payload);
   return response.data.data;
 };
 
-export const confirmPasswordResetOtp = async (payload: { challengeId: number; otp: string; newPassword: string }) => {
+export const verifyPasswordResetOtp = async (payload: { challengeId: number; otp: string }) => {
+  await apiClient.post("/v1/auth/forgot-password/verify", payload);
+};
+
+export const confirmPasswordResetOtp = async (payload: { challengeId: number; otp: string; newPassword: string; confirmPassword: string }) => {
   await apiClient.post("/v1/auth/forgot-password/confirm", payload);
 };
 

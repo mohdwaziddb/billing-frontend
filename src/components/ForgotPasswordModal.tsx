@@ -1,6 +1,6 @@
-import { Eye, EyeOff, KeyRound, Loader2, Lock, Mail, Smartphone, User } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Loader2, Lock, User } from "lucide-react";
 import { useEffect, useState } from "react";
-import { confirmPasswordResetOtp, requestPasswordResetOtp } from "../api/auth";
+import { confirmPasswordResetOtp, requestPasswordResetOtp, verifyPasswordResetOtp } from "../api/auth";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { notificationService } from "../services/notificationService";
 import { Button } from "./Button";
@@ -103,9 +103,8 @@ const BrandPasswordField = ({
 };
 
 export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone = "theme" }: ForgotPasswordModalProps) => {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [identifier, setIdentifier] = useState(initialUsername);
-  const [channel, setChannel] = useState("");
   const [challengeId, setChallengeId] = useState<number | null>(null);
   const [maskedDestination, setMaskedDestination] = useState("");
   const [otp, setOtp] = useState("");
@@ -131,7 +130,6 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
     if (open) {
       setStep(1);
       setIdentifier(initialUsername);
-      setChannel("");
       setChallengeId(null);
       setMaskedDestination("");
       setOtp("");
@@ -160,7 +158,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
     }
     try {
       setSaving(true);
-      const challenge = await requestPasswordResetOtp({ identifier: value, channel: channel || undefined });
+      const challenge = await requestPasswordResetOtp({ identifier: value });
       // 60s resend cooldown (mirrors backend) to stop OTP spam/flooding.
       setCooldownLeft(60);
       if (challenge?.challengeId == null) {
@@ -179,7 +177,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
     }
   };
 
-  const confirmReset = async (event: React.FormEvent) => {
+  const verifyOtp = async (event: React.FormEvent) => {
     event.preventDefault();
     clearMessage();
     if (challengeId == null) {
@@ -187,8 +185,28 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
       setStep(1);
       return;
     }
-    if (otp.trim().length < 4) {
-      notificationService.showError("Enter the OTP you received.");
+    if (otp.trim().length !== 6) {
+      notificationService.showError("Enter the 6-digit OTP you received on your email.");
+      return;
+    }
+    try {
+      setSaving(true);
+      await verifyPasswordResetOtp({ challengeId, otp: otp.trim() });
+      setStep(3);
+      notificationService.showSuccess("OTP verified. Set your new password.");
+    } catch (err: any) {
+      setApiError(err, "Unable to verify OTP");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmReset = async (event: React.FormEvent) => {
+    event.preventDefault();
+    clearMessage();
+    if (challengeId == null) {
+      notificationService.showError("Please request a fresh OTP first.");
+      setStep(1);
       return;
     }
     if (!isStrongPassword(newPassword)) {
@@ -201,7 +219,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
     }
     try {
       setSaving(true);
-      await confirmPasswordResetOtp({ challengeId, otp: otp.trim(), newPassword });
+      await confirmPasswordResetOtp({ challengeId, otp: otp.trim(), newPassword, confirmPassword });
       notificationService.showSuccess("Password updated successfully. Please sign in again.");
       close();
     } catch (err: any) {
@@ -224,7 +242,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
               <KeyRound size={18} />
             </span>
             <p className="min-w-0 text-sm font-medium leading-6 text-slate-600">
-              Enter your account identifier. We will send a one-time password to your registered mobile or email.
+              Enter your account identifier. We will send a 6-digit one-time password to your registered email.
             </p>
           </div>
 
@@ -258,29 +276,6 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
               </div>
             </div>
           )}
-
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { value: "", label: "Auto", icon: null },
-              { value: "SMS", label: "SMS", icon: <Smartphone size={14} /> },
-              { value: "EMAIL", label: "Email", icon: <Mail size={14} /> }
-            ].map((option) => (
-              <button
-                key={option.label}
-                type="button"
-                disabled={saving}
-                onClick={() => setChannel(option.value)}
-                className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-bold transition disabled:cursor-not-allowed ${
-                  channel === option.value
-                    ? "border-[#2453d8] bg-[#2453d8]/10 text-[#2453d8]"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                {option.icon}
-                {option.label}
-              </button>
-            ))}
-          </div>
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             {isBrand ? (
@@ -319,11 +314,11 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
             )}
           </div>
         </form>
-      ) : (
+      ) : step === 2 ? (
         <form
           className="space-y-4"
           style={{ fontFamily: isBrand ? "Manrope, Inter, system-ui, sans-serif" : undefined }}
-          onSubmit={confirmReset}
+          onSubmit={verifyOtp}
         >
           <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--theme-color)] shadow-sm">
@@ -332,68 +327,38 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
             <p className="min-w-0 text-sm font-medium leading-6 text-slate-600">
               {maskedDestination
                 ? `Enter the 6-digit OTP sent to ${maskedDestination}. It expires in 10 minutes.`
-                : "Enter the 6-digit OTP. It expires in 10 minutes."}
+                : "Enter the 6-digit OTP sent to your email. It expires in 10 minutes."}
             </p>
           </div>
 
           {isBrand ? (
-            <>
-              <BrandTextField
-                id="forgot-modal-otp"
-                label="One-Time Password"
-                value={otp}
-                placeholder="6-digit OTP"
-                inputMode="numeric"
-                onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                disabled={saving}
-                icon={<KeyRound size={16} />}
-              />
-              <BrandPasswordField
-                id="forgot-modal-new-password"
-                label="New Password"
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                disabled={saving}
-              />
-              <BrandPasswordField
-                id="forgot-modal-confirm-password"
-                label="Confirm Password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                disabled={saving}
-              />
-            </>
+            <BrandTextField
+              id="forgot-modal-otp"
+              label="One-Time Password"
+              value={otp}
+              placeholder="6-digit OTP"
+              inputMode="numeric"
+              onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              disabled={saving}
+              icon={<KeyRound size={16} />}
+            />
           ) : (
-            <>
-              <div className="space-y-1.5">
-                <label htmlFor="forgot-modal-otp" className="block text-[13px] font-bold text-slate-700">
-                  One-Time Password <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  id="forgot-modal-otp"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="6-digit OTP"
-                  value={otp}
-                  disabled={saving}
-                  className="h-[50px] w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[0.3em] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] disabled:bg-slate-50"
-                  onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                />
-              </div>
-              <PasswordInput
-                label="New Password"
-                requiredMark
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
+            <div className="space-y-1.5">
+              <label htmlFor="forgot-modal-otp" className="block text-[13px] font-bold text-slate-700">
+                One-Time Password <span className="text-rose-400">*</span>
+              </label>
+              <input
+                id="forgot-modal-otp"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="6-digit OTP"
+                value={otp}
+                disabled={saving}
+                className="h-[50px] w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[0.3em] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] disabled:bg-slate-50"
+                onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
               />
-              <PasswordInput
-                label="Confirm Password"
-                requiredMark
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-              />
-            </>
+            </div>
           )}
 
           <div className="flex items-center justify-between">
@@ -423,10 +388,10 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
                   {saving ? (
                     <>
                       <Loader2 size={16} className="animate-spin" />
-                      Updating...
+                      Verifying...
                     </>
                   ) : (
-                    "Reset password"
+                    "Verify OTP"
                   )}
                 </button>
               </div>
@@ -436,10 +401,70 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
                   Close
                 </Button>
                 <Button type="submit" disabled={saving}>
-                  {saving ? "Updating..." : "Reset password"}
+                  {saving ? "Verifying..." : "Verify OTP"}
                 </Button>
               </div>
             )}
+          </div>
+        </form>
+      ) : (
+        <form
+          className="space-y-4"
+          style={{ fontFamily: isBrand ? "Manrope, Inter, system-ui, sans-serif" : undefined }}
+          onSubmit={confirmReset}
+        >
+          <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--theme-color)] shadow-sm">
+              <Lock size={16} />
+            </span>
+            <p className="min-w-0 text-sm font-medium leading-6 text-slate-600">
+              OTP verified. Set your new password below.
+            </p>
+          </div>
+
+          {isBrand ? (
+            <>
+              <BrandPasswordField
+                id="forgot-modal-new-password"
+                label="New Password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                disabled={saving}
+              />
+              <BrandPasswordField
+                id="forgot-modal-confirm-password"
+                label="Confirm New Password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                disabled={saving}
+              />
+            </>
+          ) : (
+            <>
+              <PasswordInput
+                label="New Password"
+                requiredMark
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+              />
+              <PasswordInput
+                label="Confirm New Password"
+                requiredMark
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+              />
+            </>
+          )}
+
+          <div className="flex items-center justify-end">
+            <div className="flex gap-3">
+              <Button type="button" variant="ghost" disabled={saving} onClick={close}>
+                Close
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Updating..." : "Update password"}
+              </Button>
+            </div>
           </div>
         </form>
       )}

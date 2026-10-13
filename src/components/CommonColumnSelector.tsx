@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Columns3, Settings2 } from "lucide-react";
 import { getColumnPreference, saveColumnPreference } from "../api/columnPreferences";
 import { platformAdminColumnPrefsStorage } from "../lib/storage";
@@ -29,6 +30,9 @@ export const CommonColumnSelector = ({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>(visibleColumns.length ? visibleColumns : defaultColumns);
   const selectorRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [panelStyle, setPanelStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const saveSequence = useRef(0);
 
   const normalizeColumns = (keys: string[]) => {
@@ -115,25 +119,49 @@ export const CommonColumnSelector = ({
       return;
     }
 
+    // Portal me render hota hai taaki card/table ke overflow me kate nahi.
+    // Neeche jagah na ho to button ke upar khulta hai.
+    const place = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      const width = 288;
+      const height = 380;
+      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const top = spaceBelow >= height + 8 || rect.top < height + 8
+        ? Math.min(rect.bottom + 8, window.innerHeight - 120)
+        : Math.max(8, rect.top - height - 8);
+      setPanelStyle({ top, left });
+    };
+    place();
+
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node;
-      if (!selectorRef.current?.contains(target)) {
-        setOpen(false);
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
       }
     };
+    const dismiss = () => setOpen(false);
 
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("touchstart", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("resize", dismiss);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("touchstart", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("resize", dismiss);
     };
   }, [open]);
 
@@ -166,33 +194,28 @@ export const CommonColumnSelector = ({
   const resetDefault = () => updateColumns(defaultColumns);
   const allSelectableSelected = selectableColumns.length > 0 && selectableColumns.every((key) => draft.includes(key));
 
-  return (
-    <div ref={selectorRef} className="relative">
-      <button
-        type="button"
-        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-slate-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 transition hover:border-[var(--theme-color)] hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <Columns3 size={15} />
-        Select Column
-      </button>
-      {open ? (
-        <div className="absolute right-0 z-30 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)] dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
+  const panel = open
+    ? createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[1100] w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]"
+          style={{ top: panelStyle.top, left: panelStyle.left }}
+        >
+          <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5">
             <Settings2 size={15} className="text-[var(--theme-color)]" />
-            <p className="text-sm font-bold text-slate-950 dark:text-white">Select Column</p>
+            <p className="text-sm font-bold text-slate-950">Select Column</p>
           </div>
-          <div className="flex gap-2 border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
+          <div className="flex gap-2 border-b border-slate-100 px-3 py-2.5">
             <button
               type="button"
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
               onClick={allSelectableSelected ? unselectAll : selectAll}
             >
               {allSelectableSelected ? "Unselect All" : "Select All"}
             </button>
             <button
               type="button"
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
               onClick={resetDefault}
             >
               Reset Default
@@ -200,7 +223,7 @@ export const CommonColumnSelector = ({
           </div>
           <div className="max-h-72 overflow-y-auto p-2">
             {availableColumns.map((column) => (
-              <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
+              <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 <input
                   type="checkbox"
                   className="h-4 w-4 rounded border-slate-300 text-[var(--theme-color)]"
@@ -212,8 +235,23 @@ export const CommonColumnSelector = ({
               </label>
             ))}
           </div>
-        </div>
-      ) : null}
+        </div>,
+        document.body
+      )
+    : null;
+
+  return (
+    <div ref={selectorRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-slate-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 transition hover:border-[var(--theme-color)] hover:bg-slate-50 hover:text-slate-950"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Columns3 size={15} />
+        Select Column
+      </button>
+      {panel}
     </div>
   );
 };

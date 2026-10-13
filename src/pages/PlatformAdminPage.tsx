@@ -141,6 +141,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [dumpDownloadingId, setDumpDownloadingId] = useState<number | null>(null);
   const [dumpExpandedErrorId, setDumpExpandedErrorId] = useState<number | null>(null);
   const [dumpDeleteTarget, setDumpDeleteTarget] = useState<PlatformAdminDumpRequest | null>(null);
+  const [visibleDumpColumns, setVisibleDumpColumns] = useState<string[]>([]);
   const dumpActiveCount = dumpHistory.filter((item) => item.status === "QUEUED" || item.status === "RUNNING").length;
   const { setApiError } = useApiMessage();
 
@@ -568,6 +569,153 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       .finally(() => setDumpHistoryLoading(false));
   };
 
+  type DumpHistoryRow = PlatformAdminDumpRequest & { rowNumber: number };
+
+  const dumpColumns: Array<{ key: string; header: string; locked?: boolean; render: (item: DumpHistoryRow) => ReactNode }> = useMemo(() => [
+    {
+      key: "index",
+      header: "#",
+      render: (item: DumpHistoryRow) => <span className="text-slate-500">{item.rowNumber}</span>
+    },
+    {
+      key: "database",
+      header: "Database",
+      locked: true,
+      render: (item: DumpHistoryRow) => (
+        <div className="min-w-[140px]">
+          <p className="font-semibold text-slate-950">{item.databaseName}</p>
+          <p className="mt-0.5 text-xs text-slate-500">{item.mode} • {item.companyCode ?? "catalog"}</p>
+        </div>
+      )
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (item: DumpHistoryRow) => (
+        <div>
+          <StatusBadge label={item.status} />
+          {(item.status === "FAILED" || item.status === "CANCELLED") && item.error ? (
+            <button
+              type="button"
+              title={item.error}
+              onClick={() => setDumpExpandedErrorId((current) => (current === item.id ? null : item.id))}
+              className={`mt-1 block max-w-[220px] text-left text-[11px] text-rose-600 hover:underline ${dumpExpandedErrorId === item.id ? "whitespace-pre-wrap break-words" : "truncate"}`}
+            >
+              {item.error}
+            </button>
+          ) : null}
+        </div>
+      )
+    },
+    {
+      key: "size",
+      header: "Size",
+      render: (item: DumpHistoryRow) => <span className="whitespace-nowrap">{item.hasFile ? formatDumpBytes(item.fileSize) : "--"}</span>
+    },
+    {
+      key: "requested",
+      header: "Requested",
+      render: (item: DumpHistoryRow) => (
+        <div className="min-w-[150px]">
+          <p className="text-xs font-semibold text-slate-700">{item.requestedBy ?? "--"}</p>
+          <p className="text-[11px] text-slate-500">{formatDateTime(item.createdAt)}</p>
+        </div>
+      )
+    },
+    {
+      key: "started",
+      header: "Started",
+      render: (item: DumpHistoryRow) => <span className="whitespace-nowrap text-xs text-slate-600">{item.startedAt ? formatTime(item.startedAt) : "--"}</span>
+    },
+    {
+      key: "duration",
+      header: "Duration",
+      render: (item: DumpHistoryRow) => (
+        <span className="whitespace-nowrap text-xs text-slate-600">
+          {item.startedAt ? formatDuration(item.startedAt, item.finishedAt) : "--"}
+        </span>
+      )
+    },
+    {
+      key: "file",
+      header: "File",
+      render: (item: DumpHistoryRow) => item.status === "COMPLETED" && item.hasFile && item.fileName ? (
+                    <button
+                      type="button"
+                      title={`Download ${item.fileName}`}
+                      onClick={() => void downloadDump(item)}
+                      className="flex min-w-[160px] max-w-[240px] items-center gap-1.5 text-left text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      <FileText size={14} className="shrink-0" />
+                      <span className="truncate">{item.fileName}</span>
+                    </button>
+      ) : (
+        <span className="text-xs text-slate-400">--</span>
+      )
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      locked: true,
+      render: (item: DumpHistoryRow) => (
+        <span className="flex items-center gap-1">
+          {(item.status === "QUEUED" || item.status === "RUNNING") && !item.hasFile ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              title={`Stop dump #${item.id}`}
+              aria-label={`Stop dump #${item.id}`}
+              disabled={dumpActionId === item.id}
+              onClick={() => void stopDump(item)}
+            >
+              {dumpActionId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <Square size={14} />}
+            </Button>
+          ) : null}
+          {(item.status === "FAILED" || item.status === "CANCELLED") && !item.hasFile ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon-sm"
+              title={`Retry dump for ${item.databaseName}`}
+              aria-label={`Retry dump for ${item.databaseName}`}
+              disabled={dumpActionId === item.id}
+              onClick={() => void retryDump(item)}
+            >
+              {dumpActionId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <RotateCcw size={15} />}
+            </Button>
+          ) : null}
+          {dumpActionId !== item.id && (item.status === "COMPLETED" || item.status === "FAILED" || item.status === "CANCELLED") ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              title={`Delete dump #${item.id}`}
+              aria-label={`Delete dump #${item.id}`}
+              disabled={dumpActionId === item.id}
+              onClick={() => setDumpDeleteTarget(item)}
+            >
+              <Trash2 size={15} className="text-rose-500" />
+            </Button>
+          ) : null}
+          {dumpActionId === item.id && item.status !== "COMPLETED" ? (
+            <LoaderCircle className="animate-spin text-slate-400" size={15} />
+          ) : null}
+        </span>
+      )
+    }
+  ], [dumpPage, dumpPageSize, dumpDownloadingId, dumpActionId, dumpExpandedErrorId]);
+
+  const visibleDumpTableColumns = useMemo(
+    () => applyVisibleColumns(dumpColumns, visibleDumpColumns),
+    [dumpColumns, visibleDumpColumns]
+  );
+
+  const dumpColumnOptions = useMemo(
+    () => dumpColumns.map(({ key, header, locked }) => ({ key, header, locked })),
+    [dumpColumns]
+  );
+
   return (
     <div className="space-y-4 pb-6">
       <Header title={pageMeta[mode].title} subtitle={pageMeta[mode].subtitle} />
@@ -829,144 +977,14 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
                 >
                   <RefreshCw size={15} /> Refresh
                 </Button>
+                <CommonColumnSelector tableName="PLATFORM_DUMPS" availableColumns={dumpColumnOptions} visibleColumns={visibleDumpColumns} onApply={setVisibleDumpColumns} localOnly />
               </div>
             </div>
             {dumpHistoryLoading ? <LoadingPanel label="Loading dump history..." /> : null}
             <Table
               data={dumpHistory.map((item, index) => ({ ...item, rowNumber: dumpPage * dumpPageSize + index + 1 }))}
               emptyText="No dump requests yet. Use the form on the left to get started."
-              columns={[
-                {
-                  key: "index",
-                  header: "#",
-                  render: (item) => <span className="text-slate-500">{item.rowNumber}</span>
-                },
-                {
-                  key: "database",
-                  header: "Database",
-                  render: (item) => (
-                    <div className="min-w-[140px]">
-                      <p className="font-semibold text-slate-950">{item.databaseName}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{item.mode} • {item.companyCode ?? "catalog"}</p>
-                    </div>
-                  )
-                },
-                {
-                  key: "status",
-                  header: "Status",
-                  render: (item) => (
-                    <div>
-                      <StatusBadge label={item.status} />
-                      {(item.status === "FAILED" || item.status === "CANCELLED") && item.error ? (
-                        <button
-                          type="button"
-                          title={item.error}
-                          onClick={() => setDumpExpandedErrorId((current) => (current === item.id ? null : item.id))}
-                          className={`mt-1 block max-w-[220px] text-left text-[11px] text-rose-600 hover:underline ${dumpExpandedErrorId === item.id ? "whitespace-pre-wrap break-words" : "truncate"}`}
-                        >
-                          {item.error}
-                        </button>
-                      ) : null}
-                    </div>
-                  )
-                },
-                {
-                  key: "size",
-                  header: "Size",
-                  render: (item) => <span className="whitespace-nowrap">{item.hasFile ? formatDumpBytes(item.fileSize) : "--"}</span>
-                },
-                {
-                  key: "requested",
-                  header: "Requested",
-                  render: (item) => (
-                    <div className="min-w-[150px]">
-                      <p className="text-xs font-semibold text-slate-700">{item.requestedBy ?? "--"}</p>
-                      <p className="text-[11px] text-slate-500">{formatDateTime(item.createdAt)}</p>
-                    </div>
-                  )
-                },
-                {
-                  key: "started",
-                  header: "Started",
-                  render: (item) => <span className="whitespace-nowrap text-xs text-slate-600">{item.startedAt ? formatTime(item.startedAt) : "--"}</span>
-                },
-                {
-                  key: "duration",
-                  header: "Duration",
-                  render: (item) => (
-                    <span className="whitespace-nowrap text-xs text-slate-600">
-                      {item.startedAt ? formatDuration(item.startedAt, item.finishedAt) : "--"}
-                    </span>
-                  )
-                },
-                {
-                  key: "file",
-                  header: "File",
-                  render: (item) => item.status === "COMPLETED" && item.hasFile && item.fileName ? (
-                    <button
-                      type="button"
-                      title={`Download ${item.fileName}`}
-                      onClick={() => void downloadDump(item)}
-                      className="flex max-w-[180px] items-center gap-1.5 text-left text-xs font-semibold text-blue-600 hover:underline"
-                    >
-                      <FileText size={14} className="shrink-0" />
-                      <span className="truncate">{item.fileName}</span>
-                    </button>
-                  ) : (
-                    <span className="text-xs text-slate-400">--</span>
-                  )
-                },
-                {
-                  key: "actions",
-                  header: "Actions",
-                  render: (item) => (
-                    <span className="flex items-center gap-1">
-                      {(item.status === "QUEUED" || item.status === "RUNNING") && !item.hasFile ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon-sm"
-                          title={`Stop dump #${item.id}`}
-                          aria-label={`Stop dump #${item.id}`}
-                          disabled={dumpActionId === item.id}
-                          onClick={() => void stopDump(item)}
-                        >
-                          {dumpActionId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <Square size={14} />}
-                        </Button>
-                      ) : null}
-                      {(item.status === "FAILED" || item.status === "CANCELLED") && !item.hasFile ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon-sm"
-                          title={`Retry dump for ${item.databaseName}`}
-                          aria-label={`Retry dump for ${item.databaseName}`}
-                          disabled={dumpActionId === item.id}
-                          onClick={() => void retryDump(item)}
-                        >
-                          {dumpActionId === item.id ? <LoaderCircle className="animate-spin" size={15} /> : <RotateCcw size={15} />}
-                        </Button>
-                      ) : null}
-                      {dumpActionId !== item.id && (item.status === "COMPLETED" || item.status === "FAILED" || item.status === "CANCELLED") ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          title={`Delete dump #${item.id}`}
-                          aria-label={`Delete dump #${item.id}`}
-                          disabled={dumpActionId === item.id}
-                          onClick={() => setDumpDeleteTarget(item)}
-                        >
-                          <Trash2 size={15} className="text-rose-500" />
-                        </Button>
-                      ) : null}
-                      {dumpActionId === item.id && item.status !== "COMPLETED" ? (
-                        <LoaderCircle className="animate-spin text-slate-400" size={15} />
-                      ) : null}
-                    </span>
-                  )
-                }
-              ]}
+              columns={visibleDumpTableColumns}
             />
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
