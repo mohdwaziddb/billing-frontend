@@ -303,7 +303,7 @@ const CommunicationHubPage = () => {
             {tab === "email" ? (
               <div className="mt-5 flex flex-col gap-3 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-end">
                 <Input label="Test Recipient Email" type="email" value={testRecipient} onChange={(event) => setTestRecipient(event.target.value)} placeholder="Defaults to company email" />
-                <div className="text-sm text-slate-500">Use the active email provider to verify delivery.</div>
+                <div className="text-sm text-slate-500">Use the active email provider to verify delivery. Some servers accept mail and bounce later — check the sender mailbox too.</div>
               </div>
             ) : tab === "sms" ? (
               <div className="mt-5 flex flex-col gap-3 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-end">
