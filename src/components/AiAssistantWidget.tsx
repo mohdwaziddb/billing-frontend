@@ -36,7 +36,7 @@ const buildCopyText = (item: ChatMessage) => {
 };
 
 export const AiAssistantWidget = () => {
-  const { sessionType, user } = useAuth();
+  const { auth, sessionType, user, refreshProfile } = useAuth();
   const chart = getChartTheme(useIsDarkMode());
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -45,6 +45,18 @@ export const AiAssistantWidget = () => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Platform-admin can disable the chatbot at any time. user.company is cached
+  // at login, so refresh once per session — otherwise a disabled chatbot keeps
+  // showing until full reload. (Backend AiService blocks calls regardless.)
+  const refreshedTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const token = auth?.accessToken;
+    if (sessionType === "user" && token && refreshedTokenRef.current !== token) {
+      refreshedTokenRef.current = token;
+      void refreshProfile().catch(() => undefined);
+    }
+  }, [auth?.accessToken, sessionType, refreshProfile]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -57,6 +69,13 @@ export const AiAssistantWidget = () => {
   if (user?.company && user.company.chatbotEnabled === false) {
     return null;
   }
+
+  const openChat = () => {
+    // Re-check the flag when the user opens the chat: covers disable
+    // happening mid-session (mount refresh only runs once per load).
+    void refreshProfile().catch(() => undefined);
+    setOpen(true);
+  };
 
   const send = async () => {
     const message = input.trim();
@@ -254,7 +273,7 @@ export const AiAssistantWidget = () => {
           aria-label="Open AI assistant"
           title="Bizio AI Assistant"
           className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0f172a,#155e75)] text-white shadow-[0_16px_40px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(15,23,42,0.4)]"
-          onClick={() => setOpen(true)}
+          onClick={openChat}
         >
           <Bot size={26} />
         </button>

@@ -1193,6 +1193,8 @@ export type EmailLog = {
   recipientEmail: string;
   subject: string;
   emailBody: string;
+  providerName?: string | null;
+  senderEmail?: string | null;
   status: "Pending" | "Sent" | "Failed";
   errorMessage: string | null;
   sentBy: string | null;
@@ -1207,6 +1209,7 @@ export type NotificationLog = {
   subject: string | null;
   message: string | null;
   providerName?: string | null;
+  sender?: string | null;
   messageId?: string | null;
   failureReason?: string | null;
   providerResponse: string | null;

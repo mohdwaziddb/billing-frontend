@@ -13,6 +13,7 @@ export type CommunicationHistoryItem = {
   status: string;
   errorMessage: string | null;
   providerName: string | null;
+  sender: string | null;
   messageId: string | null;
   sentBy: string | null;
   sentAt: string | null;

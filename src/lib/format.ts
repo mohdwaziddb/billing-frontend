@@ -37,7 +37,8 @@ const istParts = (date: Date) => {
     hourCycle: "h23"
   }).formatToParts(date);
   const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  return { day: get("day"), month: get("month"), year: get("year"), hour: get("hour"), minute: get("minute") };
+  const twelve = to12h(Number(get("hour") || "0"));
+  return { day: get("day"), month: get("month"), year: get("year"), minute: get("minute"), ...twelve };
 };
 
 const localParts = (date: Date) => {
@@ -46,9 +47,18 @@ const localParts = (date: Date) => {
     day: pad(date.getDate()),
     month: pad(date.getMonth() + 1),
     year: String(date.getFullYear()),
-    hour: pad(date.getHours()),
-    minute: pad(date.getMinutes())
+    minute: pad(date.getMinutes()),
+    ...to12h(date.getHours())
   };
+};
+
+// 12-hour clock everywhere (e.g. "04:43 PM"): single place so every screen
+// shows the same time format.
+const to12h = (hour24: number) => {
+  const normalized = ((Math.floor(hour24) % 24) + 24) % 24;
+  const ampm = normalized < 12 ? "AM" : "PM";
+  const hour12 = normalized % 12 === 0 ? 12 : normalized % 12;
+  return { hour: String(hour12).padStart(2, "0"), ampm };
 };
 
 const partsFor = (date: Date) => (useUtcSource() ? istParts(date) : localParts(date));
@@ -78,7 +88,7 @@ export const formatDateTime = (value: string | null | undefined) => {
     return value;
   }
   const parts = partsFor(date);
-  return `${parts.day}-${parts.month}-${parts.year} ${parts.hour}:${parts.minute}`;
+  return `${parts.day}-${parts.month}-${parts.year} ${parts.hour}:${parts.minute} ${parts.ampm}`;
 };
 
 export const formatDateInputDisplay = (value: string | null | undefined) => formatDate(value);
@@ -92,7 +102,7 @@ export const formatTime = (value: string | null | undefined) => {
     return value;
   }
   const parts = partsFor(date);
-  return `${parts.hour}:${parts.minute}`;
+  return `${parts.hour}:${parts.minute} ${parts.ampm}`;
 };
 
 /** "2m 14s" / "58s" / "1h 05m" — for dump durations (startedAt → finishedAt or now). */
