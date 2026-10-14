@@ -15,6 +15,7 @@ import {
   notifyMaintenance
 } from "./lib/tenantMaintenance";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
+import { SuperAdminRoute } from "./components/SuperAdminRoute";
 import { PermissionRoute } from "./components/PermissionRoute";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -55,6 +56,7 @@ import { TaxMasterPage } from "./pages/TaxMasterPage";
 import { UserManagementPage } from "./pages/UserManagementPage";
 import { SmsTemplatePage } from "./pages/SmsTemplatePage";
 import { PlatformAdminPage } from "./pages/PlatformAdminPage";
+import { BizioConsolePage } from "./pages/BizioConsolePage";
 import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { PurchaseListPage } from "./pages/PurchaseListPage";
 import { StockLedgerPage } from "./pages/StockLedgerPage";
@@ -161,6 +163,9 @@ function App() {
       <Route path="/platform-admin/login" element={<PlatformAdminHostGuard><PlatformAdminLoginPage /></PlatformAdminHostGuard>} />
 
       <Route element={<ProtectedRoute />}>
+        <Route element={<SuperAdminRoute />}>
+          <Route path="/BizioConsole" element={<BizioConsolePage />} />
+        </Route>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<PermissionRoute menuCode="DASHBOARD"><DashboardPage /></PermissionRoute>} />
           <Route path="/customers" element={<PermissionRoute menuCode="CUSTOMERS"><CustomerListPage /></PermissionRoute>} />
