@@ -35,6 +35,7 @@ import { PaymentHierarchyPage } from "./pages/PaymentHierarchyPage";
 import { PaymentListPage } from "./pages/PaymentListPage";
 import { PaymentModePage } from "./pages/PaymentModePage";
 import { ExpenseCategoryPage } from "./pages/ExpenseCategoryPage";
+import { CommunicationHistoryPage } from "./pages/CommunicationHistoryPage";
 import { ExpenseListPage } from "./pages/ExpenseListPage";
 import { GstSummaryPage } from "./pages/GstSummaryPage";
 import { ProfitLossReportPage } from "./pages/ProfitLossReportPage";
@@ -184,6 +185,9 @@ function App() {
           <Route path="/setup/sms-templates" element={<PermissionRoute menuCode="SMS_TEMPLATES"><SmsTemplatePage /></PermissionRoute>} />
           <Route path="/setup/invoice-templates" element={<PermissionRoute menuCode="INVOICE_TEMPLATES"><InvoiceTemplatesPage /></PermissionRoute>} />
           <Route path="/setup/communication" element={<PermissionRoute menuCode="COMMUNICATION"><CommunicationSettingsPage /></PermissionRoute>} />
+          <Route path="/communication-history/mail" element={<PermissionRoute menuCode="MAIL_HISTORY"><CommunicationHistoryPage channel="mail" /></PermissionRoute>} />
+          <Route path="/communication-history/sms" element={<PermissionRoute menuCode="SMS_HISTORY"><CommunicationHistoryPage channel="sms" /></PermissionRoute>} />
+          <Route path="/communication-history/whatsapp" element={<PermissionRoute menuCode="WHATSAPP_HISTORY"><CommunicationHistoryPage channel="whatsapp" /></PermissionRoute>} />
           <Route path="/setup/email-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/sms-settings" element={<Navigate replace to="/dashboard" />} />
           <Route path="/setup/whatsapp-settings" element={<Navigate replace to="/dashboard" />} />
