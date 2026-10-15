@@ -13,11 +13,6 @@ export const getProductSubCategories = async (params?: { search?: string; active
   return response.records;
 };
 
-export const getProductSubCategory = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<ProductSubCategory>>(`/v1/product-sub-categories/${id}`);
-  return response.data.data;
-};
-
 export const createProductSubCategory = async (payload: ProductSubCategoryRequest) => {
   const response = await apiClient.post<ApiResponse<ProductSubCategory>>("/v1/product-sub-categories", payload);
   return response.data.data;

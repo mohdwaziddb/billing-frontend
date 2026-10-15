@@ -21,8 +21,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
@@ -1224,14 +1223,14 @@ export const DashboardPage = () => {
                 Export Excel
               </Button>
               {details ? (
-                <ModalPagination
+                <div className="flex justify-end"><Pagination
                   page={details.page}
                   size={details.size}
                   totalRecords={details.totalElements}
                   totalPages={details.totalPages}
                   disabled={detailsLoading}
                   onPageChange={setDetailPage}
-                />
+                layout="inline" /></div>
               ) : null}
             </div>
           </div>

@@ -37,11 +37,6 @@ export const getProductCategories = async (params?: { search?: string; active?: 
   return response.records;
 };
 
-export const getProductCategory = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<ProductCategory>>(`/v1/product-categories/${id}`);
-  return response.data.data;
-};
-
 export const createProductCategory = async (payload: ProductCategoryRequest) => {
   const response = await apiClient.post<ApiResponse<ProductCategory>>("/v1/product-categories", payload);
   sessionCache.clear(ACTIVE_PRODUCT_CATEGORIES_CACHE_KEY);

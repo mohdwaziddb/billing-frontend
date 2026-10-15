@@ -1,5 +1,5 @@
 import { BarChart3, Building2 } from "lucide-react";
-import { env } from "../../config/env";
+import { resolveAssetUrl } from "../../config/env";
 import { mainSiteHomeUrl } from "../../lib/hosts";
 
 export type LoginBrandCompany = {
@@ -13,13 +13,7 @@ type LoginBrandProps = {
 };
 
 export const LoginBrand = ({ className = "", company = null }: LoginBrandProps) => {
-  const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
-  const logoUrl =
-    company?.logoUrl != null && company.logoUrl !== ""
-      ? company.logoUrl.startsWith("http")
-        ? company.logoUrl
-        : `${apiOrigin}${company.logoUrl}`
-      : null;
+  const logoUrl = resolveAssetUrl(company?.logoUrl);
 
   // Rule: logo ho to logo (+ naam), warna company ka naam, warna Bizio fallback.
   // Brand hamesha main site (landing) pe le jata hai — tenant login page pe

@@ -6,8 +6,8 @@ import { LoginCard } from "../components/login/LoginCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { getApiErrorMessage } from "../lib/errors";
-import { currentHostname, getSubdomainCompanyCode, isLiveHost, isMainHost, mainSiteHomeUrl } from "../lib/hosts";
-import { isMaintenanceError, isTenantSubdomainHost, notifyMaintenance } from "../lib/tenantMaintenance";
+import { currentHostname, getSubdomainCompanyCode, isLiveHost, isMainHost, isTenantSubdomainHost, mainSiteHomeUrl } from "../lib/hosts";
+import { isMaintenanceError, notifyMaintenance } from "../lib/tenantMaintenance";
 import type { ApiResponse } from "../types/api";
 
 const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";

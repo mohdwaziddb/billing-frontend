@@ -11,8 +11,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { Table } from "../components/Table";
@@ -224,9 +223,9 @@ export const ProfitLossReportPage = () => {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
             <span className="text-sm font-semibold text-slate-700">{activeFilters.join(" | ") || "No filters applied"}</span>
             <div className="flex flex-wrap items-center gap-3">
-              {activeDetail === "revenue" ? <ModalPagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={setDetailPage} /> : null}
-              {activeDetail === "expense" ? <ModalPagination page={expensePage.page} size={expensePage.size} totalRecords={expensePage.totalRecords} totalPages={expensePage.totalPages} onPageChange={setDetailPage} /> : null}
-              {activeDetail === "net" ? <ModalPagination page={netPage.page} size={netPage.size} totalRecords={netPage.totalRecords} totalPages={netPage.totalPages} onPageChange={setDetailPage} /> : null}
+              {activeDetail === "revenue" ? <div className="flex justify-end"><Pagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={setDetailPage} layout="inline" /></div> : null}
+              {activeDetail === "expense" ? <div className="flex justify-end"><Pagination page={expensePage.page} size={expensePage.size} totalRecords={expensePage.totalRecords} totalPages={expensePage.totalPages} onPageChange={setDetailPage} layout="inline" /></div> : null}
+              {activeDetail === "net" ? <div className="flex justify-end"><Pagination page={netPage.page} size={netPage.size} totalRecords={netPage.totalRecords} totalPages={netPage.totalPages} onPageChange={setDetailPage} layout="inline" /></div> : null}
               <Button type="button" variant="secondary" onClick={exportDetail}><Download size={16} />Export</Button>
             </div>
           </div>

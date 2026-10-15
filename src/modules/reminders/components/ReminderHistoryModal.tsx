@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal } from "../../../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../../../components/Pagination";
-import { ModalPagination } from "../../../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../../../components/Pagination";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
 import { formatCurrency } from "../../../lib/currency";
@@ -51,14 +50,14 @@ export const ReminderHistoryModal = ({
   return (
     <Modal open={open} title={`Reminder history - ${customerName}`} onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <ModalPagination
+        <div className="flex justify-end"><Pagination
           page={historyPage.page}
           size={historyPage.size}
           totalRecords={historyPage.totalRecords}
           totalPages={historyPage.totalPages}
           disabled={loading}
           onPageChange={loadHistory}
-        />
+        layout="inline" /></div>
         {loading ? (
           <div className="rounded-[24px] border border-white/10 bg-white/5 p-6 text-sm text-slate-300/75">
             Loading reminder history...

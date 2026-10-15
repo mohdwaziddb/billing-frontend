@@ -10,8 +10,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PreviewSurface } from "../components/PreviewSurface";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -119,7 +118,7 @@ export const SmsTemplatePage = () => {
             />
             <Button variant="secondary" onClick={() => void loadTemplates(0)}>Search</Button>
             {can("SMS_TEMPLATES", "ADD") ? <Button onClick={openCreate}><FilePlus2 size={16} /> New Template</Button> : null}
-            <PagePagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} onPageChange={(nextPage) => void loadTemplates(nextPage)} />
+            <Pagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} onPageChange={(nextPage) => void loadTemplates(nextPage)} layout="inline" />
           </div>
         </div>
         <div className="mt-5 flex min-h-0 flex-1 flex-col">

@@ -11,7 +11,7 @@ import { Select } from "../components/Select";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
-import { env } from "../config/env";
+import { resolveAssetUrl } from "../config/env";
 import { notificationService } from "../services/notificationService";
 
 type FormState = CompanySettingsRequest;
@@ -47,13 +47,7 @@ const emptyForm: FormState = {
   invoiceTerms: "",
 };
 
-const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
-const logoSrc = (url?: string | null) => {
-  if (!url) {
-    return null;
-  }
-  return url.startsWith("http") ? url : `${apiOrigin}${url}`;
-};
+const logoSrc = (url?: string | null) => resolveAssetUrl(url);
 
 export const AboutCompanyPage = () => {
   const { can, refreshProfile } = useAuth();

@@ -39,14 +39,3 @@ export const verifyPasswordResetOtp = async (payload: { challengeId: number; otp
 export const confirmPasswordResetOtp = async (payload: { challengeId: number; otp: string; newPassword: string; confirmPassword: string }) => {
   await apiClient.post("/v1/auth/forgot-password/confirm", payload);
 };
-
-export const refreshTokenRequest = async (refreshToken: string) => {
-  const response = await apiClient.post<ApiResponse<AuthPayload>>(
-    "/v1/auth/refresh",
-    { refreshToken },
-    {
-      skipAuthRefresh: true
-    }
-  );
-  return response.data.data;
-};

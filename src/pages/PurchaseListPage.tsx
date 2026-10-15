@@ -10,8 +10,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
@@ -172,7 +171,7 @@ export const PurchaseListPage = () => {
               <Plus size={16} />
               New Purchase
             </Button>
-<PagePagination
+<Pagination
               page={purchasePage.page}
               size={purchasePage.size}
               totalRecords={purchasePage.totalRecords}
@@ -181,7 +180,7 @@ export const PurchaseListPage = () => {
                 setPage(nextPage);
                 void loadPage(nextPage);
               }}
-            />
+            layout="inline" />
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_170px_180px_180px_140px]">

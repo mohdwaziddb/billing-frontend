@@ -19,11 +19,6 @@ export const getExpensesPage = async (params?: ExpenseFilterParams) => {
   return response.data.data;
 };
 
-export const getExpenses = async (params?: ExpenseFilterParams) => {
-  const response = await getExpensesPage(params);
-  return response.records;
-};
-
 export const createExpense = async (payload: ExpenseRequest) => {
   const response = await apiClient.post<ApiResponse<Expense>>("/v1/expenses", payload);
   return response.data.data;

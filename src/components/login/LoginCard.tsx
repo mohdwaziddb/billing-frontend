@@ -1,6 +1,6 @@
 import { Building2, CheckCircle2, CircleAlert, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { env } from "../../config/env";
+import { resolveAssetUrl } from "../../config/env";
 import { ForgotPasswordModal } from "../ForgotPasswordModal";
 import { LoginBrand } from "./LoginBrand";
 
@@ -75,13 +75,7 @@ export const LoginCard = ({
     }
   };
 
-  const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
-  const companyLogoUrl =
-    company?.logoUrl != null && company.logoUrl !== ""
-      ? company.logoUrl.startsWith("http")
-        ? company.logoUrl
-        : `${apiOrigin}${company.logoUrl}`
-      : null;
+  const companyLogoUrl = resolveAssetUrl(company?.logoUrl);
 
   return (
     <>

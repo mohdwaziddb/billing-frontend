@@ -4,7 +4,6 @@ import type {
   PageResponse,
   PlatformAdminCompany,
   PlatformAdminCompanyDetails,
-  PlatformAdminCompanyOverview,
   PlatformAdminDashboardSummary,
   PlatformAdminDumpHistoryPage,
   PlatformAdminDumpMode,
@@ -36,11 +35,6 @@ export const getPlatformAdminDashboard = async () => {
 
 export const getPlatformAdminCompanies = async (params?: PlatformAdminCompanyFilters) => {
   const response = await apiClient.get<ApiResponse<PageResponse<PlatformAdminCompany>>>("/v1/platform-admin/companies", { params });
-  return response.data.data;
-};
-
-export const getPlatformAdminCompanyOverview = async (params?: Pick<PlatformAdminCompanyFilters, "search" | "active">) => {
-  const response = await apiClient.get<ApiResponse<PlatformAdminCompanyOverview>>("/v1/platform-admin/companies/overview", { params });
   return response.data.data;
 };
 

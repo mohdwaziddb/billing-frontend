@@ -25,8 +25,7 @@ import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { StatCard } from "../components/StatCard";
 import { Table } from "../components/Table";
 import { TrendBadge } from "../components/TrendBadge";
@@ -474,13 +473,13 @@ export const SalesAnalyticsPage = () => {
               <p className="text-xs uppercase text-slate-400">Inventory alert</p>
               <h2 className="mt-2 text-2xl font-bold text-white">Low stock products</h2>
             </div>
-            <PagePagination
+            <Pagination
               page={lowStockPage.page}
               size={lowStockPage.size}
               totalRecords={lowStockPage.totalRecords}
               totalPages={lowStockPage.totalPages}
               onPageChange={(nextPage) => void loadLowStockProducts(nextPage)}
-            />
+            layout="inline" />
           </div>
           <Table
             data={lowStockPage.records}
@@ -500,13 +499,13 @@ export const SalesAnalyticsPage = () => {
             <p className="text-xs uppercase text-slate-400">Customer dues</p>
             <h2 className="mt-2 text-2xl font-bold text-white">Due customer list</h2>
           </div>
-          <PagePagination
+          <Pagination
             page={dueCustomersPage.page}
             size={dueCustomersPage.size}
             totalRecords={dueCustomersPage.totalRecords}
             totalPages={dueCustomersPage.totalPages}
             onPageChange={(nextPage) => void loadDueCustomers(nextPage)}
-          />
+          layout="inline" />
         </div>
         <Table
           data={dueCustomersPage.records}

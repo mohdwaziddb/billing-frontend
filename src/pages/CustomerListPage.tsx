@@ -14,9 +14,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -187,7 +185,7 @@ export const CustomerListPage = () => {
                 </Link> : null}
                 </>
               ) : null}
-<PagePagination
+<Pagination
                 page={customerPage.page}
                 size={customerPage.size}
                 totalRecords={customerPage.totalRecords}
@@ -196,7 +194,7 @@ export const CustomerListPage = () => {
                   setPage(nextPage);
                   void loadCustomers(nextPage);
                 }}
-              />
+              layout="inline" />
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
@@ -270,7 +268,7 @@ export const CustomerListPage = () => {
           ) : null}
           <div className="flex justify-end">
             {selectedLedger ? (
-              <ModalPagination
+              <div className="flex justify-end"><Pagination
                 page={selectedLedger.page}
                 size={selectedLedger.size}
                 totalRecords={selectedLedger.totalRecords}
@@ -280,7 +278,7 @@ export const CustomerListPage = () => {
                     void loadLedger(ledgerCustomerId, nextPage);
                   }
                 }}
-              />
+              layout="inline" /></div>
             ) : null}
           </div>
           <div className="max-h-[420px] space-y-2 overflow-auto scrollbar-thin">

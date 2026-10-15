@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { env } from "../config/env";
+import { resolveAssetUrl } from "../config/env";
 import { useAuth } from "../context/AuthContext";
 import { MenuSearchService, type MenuSearchResult } from "../services/MenuSearchService";
 import { ForgotPasswordModal } from "./ForgotPasswordModal";
@@ -58,10 +58,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
     () => MenuSearchService.search(searchValue, permissions?.menus ?? []),
     [permissions?.menus, searchValue]
   );
-  const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
-  const platformLogoUrl = platform.platformLogo
-    ? (platform.platformLogo.startsWith("http") ? platform.platformLogo : `${apiOrigin}${platform.platformLogo}`)
-    : null;
+  const platformLogoUrl = resolveAssetUrl(platform.platformLogo);
   const headerTitle = title;
   const profileName = sessionType === "platform-admin" ? "Platform Admin" : (user?.fullName ?? "Owner");
   // Tenant super-admin sessions carry role OWNER for full rights — show the

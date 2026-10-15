@@ -16,7 +16,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { ModalPagination } from "../components/ModalPagination";
+import { Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
@@ -361,7 +361,7 @@ const InvoiceDrilldown = ({ description, invoices }: { description: string; invo
         />
       </div>
       <InvoiceRows invoices={pagedInvoices} />
-      <ModalPagination page={page} size={REFERRAL_MODAL_PAGE_SIZE} totalRecords={filtered.length} totalPages={totalPages} onPageChange={setPage} />
+      <div className="flex justify-end"><Pagination page={page} size={REFERRAL_MODAL_PAGE_SIZE} totalRecords={filtered.length} totalPages={totalPages} onPageChange={setPage} layout="inline" /></div>
     </div>
   );
 };
@@ -439,7 +439,7 @@ const RankingDrilldown = ({ users, onSelectUser }: { users: SalesReferralUserSum
           </button>
         )) : <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No contributors found.</p>}
       </div>
-      <ModalPagination page={page} size={REFERRAL_MODAL_PAGE_SIZE} totalRecords={filtered.length} totalPages={totalPages} onPageChange={setPage} />
+      <div className="flex justify-end"><Pagination page={page} size={REFERRAL_MODAL_PAGE_SIZE} totalRecords={filtered.length} totalPages={totalPages} onPageChange={setPage} layout="inline" /></div>
     </div>
   );
 };

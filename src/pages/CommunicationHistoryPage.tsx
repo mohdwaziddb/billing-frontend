@@ -6,8 +6,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PreviewSurface } from "../components/PreviewSurface";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
@@ -227,7 +226,7 @@ export const CommunicationHistoryPage = ({ channel }: { channel: CommunicationHi
         />
 
         <div className="mt-4 flex justify-end">
-          <PagePagination
+          <Pagination
             page={page}
             size={size}
             totalRecords={totalRecords}
@@ -239,7 +238,7 @@ export const CommunicationHistoryPage = ({ channel }: { channel: CommunicationHi
                 .catch((err) => setApiError(err, "Unable to load communication history"))
                 .finally(() => setLoading(false));
             }}
-          />
+          layout="inline" />
         </div>
       </GlassCard>
 

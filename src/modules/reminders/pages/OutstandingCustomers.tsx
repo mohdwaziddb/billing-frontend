@@ -15,8 +15,7 @@ import { PreviewSurface } from "../../../components/PreviewSurface";
 import { sanitizeHtml } from "../../../lib/sanitizeHtml";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { Table } from "../../../components/Table";
-import { DEFAULT_PAGE_SIZE } from "../../../components/Pagination";
-import { PagePagination } from "../../../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../../../components/Pagination";
 import { useAuth } from "../../../context/AuthContext";
 import { notificationService } from "../../../services/notificationService";
 import { ReminderHistoryModal } from "../components/ReminderHistoryModal";
@@ -299,7 +298,7 @@ export const OutstandingCustomersReminderPage = () => {
             visibleColumns={visibleColumns}
             onApply={setVisibleColumns}
           />
-          <PagePagination page={customerPage.page} size={customerPage.size} totalRecords={customerPage.totalRecords} totalPages={customerPage.totalPages} disabled={loading} onPageChange={(nextPage) => void loadCustomers(filters, nextPage)} />
+          <Pagination page={customerPage.page} size={customerPage.size} totalRecords={customerPage.totalRecords} totalPages={customerPage.totalPages} disabled={loading} onPageChange={(nextPage) => void loadCustomers(filters, nextPage)} layout="inline" />
           </div>
         </div>
 

@@ -11,8 +11,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -134,7 +133,7 @@ export const PaymentModePage = () => {
                   Add Payment Mode
                 </Button>
               ) : null}
-              <PagePagination page={modePage.page} size={modePage.size} totalRecords={modePage.totalRecords} totalPages={modePage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadModes(nextPage); }} />
+              <Pagination page={modePage.page} size={modePage.size} totalRecords={modePage.totalRecords} totalPages={modePage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadModes(nextPage); }} layout="inline" />
             </div>
           </div>
 

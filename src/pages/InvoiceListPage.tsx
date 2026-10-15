@@ -15,9 +15,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
@@ -529,7 +527,7 @@ export const InvoiceListPage = () => {
               ) : null}
               </>
             ) : null}
-            <PagePagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadInvoices(nextPage); }} />
+            <Pagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadInvoices(nextPage); }} layout="inline" />
           </div>
         </div>
         <div className="flex-1">
@@ -554,13 +552,13 @@ export const InvoiceListPage = () => {
               <Download size={17} />
               Export Excel
             </Button>
-            <ModalPagination
+            <div className="flex justify-end"><Pagination
               page={modalInvoicePage.page}
               size={modalInvoicePage.size}
               totalRecords={modalInvoicePage.totalRecords}
               totalPages={modalInvoicePage.totalPages}
               onPageChange={setModalPage}
-            />
+            layout="inline" /></div>
           </div>
           </div>
           <InvoiceTable invoices={modalInvoices} logCounts={logCounts} canDelete={false} canRestore={can("INVOICES", "RESTORE")} canViewLogs={can("INVOICES", "LOGS")} restoringId={restoringId} onDelete={setDeleteTarget} onRestore={setRestoreTarget} onShowLogs={setLogTarget} />

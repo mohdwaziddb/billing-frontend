@@ -11,11 +11,6 @@ export const getTaxMasters = async (params?: { search?: string; active?: boolean
   return response.data.data;
 };
 
-export const getTaxMaster = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<TaxMaster>>(`/v1/tax-master/${id}`);
-  return response.data.data;
-};
-
 export const createTaxMaster = async (payload: TaxMasterRequest) => {
   const response = await apiClient.post<ApiResponse<TaxMaster>>("/v1/tax-master", payload);
   return response.data.data;

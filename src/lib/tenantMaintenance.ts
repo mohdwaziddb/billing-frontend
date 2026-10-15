@@ -1,16 +1,11 @@
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
 import { sessionCache } from "./sessionCache";
-import { isTenantSubdomainHost as isTenantHost, tenantKeySuffix } from "./hosts";
+import { tenantKeySuffix } from "./hosts";
 import { authStorage } from "./storage";
 
-export const AUTH_BOOTSTRAP_CACHE_KEY = `billing_frontend_auth_bootstrap${tenantKeySuffix()}`;
-export const MAINTENANCE_CODES = new Set(["TENANT_INACTIVE", "TENANT_UNAVAILABLE"]);
+const AUTH_BOOTSTRAP_CACHE_KEY = `billing_frontend_auth_bootstrap${tenantKeySuffix()}`;
+const MAINTENANCE_CODES = new Set(["TENANT_INACTIVE", "TENANT_UNAVAILABLE"]);
 export const MAINTENANCE_EVENT = "bizio:tenant-maintenance";
-
-// Single shared host helper lives in ./hosts — re-exported here so existing
-// imports keep working. New code should import from ./hosts directly.
-export const isTenantSubdomainHost = (host?: string): boolean =>
-  host === undefined ? isTenantHost() : isTenantHost(host);
 
 export const isMaintenanceError = (err: unknown) => {
   const status = (err as any)?.response?.status;

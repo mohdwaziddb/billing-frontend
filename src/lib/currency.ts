@@ -1,7 +1,7 @@
 const DEFAULT_CURRENCY = "INR";
 const DEFAULT_LOCALE = "en-IN";
 
-export const currencyConfig = {
+const currencyConfig = {
   code: DEFAULT_CURRENCY,
   locale: DEFAULT_LOCALE
 };

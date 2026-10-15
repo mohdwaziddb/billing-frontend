@@ -125,13 +125,6 @@ export type PlatformAdminCompany = {
   totalUsers: number;
 };
 
-export type PlatformAdminCompanyOverview = {
-  companyCount: number;
-  ownerCount: number;
-  adminCount: number;
-  userCount: number;
-};
-
 export type PlatformAdminUser = {
   id: number;
   companyId: number;
@@ -1151,19 +1144,6 @@ export type AuditLog = {
   createdAt: string;
 };
 
-export type BulkDeleteResponse = {
-  deleted: number;
-  failed: number;
-  failures: Record<number, string>;
-};
-
-export type NotificationChannel = {
-  id: number;
-  channelName: string;
-  defaultChannel: boolean;
-  active: boolean;
-};
-
 export type EmailTemplate = {
   id: number;
   templateName: string;
@@ -1185,20 +1165,6 @@ export type EmailTemplateRequest = {
 export type EmailPreview = {
   subject: string;
   emailBody: string;
-};
-
-export type EmailLog = {
-  id: number;
-  templateId: number | null;
-  recipientEmail: string;
-  subject: string;
-  emailBody: string;
-  providerName?: string | null;
-  senderEmail?: string | null;
-  status: "Pending" | "Sent" | "Failed";
-  errorMessage: string | null;
-  sentBy: string | null;
-  sentAt: string | null;
 };
 
 export type NotificationLog = {
@@ -1335,31 +1301,6 @@ export type NotificationSendRequest = {
   mobileNumbers?: string[];
   attachments?: NotificationAttachmentPayload[];
   variables?: Record<string, string | number | boolean | null>;
-};
-
-export type HierarchyNode = {
-  id: number;
-  name: string;
-  role: Role;
-  department: string;
-  status: "Active" | "Inactive";
-  email: string;
-  mobile: string;
-  reportingManager: string;
-  createdAt: string;
-  hasChildren: boolean;
-  metrics: {
-    totalCustomers: number;
-    totalInvoices: number;
-    totalPayments: number;
-    totalProducts: number;
-    totalUsers: number;
-    totalRevenue: number;
-    totalCollection: number;
-    outstandingAmount: number;
-    averageInvoiceValue: number;
-    lastActivityDate: string | null;
-  };
 };
 
 export type CompanyUserRequest = {

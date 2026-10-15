@@ -55,8 +55,3 @@ export const getCustomerPurchaseHistory = async (id: number, params?: { page?: n
   const response = await apiClient.get<ApiResponse<CustomerPurchaseHistory>>(`/v1/customers/${id}/purchase-history`, { params });
   return response.data.data;
 };
-
-export const getOutstandingCustomers = async () => {
-  const response = await apiClient.get<ApiResponse<Customer[]>>("/v1/customers/outstanding");
-  return response.data.data;
-};

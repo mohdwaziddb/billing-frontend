@@ -17,9 +17,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
@@ -402,7 +400,7 @@ export const PaymentListPage = () => {
               ) : null}
               </>
             ) : null}
-            <PagePagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadPayments(nextPage); }} />
+            <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadPayments(nextPage); }} layout="inline" />
           </div>
         </div>
         <div className="flex-1">
@@ -460,7 +458,7 @@ export const PaymentListPage = () => {
               <Download size={17} />
               Export Excel
             </Button>
-            <ModalPagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} />
+            <div className="flex justify-end"><Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} layout="inline" /></div>
           </div>
           </div>
           <PaymentTable

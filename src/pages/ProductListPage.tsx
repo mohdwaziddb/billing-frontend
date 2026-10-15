@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { getProductCategories } from "../api/productCategories";
 import { getProductSubCategories } from "../api/productSubCategories";
 import { deleteProduct, deleteProductsBulk, getProductsPage } from "../api/products";
-import { BulkDeleteModal } from "../components/BulkDeleteModal";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
@@ -15,8 +14,7 @@ import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -245,7 +243,7 @@ export const ProductListPage = () => {
                 </Link> : null}
                 </>
               ) : null}
-<PagePagination
+<Pagination
                 page={productPage.page}
                 size={productPage.size}
                 totalRecords={productPage.totalRecords}
@@ -254,7 +252,7 @@ export const ProductListPage = () => {
                   setPage(nextPage);
                   void loadProducts(nextPage);
                 }}
-              />
+              layout="inline" />
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_180px_160px]">
@@ -339,12 +337,13 @@ export const ProductListPage = () => {
       </GlassCard>
       <AuditLogModal open={Boolean(logTarget)} moduleName="Product" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Product Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
-      <BulkDeleteModal
+      <CommonDeleteModal
         open={bulkDeleteOpen}
         loading={deleting}
-        selectedCount={bulkSelection.selectedCount}
         onCancel={() => setBulkDeleteOpen(false)}
         onConfirm={() => void handleBulkDelete()}
+        title={`Delete ${bulkSelection.selectedCount} selected record${bulkSelection.selectedCount === 1 ? "" : "s"}`}
+        description={`This action will permanently delete ${bulkSelection.selectedCount} selected record${bulkSelection.selectedCount === 1 ? "" : "s"}. Are you sure you want to continue?`}
       />
     </div>
   );

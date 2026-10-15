@@ -1,11 +1,9 @@
 import { apiClient } from "./apiClient";
 import type {
   ApiResponse,
-  EmailLog,
   EmailPreview,
   EmailTemplate,
   EmailTemplateRequest,
-  NotificationChannel,
   PageResponse
 } from "../types/api";
 
@@ -29,11 +27,6 @@ export const getEmailTemplateVariables = async () => {
   return response.data.data;
 };
 
-export const getNotificationChannels = async () => {
-  const response = await apiClient.get<ApiResponse<NotificationChannel[]>>("/v1/email-templates/channels");
-  return response.data.data;
-};
-
 export const createEmailTemplate = async (payload: EmailTemplateRequest) => {
   const response = await apiClient.post<ApiResponse<EmailTemplate>>("/v1/email-templates", payload);
   return response.data.data;
@@ -50,14 +43,5 @@ export const deleteEmailTemplate = async (id: number) => {
 
 export const previewEmailTemplate = async (id: number, variables?: Record<string, unknown>) => {
   const response = await apiClient.post<ApiResponse<EmailPreview>>(`/v1/email-templates/${id}/preview`, { variables });
-  return response.data.data;
-};
-
-export const sendTemplateEmail = async (payload: {
-  templateId: number;
-  recipientEmail: string;
-  variables?: Record<string, unknown>;
-}) => {
-  const response = await apiClient.post<ApiResponse<EmailLog>>("/v1/email-templates/send", payload);
   return response.data.data;
 };

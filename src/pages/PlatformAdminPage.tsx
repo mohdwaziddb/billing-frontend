@@ -32,9 +32,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PasswordInput } from "../components/PasswordInput";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
@@ -768,7 +766,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
             <SectionHeader title="Registered Companies" subtitle="Inspect, activate, and suspend tenant companies from one clean operational workspace." />
             <div className="flex flex-wrap items-center gap-2 md:pt-0.5">
               <CommonColumnSelector tableName="PLATFORM_COMPANIES" availableColumns={companyColumnOptions} visibleColumns={visibleColumns} onApply={setVisibleColumns} localOnly />
-              <PagePagination
+              <Pagination
                 page={companies.page}
                 size={companies.size}
                 totalRecords={companies.totalRecords}
@@ -777,7 +775,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
                 onPageChange={(page) => {
                   void loadCompanies(page).catch((err) => setApiError(err, "Unable to load companies"));
                 }}
-              />
+              layout="inline" />
             </div>
           </div>
           <Toolbar search={companySearch} setSearch={setCompanySearch} active={companyActive} setActive={setCompanyActive} />
@@ -1160,7 +1158,7 @@ const CompanySummaryModal = ({
         <div className="min-w-0 flex-1">
           <Input label="Search By Company Name" value={search} onChange={(event) => onSearchChange(event.target.value)} />
         </div>
-        <ModalPagination page={companies.page} size={companies.size} totalRecords={companies.totalRecords} totalPages={companies.totalPages} disabled={loading} onPageChange={onPageChange} />
+        <div className="flex justify-end"><Pagination page={companies.page} size={companies.size} totalRecords={companies.totalRecords} totalPages={companies.totalPages} disabled={loading} onPageChange={onPageChange} layout="inline" /></div>
       </div>
       <div className="flex-1">
         <CompanySummaryTable companies={companies.records} onView={onView} />

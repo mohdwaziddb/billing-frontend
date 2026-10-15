@@ -1,8 +1,7 @@
 import { Download, Search } from "lucide-react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
-import { DEFAULT_PAGE_SIZE } from "./Pagination";
-import { ModalPagination } from "./ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "./Pagination";
 import { StatusBadge } from "./StatusBadge";
 import { formatAmount } from "../lib/currency";
 import { formatDate } from "../lib/format";
@@ -79,14 +78,14 @@ export const CommonDashboardDetailModal = <T,>({
             Export Excel
           </Button>
           {paginationPosition === "top" ? (
-            <ModalPagination
+            <div className="flex justify-end"><Pagination
                 page={page}
                 size={DEFAULT_PAGE_SIZE}
                 totalRecords={totalRecords}
                 totalPages={totalPages}
                 disabled={loading}
                 onPageChange={onPageChange}
-              />
+              layout="inline" /></div>
           ) : null}
         </div>
       </div>

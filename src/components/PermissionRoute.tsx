@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { handlePermissionDenied } from "../lib/permissionHandler";
+import { notificationService } from "../services/notificationService";
 
 export const PermissionRoute = ({
   menuCode,
@@ -19,7 +19,7 @@ export const PermissionRoute = ({
 
   useEffect(() => {
     if (denied) {
-      handlePermissionDenied();
+      notificationService.handlePermissionDenied();
     }
   }, [denied, location.pathname]);
 

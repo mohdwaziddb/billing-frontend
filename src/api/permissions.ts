@@ -1,11 +1,6 @@
 import { apiClient } from "./apiClient";
 import type { ApiResponse, PermissionMatrix, PermissionMatrixRequest, Role } from "../types/api";
 
-export const getMyPermissions = async () => {
-  const response = await apiClient.get<ApiResponse<PermissionMatrix>>("/v1/permissions/me");
-  return response.data.data;
-};
-
 export const getMyMenus = async () => {
   const response = await apiClient.get<ApiResponse<PermissionMatrix>>("/v1/permissions/my-menus");
   return response.data.data;

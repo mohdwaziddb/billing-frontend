@@ -7,8 +7,7 @@ import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
@@ -70,7 +69,7 @@ export const StockLedgerPage = () => {
               <Download size={16} />
               Export Excel
             </Button>
-<PagePagination
+<Pagination
               page={ledgerPage.page}
               size={ledgerPage.size}
               totalRecords={ledgerPage.totalRecords}
@@ -79,7 +78,7 @@ export const StockLedgerPage = () => {
                 setPage(nextPage);
                 void loadPage(nextPage);
               }}
-            />
+            layout="inline" />
           </div>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_260px_180px_180px_140px]">

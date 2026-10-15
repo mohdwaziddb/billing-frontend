@@ -19,8 +19,3 @@ export const getPaymentHierarchyChildren = async (params?: PaymentHierarchyParam
   const response = await apiClient.get<ApiResponse<PaymentHierarchyResponse>>("/v1/payment-hierarchy/children", { params });
   return response.data.data;
 };
-
-export const getPaymentHierarchySummary = async (params?: PaymentHierarchyParams) => {
-  const response = await apiClient.get<ApiResponse<PaymentHierarchyResponse>>("/v1/payment-hierarchy/summary", { params });
-  return response.data.data;
-};

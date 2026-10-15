@@ -44,8 +44,6 @@ export const getContrastTextColor = (backgroundColor: string) => {
   return getRelativeLuminance(hexToRgb(color)) < 0.48 ? "#FFFFFF" : "#111827";
 };
 
-export const getThemeAwareTextColor = (backgroundColor: string) => getContrastTextColor(backgroundColor);
-
 export const applyThemeColor = (themeColor?: string | null) => {
   const color = normalizeHexColor(themeColor ?? DEFAULT_THEME_COLOR);
   const root = document.documentElement;

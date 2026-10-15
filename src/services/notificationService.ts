@@ -124,9 +124,3 @@ export const notificationService = {
     emit("info", message);
   }
 };
-
-export const showSuccess = notificationService.showSuccess;
-export const showError = notificationService.showError;
-export const handlePermissionDenied = notificationService.handlePermissionDenied;
-export const showWarning = notificationService.showWarning;
-export const showInfo = notificationService.showInfo;

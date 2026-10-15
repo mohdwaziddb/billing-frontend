@@ -9,3 +9,14 @@ export const env = {
   apiBaseUrl: getEnv("VITE_API_BASE_URL", LOCAL_API_BASE_URL_FALLBACK),
   appEnv: getEnv("VITE_APP_ENV", "local")
 } as const;
+
+/** Origin without the trailing /api (for uploads/logos served by the backend). */
+export const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
+
+/** Absolute URLs pass through; backend-relative paths are prefixed with the API origin. */
+export const resolveAssetUrl = (url?: string | null): string | null => {
+  if (!url) {
+    return null;
+  }
+  return url.startsWith("http") ? url : `${apiOrigin}${url}`;
+};

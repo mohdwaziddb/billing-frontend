@@ -7,9 +7,9 @@ import { notificationService } from "../services/notificationService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
 import {
   isMaintenanceError,
-  isTenantSubdomainHost,
   notifyMaintenance
 } from "../lib/tenantMaintenance";
+import { isTenantSubdomainHost } from "../lib/hosts";
 import type { ApiResponse, AuthPayload, StoredAuthSession } from "../types/api";
 
 declare module "axios" {

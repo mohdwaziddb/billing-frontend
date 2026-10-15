@@ -6,7 +6,7 @@ import { formatDateTime } from "../lib/format";
 import { DEFAULT_THEME_COLOR, getContrastTextColor } from "../lib/theme";
 import type { AuditLog } from "../types/api";
 import { CommonDeleteIcon } from "./CommonDeleteAction";
-import { ModalPagination } from "./ModalPagination";
+import { Pagination } from "./Pagination";
 
 type ChangeRow = {
   field: string;
@@ -115,7 +115,7 @@ export const AuditLogModal = ({
         <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[300px_minmax(0,1fr)]">
           <div className="min-h-0 overflow-y-auto border-b border-slate-200 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900 lg:border-b-0 lg:border-r">
             <div className="mb-2 flex justify-end">
-              <ModalPagination page={page} size={size} totalRecords={totalRecords} totalPages={totalPages} onPageChange={setPage} />
+              <div className="flex justify-end"><Pagination page={page} size={size} totalRecords={totalRecords} totalPages={totalPages} onPageChange={setPage} layout="inline" /></div>
             </div>
             {logs.length ? (
               <div className="space-y-1.5">

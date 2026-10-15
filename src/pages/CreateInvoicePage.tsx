@@ -15,8 +15,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -1271,14 +1270,14 @@ export const CreateInvoicePage = () => {
               </div>
             </div>
             <div className="flex justify-end">
-              <ModalPagination
+              <div className="flex justify-end"><Pagination
                 page={purchaseHistory.page}
                 size={purchaseHistory.size}
                 totalRecords={purchaseHistory.totalRecords}
                 totalPages={purchaseHistory.totalPages}
                 disabled={historyLoading}
                 onPageChange={(nextPage) => void loadPurchaseHistory(nextPage)}
-              />
+              layout="inline" /></div>
             </div>
             <Table
               data={purchaseHistory.invoices}

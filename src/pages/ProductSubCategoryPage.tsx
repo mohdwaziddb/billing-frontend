@@ -12,8 +12,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
@@ -194,7 +193,7 @@ export const ProductSubCategoryPage = () => {
                 Export Excel
               </Button> : null}
               {canAdd ? <Button onClick={openCreate}>Add Sub Category</Button> : null}
-              <PagePagination page={subCategoryPage.page} size={subCategoryPage.size} totalRecords={subCategoryPage.totalRecords} totalPages={subCategoryPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadSubCategories(nextPage); }} />
+              <Pagination page={subCategoryPage.page} size={subCategoryPage.size} totalRecords={subCategoryPage.totalRecords} totalPages={subCategoryPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadSubCategories(nextPage); }} layout="inline" />
             </div>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_160px]">

@@ -1,13 +1,5 @@
 import type { ReactNode } from "react";
 import clsx from "clsx";
-import { getContrastTextColor } from "../lib/theme";
-
-export const previewSurfaceColors = {
-  lightBackground: "#FFFFFF",
-  darkBackground: "#1F2937",
-  lightText: getContrastTextColor("#FFFFFF"),
-  darkText: getContrastTextColor("#1F2937")
-};
 
 export const PreviewSurface = ({
   children,

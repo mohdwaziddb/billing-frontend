@@ -11,9 +11,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
-import { PagePagination } from "../components/PagePagination";
-import { ModalPagination } from "../components/ModalPagination";
+import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PasswordInput } from "../components/PasswordInput";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
@@ -322,7 +320,7 @@ export const UserManagementPage = () => {
                 <Plus size={16} />
                 Add user
               </Button> : null}
-              <PagePagination page={userPage.page} size={userPage.size} totalRecords={userPage.totalRecords} totalPages={userPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadUsers(nextPage); }} />
+              <Pagination page={userPage.page} size={userPage.size} totalRecords={userPage.totalRecords} totalPages={userPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadUsers(nextPage); }} layout="inline" />
             </div>
           ) : null}
         </div>
@@ -554,7 +552,7 @@ export const UserManagementPage = () => {
               <Download size={17} />
               Export Excel
             </Button>
-            <ModalPagination page={modalUserPage.page} size={modalUserPage.size} totalRecords={modalUserPage.totalRecords} totalPages={modalUserPage.totalPages} onPageChange={setModalPage} />
+            <div className="flex justify-end"><Pagination page={modalUserPage.page} size={modalUserPage.size} totalRecords={modalUserPage.totalRecords} totalPages={modalUserPage.totalPages} onPageChange={setModalPage} layout="inline" /></div>
           </div>
           </div>
           <Table

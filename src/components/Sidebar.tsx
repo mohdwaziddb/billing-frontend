@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { env } from "../config/env";
+import { resolveAssetUrl } from "../config/env";
 import { useAuth } from "../context/AuthContext";
 import type { MenuPermission } from "../types/api";
 
@@ -94,8 +94,7 @@ export const Sidebar = () => {
   }, [location.pathname, menus]);
 
   const company = user?.company;
-  const apiOrigin = env.apiBaseUrl.replace(/\/api\/?$/, "");
-  const companyLogoUrl = company?.logoUrl ? (company.logoUrl.startsWith("http") ? company.logoUrl : `${apiOrigin}${company.logoUrl}`) : null;
+  const companyLogoUrl = resolveAssetUrl(company?.logoUrl);
   const title = sessionType === "platform-admin" ? (platform.platformName || "Platform Admin") : (company?.name ?? "Workspace");
   // Same rule as Header: super-admin sessions show SUPER ADMIN, not OWNER.
   const subtitle = sessionType === "platform-admin" ? "Platform Administrator" : (user?.superAdmin ? "Super Admin" : (user?.role ?? "User"));
