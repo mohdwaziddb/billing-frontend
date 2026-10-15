@@ -149,18 +149,27 @@ export const CommonColumnSelector = ({
         setOpen(false);
       }
     };
+    const handleScroll = (event: Event) => {
+      // Panel ke andar ka scroll (lambi column list) ignore — warna panel
+      // kholte hi uska apna scrollbar use karte band ho jata hai.
+      // Sirf bahar (page/table) ke scroll par band karo.
+      if (panelRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      setOpen(false);
+    };
     const dismiss = () => setOpen(false);
 
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("touchstart", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", dismiss, true);
+    window.addEventListener("scroll", handleScroll, true);
     window.addEventListener("resize", dismiss);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("touchstart", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", dismiss, true);
+      window.removeEventListener("scroll", handleScroll, true);
       window.removeEventListener("resize", dismiss);
     };
   }, [open]);
