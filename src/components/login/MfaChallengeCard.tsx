@@ -66,38 +66,42 @@ export const MfaChallengeCard = ({
   };
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_24px_64px_-24px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="w-full max-w-[620px] rounded-[24px] border border-slate-200 bg-white p-6 text-left shadow-[0_24px_64px_-24px_rgba(15,23,42,0.25)] sm:p-8">
       <div className="flex flex-col items-center text-center">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-white">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
           <ShieldCheck size={22} />
         </span>
-        <h2 className="mt-4 text-xl font-bold text-slate-950">{title}</h2>
-        {accountLabel ? <p className="mt-1 text-sm font-semibold text-slate-600">{accountLabel}</p> : null}
-        <p className="mt-2 text-sm leading-relaxed text-slate-500">{subtitle}</p>
+        <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Step 2 of 2 — Verification</p>
+        <h2 className="mt-1.5 text-[22px] font-bold tracking-tight text-slate-950">{title}</h2>
+        {accountLabel ? <p className="mt-0.5 text-sm font-semibold text-slate-600">{accountLabel}</p> : null}
+        <p className="mt-1.5 max-w-md text-sm leading-relaxed text-slate-500">{subtitle}</p>
       </div>
 
-      <div className="mt-6 flex items-center justify-center gap-2 sm:gap-3" onPaste={handlePaste}>
-        {digits.map((digit, index) => (
-          <input
-            key={index}
-            ref={(element) => {
-              inputsRef.current[index] = element;
-            }}
-            value={digit}
-            inputMode="numeric"
-            autoComplete={index === 0 ? "one-time-code" : "off"}
-            maxLength={1}
-            disabled={loading}
-            onChange={(event) => setDigit(index, event.target.value)}
-            onKeyDown={(event) => handleKeyDown(index, event)}
-            aria-label={`Digit ${index + 1}`}
-            className="h-12 w-11 rounded-xl border border-slate-300 bg-white text-center text-xl font-bold text-slate-950 outline-none transition focus:border-slate-900 focus:ring-4 focus:ring-slate-900/10 disabled:bg-slate-50 sm:h-14 sm:w-12"
-          />
-        ))}
+      <div className="mx-auto mt-5 w-full max-w-[420px]">
+        <div className="flex items-center justify-center gap-2 sm:gap-2.5" onPaste={handlePaste}>
+          {digits.map((digit, index) => (
+            <input
+              key={index}
+              ref={(element) => {
+                inputsRef.current[index] = element;
+              }}
+              value={digit}
+              inputMode="numeric"
+              autoComplete={index === 0 ? "one-time-code" : "off"}
+              maxLength={1}
+              disabled={loading}
+              onChange={(event) => setDigit(index, event.target.value)}
+              onKeyDown={(event) => handleKeyDown(index, event)}
+              aria-label={`Digit ${index + 1}`}
+              className="h-14 w-full min-w-0 flex-1 rounded-xl border border-slate-300 bg-white text-center text-xl font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#2453d8] focus:ring-4 focus:ring-[rgba(36,83,216,0.12)] disabled:bg-slate-50"
+            />
+          ))}
+        </div>
+        <p className="mt-2.5 text-center text-xs text-slate-400">Codes refresh every 30 seconds in your authenticator app.</p>
       </div>
 
       {error ? (
-        <p className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">
+        <p className="mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">
           <CircleAlert size={16} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </p>
@@ -107,7 +111,7 @@ export const MfaChallengeCard = ({
         type="button"
         disabled={!canSubmit}
         onClick={() => onSubmit(digits.join(""))}
-        className="mt-6 flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-slate-950 text-[15px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#2453d8] text-[15px] font-semibold text-white transition hover:bg-[#1d44b4] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading ? (
           <>
@@ -123,7 +127,7 @@ export const MfaChallengeCard = ({
         type="button"
         disabled={loading}
         onClick={onBack}
-        className="mt-3 w-full text-center text-sm font-semibold text-slate-500 transition hover:text-slate-900 disabled:opacity-60"
+        className="mt-2.5 w-full text-center text-sm font-semibold text-slate-500 transition hover:text-slate-900 disabled:opacity-60"
       >
         ← Back to password
       </button>

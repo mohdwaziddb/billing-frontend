@@ -22,10 +22,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getMfaStatus } from "../api/mfa";
 import { resolveAssetUrl } from "../config/env";
 import { useAuth } from "../context/AuthContext";
 import { MenuSearchService, type MenuSearchResult } from "../services/MenuSearchService";
 import { ForgotPasswordModal } from "./ForgotPasswordModal";
+import { Modal } from "./Modal";
 
 const iconMap: Record<string, LucideIcon> = {
   BarChart3,
@@ -44,10 +46,17 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 export const Header = ({ title, subtitle }: { title: string; subtitle: string }) => {
-  const { user, can, logout, permissions, platform, preferences, setDarkMode, sessionType, platformAdmin } = useAuth();
+  const { auth, user, can, logout, permissions, platform, preferences, setDarkMode, sessionType, platformAdmin } = useAuth();
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  // Company MFA flag session user object se nahi, live API se: purane
+  // sessions (backend deploy se pehle ke login) me applyMfa field hoti hi
+  // nahi, aur cached session se button hamesha chhupa rehta. Ek baar per
+  // session fetch — fail ho to chup-chaap chhupao, kabhi block mat karo.
+  const [mfaMenuVisible, setMfaMenuVisible] = useState(false);
+  const mfaCheckedTokenRef = useRef<string | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -124,6 +133,17 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
   useEffect(() => {
     setActiveSearchIndex(0);
   }, [searchValue]);
+
+  useEffect(() => {
+    const token = auth?.accessToken;
+    if (sessionType !== "user" || !token || mfaCheckedTokenRef.current === token) {
+      return;
+    }
+    mfaCheckedTokenRef.current = token;
+    void getMfaStatus()
+      .then((status) => setMfaMenuVisible(Boolean(status.applyMfaByCompany)))
+      .catch(() => setMfaMenuVisible(false));
+  }, [auth?.accessToken, sessionType]);
 
   return (
     <header className="sticky top-3 z-40 rounded-[22px] border border-slate-200 bg-white/92 px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.08)] backdrop-blur-xl md:px-5">
@@ -253,13 +273,27 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
                   <KeyRound size={17} />
                   Forgot Password
                 </button>
+                {sessionType === "user" && mfaMenuVisible ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      navigate("/setup/two-step-verification");
+                    }}
+                  >
+                    <ShieldCheck size={17} />
+                    Two Step Authentication
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   role="menuitem"
                   className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
                   onClick={() => {
                     setProfileOpen(false);
-                    void logout();
+                    setLogoutConfirmOpen(true);
                   }}
                 >
                   <LogOut size={17} />
@@ -275,6 +309,38 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
         initialUsername={user?.email ?? user?.mobileNumber ?? ""}
         onClose={() => setForgotPasswordOpen(false)}
       />
+      <Modal
+        open={logoutConfirmOpen}
+        title="Sign out?"
+        eyebrow="Logout"
+        maxWidthClass="max-w-md"
+        onClose={() => setLogoutConfirmOpen(false)}
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          Are you sure you want to sign out{profileName ? `, ${profileName}` : ""}? You will need to sign in again to
+          continue.
+        </p>
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={() => setLogoutConfirmOpen(false)}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLogoutConfirmOpen(false);
+              void logout();
+            }}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-transparent bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
+      </Modal>
     </header>
   );
 };

@@ -2,16 +2,27 @@ import { ShieldCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMfaStatus } from "../api/mfa";
+import { useAuth } from "../context/AuthContext";
+import { isMfaEnrollDismissed, markMfaEnrollDismissed, mfaEnrollDismissKey } from "../lib/mfaBanner";
 
 export const MfaEnrollBanner = () => {
+  const { user } = useAuth();
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    const key = mfaEnrollDismissKey(user?.username ?? user?.email ?? null);
+    // Is tab-session me pehle close ho chuka hai to dobara mat dikhao.
+    if (isMfaEnrollDismissed(key)) {
+      return;
+    }
     let cancelled = false;
     void getMfaStatus()
       .then((status) => {
-        if (!cancelled && status.applyMfaByCompany && !status.mfaEnabled) {
+        if (cancelled) {
+          return;
+        }
+        if (status.applyMfaByCompany && !status.mfaEnabled) {
           setVisible(true);
         }
       })
@@ -21,11 +32,16 @@ export const MfaEnrollBanner = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.username, user?.email]);
 
   if (!visible || dismissed) {
     return null;
   }
+
+  const dismiss = () => {
+    markMfaEnrollDismissed(mfaEnrollDismissKey(user?.username ?? user?.email ?? null));
+    setDismissed(true);
+  };
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
@@ -41,7 +57,7 @@ export const MfaEnrollBanner = () => {
       <button
         type="button"
         aria-label="Dismiss"
-        onClick={() => setDismissed(true)}
+        onClick={dismiss}
         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-amber-700 transition hover:bg-amber-100"
       >
         <X size={16} />

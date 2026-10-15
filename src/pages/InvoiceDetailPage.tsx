@@ -210,8 +210,9 @@ export const InvoiceDetailPage = () => {
       }
       // Sanitize server-rendered HTML before document.write so a compromised
       // template cannot execute scripts in the app origin during printing.
+      // allowStyle: first-party template.css must survive, else print is unstyled.
       doc.open();
-      doc.write(sanitizeHtml(html));
+      doc.write(sanitizeHtml(html, { allowStyle: true }));
       doc.close();
     } catch (error) {
       setApiError(error, "Unable to print invoice");

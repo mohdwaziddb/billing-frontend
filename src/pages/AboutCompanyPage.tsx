@@ -5,6 +5,7 @@ import { getCompanyMfaSettings, updateCompanyMfaSettings } from "../api/mfa";
 import { getStates } from "../api/states";
 import { Button } from "../components/Button";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
+import { Modal } from "../components/Modal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -69,6 +70,7 @@ export const AboutCompanyPage = () => {
   const [mfaApply, setMfaApply] = useState<boolean | null>(null);
   const [mfaSaving, setMfaSaving] = useState(false);
   const [mfaMsg, setMfaMsg] = useState("");
+  const [mfaConfirmOff, setMfaConfirmOff] = useState(false);
   const canSaveProfile = Boolean(form.name.trim() && form.phone.trim() && form.email.trim() && (!form.gstRegistered || (form.gstin ?? form.taxId ?? "").trim()));
 
   const setField = (key: keyof FormState, value: string) => {
@@ -145,13 +147,13 @@ export const AboutCompanyPage = () => {
       return;
     }
     if (!next && mfaApply) {
-      const ok = window.confirm(
-        "Turning MFA OFF will stop asking verification codes from users who have already enrolled. Continue?"
-      );
-      if (!ok) {
-        return;
-      }
+      setMfaConfirmOff(true);
+      return;
     }
+    await applyMfaUpdate(next);
+  };
+
+  const applyMfaUpdate = async (next: boolean) => {
     try {
       setMfaSaving(true);
       setMfaMsg("");
@@ -446,6 +448,34 @@ export const AboutCompanyPage = () => {
         onCancel={() => setConfirmRemoveLogo(false)}
         onConfirm={() => void removeLogo()}
       />
+      <Modal
+        open={mfaConfirmOff}
+        title="Turn MFA OFF?"
+        eyebrow="Security"
+        maxWidthClass="max-w-md"
+        onClose={() => !mfaSaving && setMfaConfirmOff(false)}
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          Turning MFA OFF will stop asking verification codes from users who have already enrolled. Their devices
+          will stay saved, and turning MFA back ON will ask codes again. Continue?
+        </p>
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" disabled={mfaSaving} onClick={() => setMfaConfirmOff(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            disabled={mfaSaving}
+            onClick={() => {
+              setMfaConfirmOff(false);
+              void applyMfaUpdate(false);
+            }}
+          >
+            {mfaSaving ? "Turning OFF…" : "Turn OFF"}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

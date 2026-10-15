@@ -5,6 +5,7 @@ import { getMyMenus } from "../api/permissions";
 import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
 import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest, verifyMfaRequest } from "../api/auth";
+import { resetMfaEnrollBanner } from "../lib/mfaBanner";
 import { authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
 import { tenantKeySuffix } from "../lib/hosts";
 import { sessionCache } from "../lib/sessionCache";
@@ -180,6 +181,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Password ke baad ka common tail (normal login + MFA verify dono).
   // Session save, permissions/theme/bootstrap — ek jagah, duplicate nahi.
   const finishUserLogin = async (nextAuth: AuthPayload) => {
+    // Naya login = nayi yaad-dasht: pichhle session ka banner-dismiss
+    // bhool jao taaki bina-enroll user ko phir yaad dilaye. (Token-refresh
+    // yahan se nahi guzarta, isliye refresh par banner wapas nahi ayega.)
+    resetMfaEnrollBanner(nextAuth.user?.username ?? nextAuth.user?.email ?? null);
     const nextSession: StoredAuthSession = { type: "user", auth: nextAuth };
     authStorage.set(nextSession);
     const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([

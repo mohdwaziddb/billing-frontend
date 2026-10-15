@@ -282,7 +282,7 @@ export const InvoiceTemplatesPage = () => {
                   <iframe
                     ref={iframeRef}
                     title={previewName || "Invoice template preview"}
-                    srcDoc={sanitizeHtml(previewHtml)}
+                    srcDoc={sanitizeHtml(previewHtml, { allowStyle: true })}
                     sandbox="allow-print"
                     className="preview-surface rounded-[24px] border-0 bg-white"
                     style={{

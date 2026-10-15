@@ -13,11 +13,31 @@ const BASE_CONFIG = {
   ALLOW_DATA_ATTR: false
 } as unknown as Parameters<typeof DOMPurify.sanitize>[1];
 
-export const sanitizeHtml = (dirty: string | null | undefined): string => {
+export const sanitizeHtml = (
+  dirty: string | null | undefined,
+  options?: { allowStyle?: boolean }
+): string => {
   if (!dirty) {
     return "";
   }
-  return String(DOMPurify.sanitize(dirty, BASE_CONFIG));
+  if (!options?.allowStyle) {
+    return String(DOMPurify.sanitize(dirty, BASE_CONFIG));
+  }
+  // First-party invoice HTML only: backend inlines template.css into a
+  // <style> block, and stripping it renders raw unstyled invoices. <style>
+  // cannot run scripts in modern browsers, and both sinks using this are
+  // sandboxed (preview iframe) or print-only. Every other caller (AI output,
+  // emails, messages) stays on the strict config.
+  const { FORBID_TAGS, ...rest } = BASE_CONFIG as unknown as {
+    FORBID_TAGS: string[];
+    [key: string]: unknown;
+  };
+  return String(
+    DOMPurify.sanitize(dirty, {
+      ...rest,
+      FORBID_TAGS: FORBID_TAGS.filter((tag) => tag !== "style")
+    } as unknown as Parameters<typeof DOMPurify.sanitize>[1])
+  );
 };
 
 /**
