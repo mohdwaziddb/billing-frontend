@@ -22,14 +22,21 @@ export const getPaymentModesPage = async (params?: PaymentModeParams) => {
 
 export const getPaymentModes = async (params?: PaymentModeParams) => {
   if (isActiveLookupRequest(params)) {
+    // Empty cached list is treated as a miss, never served: the table may
+    // have been backfilled after an empty read (boot sweep / first invoice),
+    // and [] is truthy so a plain truthiness check would stick forever.
     const cached = sessionCache.get<PaymentModeMaster[]>(ACTIVE_PAYMENT_MODES_CACHE_KEY);
-    if (cached) {
+    if (cached && cached.length > 0) {
       return cached;
     }
     if (!activePaymentModesPromise) {
       activePaymentModesPromise = getPaymentModesPage(params)
         .then((response) => {
-          sessionCache.set(ACTIVE_PAYMENT_MODES_CACHE_KEY, response.records);
+          // Cache only non-empty lookups: caching [] would freeze every
+          // payment-mode dropdown until the tab session ends.
+          if (response.records.length > 0) {
+            sessionCache.set(ACTIVE_PAYMENT_MODES_CACHE_KEY, response.records);
+          }
           return response.records;
         })
         .finally(() => {
