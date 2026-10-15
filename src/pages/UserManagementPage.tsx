@@ -1,7 +1,8 @@
-import { Download, Edit3, History, Plus, UserX } from "lucide-react";
+import { Download, Edit3, History, KeyRound, Plus, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { createCompanyUser, deactivateCompanyUser, getCompanyUsersPage, getRoles, updateCompanyUser } from "../api/users";
+import { resetUserMfa } from "../api/mfa";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
@@ -72,7 +73,8 @@ const emptyUserPage: PageResponse<UserProfile> = {
 };
 
 export const UserManagementPage = () => {
-  const { can } = useAuth();
+  const { can, user: activeUser } = useAuth();
+  const isOwner = activeUser?.role === "OWNER" || Boolean(activeUser?.superAdmin);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [userPage, setUserPage] = useState<PageResponse<UserProfile>>(emptyUserPage);
   const [page, setPage] = useState(0);
@@ -82,6 +84,8 @@ export const UserManagementPage = () => {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [mfaResetTarget, setMfaResetTarget] = useState<UserProfile | null>(null);
+  const [mfaResetting, setMfaResetting] = useState(false);
   const [logTarget, setLogTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [activeUserRole, setActiveUserRole] = useState<Role | "ALL" | null>(null);
@@ -263,6 +267,25 @@ export const UserManagementPage = () => {
     }
   };
 
+  const resetMfa = async () => {
+    if (!mfaResetTarget) {
+      return;
+    }
+    clearMessage();
+    try {
+      setMfaResetting(true);
+      const result = await resetUserMfa(mfaResetTarget.id);
+      setMfaResetTarget(null);
+      notificationService.showSuccess(
+        `MFA reset (${result.removedDevices} device(s) removed). The user needs to enroll again.`
+      );
+    } catch (err: any) {
+      setApiError(err, "Unable to reset MFA.");
+    } finally {
+      setMfaResetting(false);
+    }
+  };
+
   if (!can("USERS", "VIEW")) {
     return (
       <div className="space-y-4 pb-6">
@@ -417,6 +440,12 @@ export const UserManagementPage = () => {
                       icon: <History size={15} />,
                       hidden: !can("USERS", "LOGS"),
                       onClick: () => setLogTarget(item)
+                    },
+                    {
+                      label: "Reset MFA",
+                      icon: <KeyRound size={15} />,
+                      hidden: !isOwner || !can("USERS", "EDIT"),
+                      onClick: () => setMfaResetTarget(item)
                     },
                     {
                       label: "Disable",
@@ -587,6 +616,26 @@ export const UserManagementPage = () => {
       </Modal>
       <AuditLogModal open={Boolean(logTarget)} moduleName="User" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.fullName} Logs` : "User Logs"} onClose={() => setLogTarget(null)} />
       <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void deactivateUser()} />
+      <Modal
+        open={Boolean(mfaResetTarget)}
+        title="Reset MFA"
+        eyebrow="Security"
+        maxWidthClass="max-w-md"
+        onClose={() => setMfaResetTarget(null)}
+      >
+        <p className="text-sm leading-relaxed text-slate-600">
+          All MFA devices of <strong>{mfaResetTarget?.fullName}</strong> ({mfaResetTarget?.username}) will be removed.
+          The user will sign in without a code next time and will need to enroll again. Continue?
+        </p>
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" disabled={mfaResetting} onClick={() => setMfaResetTarget(null)}>
+            Cancel
+          </Button>
+          <Button type="button" variant="danger" disabled={mfaResetting} onClick={() => void resetMfa()}>
+            {mfaResetting ? "Resetting…" : "Reset MFA"}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

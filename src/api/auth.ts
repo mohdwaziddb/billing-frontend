@@ -6,6 +6,11 @@ export const loginRequest = async (payload: { username: string; password: string
   return response.data.data;
 };
 
+export const verifyMfaRequest = async (payload: { mfaToken: string; code: string }) => {
+  const response = await apiClient.post<ApiResponse<AuthPayload>>("/v1/auth/mfa/verify", payload);
+  return response.data.data;
+};
+
 export const platformAdminLoginRequest = async (payload: { username: string; password: string }) => {
   const response = await apiClient.post<ApiResponse<PlatformAdminAuthPayload>>("/v1/platform-admin/login", payload);
   return response.data.data;

@@ -89,6 +89,7 @@ const isAuthBypassRoute = (url?: string) => {
   }
   return [
     "/v1/auth/login",
+    "/v1/auth/mfa/verify",
     "/v1/auth/forgot-password",
     "/v1/auth/logout",
     "/v1/auth/refresh",

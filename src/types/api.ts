@@ -44,6 +44,7 @@ export type CompanySummary = {
   inventoryConsumptionMethod?: "FIFO" | "LIFO" | "WEIGHTED_AVERAGE";
   inventoryPricingPolicy?: "LATEST_BATCH_SELLING_PRICE" | "PRODUCT_MASTER_SELLING_PRICE" | "MANUAL_PRICE" | "PRICE_LIST";
   chatbotEnabled?: boolean;
+  applyMfa?: boolean;
 };
 
 export type CompanyTheme = {
@@ -90,6 +91,44 @@ export type AuthPayload = {
   tokenType: string;
   expiresIn: number;
   user: UserProfile;
+  /** True when password passed but TOTP step is pending (backend MFA challenge). */
+  mfaRequired?: boolean;
+  /** Short-lived second-step token for /v1/auth/mfa/verify. Never store. */
+  mfaToken?: string | null;
+  /** True when company MFA is ON but this user has not enrolled yet. */
+  mfaEnrollAvailable?: boolean;
+};
+
+export type MfaDevice = {
+  id: number;
+  deviceName: string;
+  enrolledAt?: string | null;
+  lastUsedAt?: string | null;
+};
+
+export type MfaStatus = {
+  applyMfaByCompany: boolean;
+  mfaEnabled: boolean;
+  devices: MfaDevice[];
+};
+
+export type MfaSetupStart = {
+  deviceName: string;
+  otpAuthUrl: string;
+  qrBase64: string;
+  secret: string;
+};
+
+export type MfaSetupConfirmResult = {
+  deviceId: number;
+  deviceName: string;
+  mfaEnabled: boolean;
+};
+
+export type CompanyMfaSettings = {
+  applyMfa: boolean;
+  companyId: number;
+  companyCode?: string | null;
 };
 
 export type PlatformAdminAuthPayload = {

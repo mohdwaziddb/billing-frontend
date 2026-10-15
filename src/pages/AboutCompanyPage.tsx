@@ -1,6 +1,7 @@
 import { Building2, PenTool, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { deleteCompanyLogo, deleteCompanySignature, getCompanySettings, updateCompanySettings, uploadCompanyLogo, uploadCompanySignature, type CompanySettingsRequest } from "../api/company";
+import { getCompanyMfaSettings, updateCompanyMfaSettings } from "../api/mfa";
 import { getStates } from "../api/states";
 import { Button } from "../components/Button";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
@@ -50,8 +51,9 @@ const emptyForm: FormState = {
 const logoSrc = (url?: string | null) => resolveAssetUrl(url);
 
 export const AboutCompanyPage = () => {
-  const { can, refreshProfile } = useAuth();
+  const { can, refreshProfile, user } = useAuth();
   const canEdit = can("ABOUT_COMPANY", "EDIT");
+  const isOwner = user?.role === "OWNER" || Boolean(user?.superAdmin);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
@@ -64,6 +66,9 @@ export const AboutCompanyPage = () => {
   const { clearMessage, setApiError } = useApiMessage();
   const [deletingLogo, setDeletingLogo] = useState(false);
   const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
+  const [mfaApply, setMfaApply] = useState<boolean | null>(null);
+  const [mfaSaving, setMfaSaving] = useState(false);
+  const [mfaMsg, setMfaMsg] = useState("");
   const canSaveProfile = Boolean(form.name.trim() && form.phone.trim() && form.email.trim() && (!form.gstRegistered || (form.gstin ?? form.taxId ?? "").trim()));
 
   const setField = (key: keyof FormState, value: string) => {
@@ -116,6 +121,49 @@ export const AboutCompanyPage = () => {
   useEffect(() => {
     void loadCompany();
   }, [canEdit]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCompanyMfaSettings()
+      .then((settings) => {
+        if (!cancelled) {
+          setMfaApply(Boolean(settings.applyMfa));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMfaApply(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggleMfa = async (next: boolean) => {
+    if (mfaApply === null || mfaSaving) {
+      return;
+    }
+    if (!next && mfaApply) {
+      const ok = window.confirm(
+        "Turning MFA OFF will stop asking verification codes from users who have already enrolled. Continue?"
+      );
+      if (!ok) {
+        return;
+      }
+    }
+    try {
+      setMfaSaving(true);
+      setMfaMsg("");
+      const updated = await updateCompanyMfaSettings(next);
+      setMfaApply(Boolean(updated.applyMfa));
+      setMfaMsg(next ? "MFA has been turned ON. Users can now enroll in Two-Step Verification." : "MFA has been turned OFF.");
+    } catch (err: any) {
+      setApiError(err, "Unable to update MFA setting.");
+    } finally {
+      setMfaSaving(false);
+    }
+  };
 
   useEffect(() => {
     setStatesLoading(true);
@@ -360,6 +408,34 @@ export const AboutCompanyPage = () => {
               {canEdit ? <Button disabled={saving || !canSaveProfile} onClick={() => void saveProfile()}>{saving ? "Saving..." : "Save company profile"}</Button> : null}
               {!canEdit ? <p className="text-sm text-slate-400">You have view-only access to company profile details.</p> : null}
             </div>
+
+            <section className="grid gap-4 md:grid-cols-2">
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Security — Multi-Factor Authentication</p>
+              <div className="md:col-span-2 rounded-[var(--radius-control)] border border-white/10 bg-white/5 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-white">Company MFA {mfaApply === null ? "" : mfaApply ? "(ON)" : "(OFF)"}</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      When ON, users can enroll in Two-Step Verification, and a verification code will be required at login after enrollment.
+                    </p>
+                  </div>
+                  <label className="inline-flex cursor-pointer items-center gap-3">
+                    <span className="text-sm font-semibold text-slate-300">{mfaApply ? "ON" : "OFF"}</span>
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 accent-emerald-500"
+                      disabled={!isOwner || mfaSaving || mfaApply === null}
+                      checked={Boolean(mfaApply)}
+                      onChange={(event) => void toggleMfa(event.target.checked)}
+                    />
+                  </label>
+                </div>
+                {!isOwner ? (
+                  <p className="mt-2 text-sm text-slate-400">Only the OWNER can change this setting.</p>
+                ) : null}
+                {mfaMsg ? <p className="mt-2 text-sm font-medium text-emerald-300">{mfaMsg}</p> : null}
+              </div>
+            </section>
           </div>
         )}
       </GlassCard>

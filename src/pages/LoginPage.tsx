@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiClient } from "../api/apiClient";
 import { AnalyticsShowcase } from "../components/login/AnalyticsShowcase";
 import { LoginCard } from "../components/login/LoginCard";
+import { MfaChallengeCard } from "../components/login/MfaChallengeCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { getApiErrorMessage } from "../lib/errors";
@@ -27,11 +28,17 @@ type CompanyBranding = {
 };
 
 export const LoginPage = () => {
-  const { auth, sessionType, permissions, firstAccessibleRoute, login, platform } = useAuth();
+  const { auth, sessionType, permissions, firstAccessibleRoute, login, completeMfaLogin, platform } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // MFA second step: password OK hua par TOTP pending hai. mfaToken sirf
+  // memory me rehta hai — storage me kabhi nahi (5 min expiry).
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [mfaAccountLabel, setMfaAccountLabel] = useState<string | null>(null);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaError, setMfaError] = useState("");
   const [company, setCompany] = useState<LoginCompany>(null);
   const [brandingReady, setBrandingReady] = useState(false);
   const [byDomainMissing, setByDomainMissing] = useState(false);
@@ -147,8 +154,15 @@ export const LoginPage = () => {
       setLoading(true);
       setError("");
       clearMessage();
-      const firstRoute = await login(form);
-      navigate(firstRoute ?? "/no-menu", { replace: true });
+      const result = await login(form);
+      if (result.mfaRequired) {
+        // Second step: code screen dikhao, session abhi save nahi hui.
+        setMfaToken(result.mfaToken ?? null);
+        setMfaAccountLabel(result.user?.username ?? result.user?.email ?? null);
+        setMfaError("");
+        return;
+      }
+      navigate(result.route ?? "/no-menu", { replace: true });
     } catch (err: any) {
       const message = getApiErrorMessage(err, "Unable to sign in. Please check your email and password.");
       setError(message);
@@ -156,6 +170,30 @@ export const LoginPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const submitMfa = async (code: string) => {
+    if (!mfaToken) {
+      setMfaError("MFA session expired. Please sign in again.");
+      return;
+    }
+    try {
+      setMfaLoading(true);
+      setMfaError("");
+      clearMessage();
+      const route = await completeMfaLogin(mfaToken, code);
+      navigate(route ?? "/no-menu", { replace: true });
+    } catch (err: any) {
+      setMfaError(getApiErrorMessage(err, "Incorrect code. Enter the 6-digit code from your authenticator app."));
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const backToPassword = () => {
+    setMfaToken(null);
+    setMfaAccountLabel(null);
+    setMfaError("");
   };
 
   return (
@@ -166,6 +204,15 @@ export const LoginPage = () => {
       <div className="grid flex-1 lg:grid-cols-2">
         <AnalyticsShowcase />
         <main className="relative flex items-center justify-center px-4 py-10 sm:px-8 lg:py-12">
+          {mfaToken ? (
+            <MfaChallengeCard
+              accountLabel={mfaAccountLabel}
+              loading={mfaLoading}
+              error={mfaError}
+              onSubmit={(code) => void submitMfa(code)}
+              onBack={backToPassword}
+            />
+          ) : (
           <LoginCard
             username={form.username}
             password={form.password}
@@ -191,6 +238,7 @@ export const LoginPage = () => {
             }}
             onSubmit={submit}
           />
+          )}
         </main>
       </div>
       <footer className="border-t border-slate-200 bg-white/70 py-4 text-center text-xs font-medium text-slate-500">

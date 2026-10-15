@@ -19,6 +19,7 @@ import { Button } from "../components/Button";
 import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
+import { MfaEnrollBanner } from "../components/MfaEnrollBanner";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
@@ -741,6 +742,8 @@ export const DashboardPage = () => {
         title="Dashboard"
         subtitle="Track sales, collections, open balances, and customer performance with date-based business visibility."
       />
+
+      <MfaEnrollBanner />
 
       <GlassCard className="p-5 md:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">

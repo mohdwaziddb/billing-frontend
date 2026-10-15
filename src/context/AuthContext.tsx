@@ -4,7 +4,7 @@ import { getCompanyTheme } from "../api/company";
 import { getMyMenus } from "../api/permissions";
 import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
-import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest } from "../api/auth";
+import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest, verifyMfaRequest } from "../api/auth";
 import { authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
 import { tenantKeySuffix } from "../lib/hosts";
 import { sessionCache } from "../lib/sessionCache";
@@ -37,7 +37,14 @@ type AuthContextValue = {
   refreshPermissions: () => Promise<void>;
   can: (menuCode: string, actionCode?: string) => boolean;
   firstAccessibleRoute: () => string | null;
-  login: (payload: { username: string; password: string }) => Promise<string | null>;
+  login: (payload: { username: string; password: string }) => Promise<{
+    mfaRequired: boolean;
+    mfaToken?: string | null;
+    mfaEnrollAvailable?: boolean;
+    route: string | null;
+    user?: UserProfile | null;
+  }>;
+  completeMfaLogin: (mfaToken: string, code: string) => Promise<string | null>;
   loginPlatformAdmin: (payload: { username: string; password: string }) => Promise<string>;
   logout: () => Promise<void>;
 };
@@ -170,6 +177,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   }, [session?.auth.accessToken, session?.type]);
 
+  // Password ke baad ka common tail (normal login + MFA verify dono).
+  // Session save, permissions/theme/bootstrap — ek jagah, duplicate nahi.
+  const finishUserLogin = async (nextAuth: AuthPayload) => {
+    const nextSession: StoredAuthSession = { type: "user", auth: nextAuth };
+    authStorage.set(nextSession);
+    const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
+      getMyMenus(),
+      getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
+      getPlatformSettings().catch(() => defaultPlatformSettings),
+      getMyPreferences().catch(() => ({ darkModeEnabled: false }))
+    ]);
+    setPermissions(nextPermissions);
+    setTheme(nextTheme);
+    setPlatform(nextPlatform);
+    setPreferences(nextPreferences);
+    sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, {
+      accessToken: nextAuth.accessToken,
+      user: nextAuth.user,
+      permissions: nextPermissions,
+      theme: nextTheme,
+      platform: nextPlatform,
+      preferences: nextPreferences
+    });
+    setSession(nextSession);
+    setUser(nextAuth.user);
+    ThemeBootstrapService.remember(nextTheme, nextPreferences);
+    return findFirstRoute(nextPermissions.menus);
+  };
+
   const value = useMemo<AuthContextValue>(
     () => ({
       auth,
@@ -271,30 +307,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       },
       async login(payload) {
         const nextAuth = await loginRequest(payload);
-        const nextSession: StoredAuthSession = { type: "user", auth: nextAuth };
-        authStorage.set(nextSession);
-        const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
-          getMyMenus(),
-          getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
-          getPlatformSettings().catch(() => defaultPlatformSettings),
-          getMyPreferences().catch(() => ({ darkModeEnabled: false }))
-        ]);
-        setPermissions(nextPermissions);
-        setTheme(nextTheme);
-        setPlatform(nextPlatform);
-        setPreferences(nextPreferences);
-        sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, {
-          accessToken: nextAuth.accessToken,
-          user: nextAuth.user,
-          permissions: nextPermissions,
-          theme: nextTheme,
-          platform: nextPlatform,
-          preferences: nextPreferences
-        });
-        setSession(nextSession);
-        setUser(nextAuth.user);
-        ThemeBootstrapService.remember(nextTheme, nextPreferences);
-        return findFirstRoute(nextPermissions.menus);
+        if (nextAuth.mfaRequired) {
+          // Password sahi, TOTP pending: session save MAT karo. Caller
+          // (LoginPage) mfaToken lekar code screen dikhayega.
+          return {
+            mfaRequired: true,
+            mfaToken: nextAuth.mfaToken ?? null,
+            route: null,
+            user: nextAuth.user ?? null
+          };
+        }
+        const route = await finishUserLogin(nextAuth);
+        return {
+          mfaRequired: false,
+          mfaEnrollAvailable: Boolean(nextAuth.mfaEnrollAvailable),
+          route,
+          user: nextAuth.user ?? null
+        };
+      },
+      async completeMfaLogin(mfaToken, code) {
+        const nextAuth = await verifyMfaRequest({ mfaToken, code });
+        return finishUserLogin(nextAuth);
       },
       async loginPlatformAdmin(payload) {
         const nextAuth = await platformAdminLoginRequest(payload);

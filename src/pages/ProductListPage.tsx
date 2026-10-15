@@ -142,7 +142,7 @@ export const ProductListPage = () => {
       header: "Product Name",
       render: (item: Product) => (
         <div className="min-w-[180px]">
-          <Link to={`/products/${item.id}`} className="font-semibold text-white transition hover:text-[var(--theme-color)]">{item.name}</Link>
+          <Link to={`/products/${item.id}`} className="font-semibold text-slate-950 transition hover:text-[var(--theme-color)]">{item.name}</Link>
         </div>
       )
     },

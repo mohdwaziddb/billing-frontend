@@ -54,6 +54,7 @@ import { SalesReferralsPage } from "./pages/SalesReferralsPage";
 import { ThemeSettingsPage } from "./pages/ThemeSettingsPage";
 import { TaxMasterPage } from "./pages/TaxMasterPage";
 import { UserManagementPage } from "./pages/UserManagementPage";
+import { TwoStepVerificationPage } from "./pages/TwoStepVerificationPage";
 import { SmsTemplatePage } from "./pages/SmsTemplatePage";
 import { PlatformAdminPage } from "./pages/PlatformAdminPage";
 import { BizioConsolePage } from "./pages/BizioConsolePage";
@@ -213,6 +214,7 @@ function App() {
           <Route path="/reports/sales-referrals" element={<PermissionRoute menuCode="SALES_REFERRALS"><SalesReferralsPage /></PermissionRoute>} />
           <Route path="/setup/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
           <Route path="/users" element={<PermissionRoute menuCode="USERS"><UserManagementPage /></PermissionRoute>} />
+          <Route path="/setup/two-step-verification" element={<TwoStepVerificationPage />} />
           <Route path="/setup/role-permissions" element={<PermissionRoute menuCode="ROLE_PERMISSIONS"><RolePermissionsPage /></PermissionRoute>} />
           <Route path="/no-menu" element={<NoMenuPage />} />
         </Route>
