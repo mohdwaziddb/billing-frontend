@@ -1,7 +1,9 @@
 import { Bot, Check, Copy, Send, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { sendAiMessage, type AiChartData, type AiTableData } from "../api/ai";
+import { apiClient } from "../api/apiClient";
+import type { ApiResponse } from "../types/api";
 import { useAuth } from "../context/AuthContext";
 import { useIsDarkMode } from "../hooks/useIsDarkMode";
 import { getChartTheme } from "../lib/chartTheme";
@@ -58,6 +60,28 @@ export const AiAssistantWidget = () => {
     }
   }, [auth?.accessToken, sessionType, refreshProfile]);
 
+  // Server truth for the chatbot flag: the login-time session above still goes
+  // stale when Platform Admin disables mid-session, so ask the public tenant
+  // endpoint (fresh DB read every time, no session involved). Fail-open on
+  // error — AiService remains the hard guard for actual chat calls.
+  const [serverChatbotDisabled, setServerChatbotDisabled] = useState(false);
+  const refreshServerFlag = useCallback(async () => {
+    try {
+      const response = await apiClient.get<ApiResponse<{ chatbotEnabled?: boolean }>>("/v1/company/current");
+      if (response.data?.data?.chatbotEnabled === false) {
+        setServerChatbotDisabled(true);
+      }
+    } catch {
+      // Keep session-based behavior; backend remains the hard guard.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sessionType === "user" && auth?.accessToken) {
+      void refreshServerFlag().catch(() => undefined);
+    }
+  }, [auth?.accessToken, sessionType, refreshServerFlag]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, loading]);
@@ -66,7 +90,7 @@ export const AiAssistantWidget = () => {
     return null;
   }
 
-  if (user?.company && user.company.chatbotEnabled === false) {
+  if (serverChatbotDisabled || (user?.company && user.company.chatbotEnabled === false)) {
     return null;
   }
 
@@ -74,6 +98,7 @@ export const AiAssistantWidget = () => {
     // Re-check the flag when the user opens the chat: covers disable
     // happening mid-session (mount refresh only runs once per load).
     void refreshProfile().catch(() => undefined);
+    void refreshServerFlag().catch(() => undefined);
     setOpen(true);
   };
 

@@ -173,7 +173,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     },
     { key: "email", header: "Email", render: (item: PlatformAdminCompany) => <span className="block min-w-[180px]">{item.email}</span> },
     { key: "mobile", header: "Mobile", render: (item: PlatformAdminCompany) => <span className="whitespace-nowrap">{item.mobile ?? "--"}</span> },
-    { key: "chatbot", header: "Chatbot", render: (item: PlatformAdminCompany) => <StatusBadge label={item.chatbotEnabled ? "ON" : "OFF"} /> },
+    { key: "chatbot", header: "Chatbot", render: (item: PlatformAdminCompany) => <StatusBadge label={item.chatbotEnabled == null ? null : item.chatbotEnabled ? "ON" : "OFF"} /> },
     { key: "status", header: "Status", render: (item: PlatformAdminCompany) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
     { key: "users", header: "Users", render: (item: PlatformAdminCompany) => item.totalUsers },
     { key: "created", header: "Created Date", render: (item: PlatformAdminCompany) => <span className="whitespace-nowrap">{formatDateTime(item.createdAt)}</span> },
@@ -194,7 +194,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
             {
               label: item.chatbotEnabled ? "Disable Chatbot" : "Enable Chatbot",
               icon: <Bot size={15} />,
-              disabled: chatbotToggleId === item.code,
+              disabled: chatbotToggleId === item.code || item.chatbotEnabled == null,
               onClick: () => onToggleChatbot(item)
             },
             {
@@ -391,8 +391,10 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
         await activatePlatformAdminCompany(company.code);
         notificationService.showSuccess("Company activated successfully");
       }
+      // Fresh list ka WAIT karo tabhi modal band karo: warna table/buttons
+      // stale state dikhate hain (cold tenant pools par refresh slow hota hai).
+      await refreshCountsAndLists(companyPage).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
       setStatusAction(null);
-      void refreshCountsAndLists(companyPage).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
     } catch (err) {
       if (isDeactivate) {
         setStatusAction({ company, loading: false });
@@ -411,7 +413,9 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
         await disablePlatformAdminCompanyChatbot(company.code);
         notificationService.showSuccess("Chatbot disabled for company");
       }
-      void refreshCountsAndLists(companyPage).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
+      // Button ka loading tabhi hatao jab fresh list aa jaye — stale label
+      // par dobara click karne se purani state par action lag jata hai.
+      await refreshCountsAndLists(companyPage).catch((err) => setApiError(err, "Unable to refresh platform admin data"));
     } catch (err) {
       setApiError(err, "Unable to update chatbot status");
     } finally {
@@ -1109,7 +1113,7 @@ const CompanyDetailsView = ({ details, hideSummaryLabels = [] }: { details: Plat
       {!hideSummaryLabels.includes("Owners") ? <Info label="Owners" value={details.ownerCount} /> : null}
       {!hideSummaryLabels.includes("Admins") ? <Info label="Admins" value={details.adminCount} /> : null}
       {!hideSummaryLabels.includes("Users") ? <Info label="Users" value={details.userCount} /> : null}
-      {!hideSummaryLabels.includes("Chatbot") ? <Info label="Chatbot" value={details.company.chatbotEnabled ? "ON" : "OFF"} /> : null}
+      {!hideSummaryLabels.includes("Chatbot") ? <Info label="Chatbot" value={details.company.chatbotEnabled == null ? "Unknown" : details.company.chatbotEnabled ? "ON" : "OFF"} /> : null}
       {!hideSummaryLabels.includes("Audit Logs") ? <Info label="Audit Logs" value={details.auditLogCount} /> : null}
     </div>
     <Table data={details.users} emptyText="No users found." columns={[

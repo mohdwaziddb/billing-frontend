@@ -283,7 +283,11 @@ export const InvoiceTemplatesPage = () => {
                     ref={iframeRef}
                     title={previewName || "Invoice template preview"}
                     srcDoc={sanitizeHtml(previewHtml, { allowStyle: true })}
-                    sandbox="allow-print"
+                    // Print needs allow-modals (the print dialog is a modal).
+                    // NOTE: "allow-print" is NOT a valid sandbox token (ignored),
+                    // which is why Print Preview silently did nothing. No
+                    // allow-scripts/allow-same-origin: sanitized content stays inert.
+                    sandbox="allow-modals"
                     className="preview-surface rounded-[24px] border-0 bg-white"
                     style={{
                       width: iframeWidth,

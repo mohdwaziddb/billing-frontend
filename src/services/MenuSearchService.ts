@@ -27,13 +27,22 @@ const menuAlias = (menu: MenuPermission) => {
 
 const displayName = (menu: MenuPermission) => (menu.menuCode === "SETUP" ? "Settings" : menu.menuName);
 
+// Setup always renders last in the menu list, regardless of displayOrder.
+// Shared by Sidebar, search results and login landing route.
+export const compareMenuOrder = (
+  a: { menuCode?: string; displayOrder: number },
+  b: { menuCode?: string; displayOrder: number }
+): number =>
+  (a.menuCode === "SETUP" ? 1 : 0) - (b.menuCode === "SETUP" ? 1 : 0) ||
+  a.displayOrder - b.displayOrder;
+
 const flattenMenus = (menus: MenuPermission[]): MenuSearchResult[] => {
   const results: MenuSearchResult[] = [];
 
   const visit = (items: MenuPermission[]) => {
     items
       .filter((menu) => menu.canView)
-      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .sort(compareMenuOrder)
       .forEach((menu) => {
         if (menu.menuRoute) {
           const label = displayName(menu);

@@ -30,6 +30,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { resolveAssetUrl } from "../config/env";
 import { useAuth } from "../context/AuthContext";
+import { compareMenuOrder } from "../services/MenuSearchService";
 import type { MenuPermission } from "../types/api";
 
 const iconMap: Record<string, LucideIcon> = {
@@ -140,7 +141,7 @@ export const Sidebar = () => {
       <nav className="scrollbar-thin -mr-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden pr-2">
         {menus.map((item) => {
           const Icon = item.menuIcon ? iconMap[item.menuIcon] ?? LayoutDashboard : LayoutDashboard;
-          const children = (item.children ?? []).filter((child) => child.canView).sort((a, b) => a.displayOrder - b.displayOrder);
+          const children = (item.children ?? []).filter((child) => child.canView).sort(compareMenuOrder);
           if (children.length) {
             if (collapsed) {
               return (
@@ -254,4 +255,4 @@ const filterCompanyMenus = (menus: MenuPermission[]): MenuPermission[] =>
       children: filterCompanyMenus(menu.children ?? [])
     }))
     .filter((menu) => menu.menuRoute || (menu.children?.length ?? 0) > 0)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+    .sort(compareMenuOrder);

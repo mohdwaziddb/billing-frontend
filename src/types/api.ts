@@ -156,7 +156,7 @@ export type PlatformAdminCompany = {
   email: string;
   mobile: string;
   active: boolean;
-  chatbotEnabled: boolean;
+  chatbotEnabled: boolean | null;
   createdAt: string | null;
   ownerCount: number;
   adminCount: number;
