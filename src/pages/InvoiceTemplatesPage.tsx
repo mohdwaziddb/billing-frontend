@@ -12,7 +12,6 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
-import { sanitizeHtml } from "../lib/sanitizeHtml";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { notificationService } from "../services/notificationService";
@@ -152,13 +151,47 @@ export const InvoiceTemplatesPage = () => {
   };
 
   const printPreview = () => {
-    const frame = iframeRef.current?.contentWindow;
-    if (!frame) {
+    if (!previewHtml) {
       notificationService.showError("Preview is not ready for printing yet.");
       return;
     }
-    frame.focus();
-    frame.print();
+    // NOTE: on-screen preview iframe sandboxed hai (allow-modals only, bina
+    // allow-same-origin) — us par contentWindow.print() Chrome me silently
+    // fail hota hai. Isliye print ke liye InvoiceDetailPage wala proven
+    // pattern: hidden same-origin iframe me HTML likh kar print karo.
+    try {
+      const frame = document.createElement("iframe");
+      frame.style.position = "fixed";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "0";
+      frame.setAttribute("aria-hidden", "true");
+      document.body.appendChild(frame);
+      frame.onload = () => {
+        window.setTimeout(() => {
+          frame.contentWindow?.focus();
+          frame.contentWindow?.print();
+          window.setTimeout(() => {
+            document.body.removeChild(frame);
+          }, 1000);
+        }, 250);
+      };
+      const doc = frame.contentWindow?.document;
+      if (!doc) {
+        document.body.removeChild(frame);
+        notificationService.showError("Unable to open print preview right now.");
+        return;
+      }
+      // First-party backend HTML (on-screen preview jaisa RAW) taaki
+      // template.css print me bhi survive kare.
+      doc.open();
+      doc.write(previewHtml);
+      doc.close();
+    } catch {
+      notificationService.showError("Unable to print preview right now.");
+    }
   };
 
   const zoomOut = () => setZoom((current) => Math.max(0.3, Number((current - 0.1).toFixed(2))));
@@ -282,11 +315,16 @@ export const InvoiceTemplatesPage = () => {
                   <iframe
                     ref={iframeRef}
                     title={previewName || "Invoice template preview"}
-                    srcDoc={sanitizeHtml(previewHtml, { allowStyle: true })}
-                    // Print needs allow-modals (the print dialog is a modal).
-                    // NOTE: "allow-print" is NOT a valid sandbox token (ignored),
-                    // which is why Print Preview silently did nothing. No
-                    // allow-scripts/allow-same-origin: sanitized content stays inert.
+                    // First-party backend HTML (template.css inlined as <style>).
+                    // Pehle jaisa raw preview: sanitize <style> strip kar deta
+                    // hai jisse invoice unstyled dikhta hai. Iframe sandboxed
+                    // hai (allow-modals only), isliye content inert rehta hai.
+                    srcDoc={previewHtml}
+                    // On-screen preview only: sandboxed (allow-modals), no
+                    // allow-scripts/allow-same-origin, isliye content inert hai.
+                    // Printing is iframe se nahi hota (sandboxed frame par
+                    // print() silently fail hota hai) — printPreview hidden
+                    // same-origin iframe banakar print karta hai.
                     sandbox="allow-modals"
                     className="preview-surface rounded-[24px] border-0 bg-white"
                     style={{

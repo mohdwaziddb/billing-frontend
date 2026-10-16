@@ -7,6 +7,20 @@ export type ApiResponse<T> = {
 
 export type Role = "OWNER" | "ADMIN" | "USER";
 
+/** Full file metadata (file_name, type, url, key, size, ...) for branding images. Null for legacy rows. */
+export type CompanyFileInfo = {
+  file_name?: string | null;
+  original_name?: string | null;
+  key?: string | null;
+  url?: string | null;
+  type?: string | null;
+  size?: number | null;
+  bucket?: string | null;
+  tenant?: string | null;
+  kind?: string | null;
+  uploaded_at?: string | null;
+};
+
 export type CompanySummary = {
   id: number;
   name: string;
@@ -31,6 +45,7 @@ export type CompanySummary = {
   panNumber?: string | null;
   cinNumber?: string | null;
   logoUrl?: string | null;
+  logoFile?: CompanyFileInfo | null;
   websiteUrl?: string | null;
   bankName?: string | null;
   bankAccountName?: string | null;
@@ -39,6 +54,7 @@ export type CompanySummary = {
   bankBranch?: string | null;
   upiId?: string | null;
   signatureUrl?: string | null;
+  signatureFile?: CompanyFileInfo | null;
   invoiceNotes?: string | null;
   invoiceTerms?: string | null;
   inventoryConsumptionMethod?: "FIFO" | "LIFO" | "WEIGHTED_AVERAGE";
