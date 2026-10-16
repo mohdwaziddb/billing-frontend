@@ -12,10 +12,9 @@ export const StatusBadge = ({ label }: { label?: string | null }) => {
         (normalized === "PARTIAL" || normalized === "PENDING") && "status-badge-warning",
         (normalized === "UNPAID" || normalized === "FAILED" || normalized === "DELETED") && "status-badge-danger",
         normalized === "ACTIVE" && "status-badge-active",
-        normalized === "INACTIVE" && "status-badge-muted",
-        normalized === "UNKNOWN" && "status-badge-muted",
-        normalized === "CANCELLED" && "status-badge-muted",
-        !["PAID", "PARTIAL", "UNPAID", "SENT", "FAILED", "PENDING", "ACTIVE", "INACTIVE", "UNKNOWN", "DELETED", "CANCELLED"].includes(normalized) &&
+        normalized === "ON" && "status-badge-success",
+        (normalized === "OFF" || normalized === "INACTIVE" || normalized === "UNKNOWN" || normalized === "CANCELLED") && "status-badge-muted",
+        !["PAID", "PARTIAL", "UNPAID", "SENT", "FAILED", "PENDING", "ACTIVE", "ON", "OFF", "INACTIVE", "UNKNOWN", "DELETED", "CANCELLED"].includes(normalized) &&
           "status-badge-active"
       )}
     >

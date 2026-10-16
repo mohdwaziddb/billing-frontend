@@ -180,7 +180,6 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     {
       key: "actions",
       header: "Actions",
-      locked: true,
       render: (item: PlatformAdminCompany) => (
         <ActionDropdown
           actions={[
@@ -214,7 +213,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   );
 
   const companyColumnOptions = useMemo(
-    () => companyColumns.map(({ key, header, locked }) => ({ key, header, locked })),
+    () => companyColumns.map(({ key, header }) => ({ key, header })),
     [companyColumns]
   );
 
@@ -658,7 +657,6 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     {
       key: "actions",
       header: "Actions",
-      locked: true,
       render: (item: DumpHistoryRow) => (
         <span className="flex items-center gap-1">
           {(item.status === "QUEUED" || item.status === "RUNNING") && !item.hasFile ? (

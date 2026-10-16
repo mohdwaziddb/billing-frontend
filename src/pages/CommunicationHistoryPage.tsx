@@ -213,7 +213,7 @@ export const CommunicationHistoryPage = ({ channel }: { channel: CommunicationHi
         <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
           <CommonColumnSelector
             tableName={tableName}
-            availableColumns={[...allColumns.filter((column) => column.key !== "actions").map(({ key, header }) => ({ key, header })), { key: "actions", header: "Details", locked: true }]}
+            availableColumns={[...allColumns.filter((column) => column.key !== "actions").map(({ key, header }) => ({ key, header })), { key: "actions", header: "Details" }]}
             visibleColumns={visibleColumns}
             onApply={setVisibleColumns}
           />

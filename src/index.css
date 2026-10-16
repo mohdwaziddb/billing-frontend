@@ -856,6 +856,7 @@ select:-webkit-autofill {
 
 .login-float {
   animation: login-float 7s ease-in-out infinite;
+  will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {

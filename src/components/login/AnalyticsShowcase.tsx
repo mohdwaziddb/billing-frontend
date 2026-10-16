@@ -292,7 +292,7 @@ const FloatingBadges = () => (
     {FLOATING_BADGES.map(({ title, value, icon: Icon, color, className, delay, duration }) => (
       <div
         key={title}
-        className={`login-float absolute hidden items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white/95 px-3.5 py-2.5 shadow-[0_16px_32px_rgba(15,23,42,0.10)] backdrop-blur md:flex ${className}`}
+        className={`login-float absolute hidden items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white/95 px-3.5 py-2.5 shadow-[0_16px_32px_rgba(15,23,42,0.10)] md:flex ${className}`}
         style={{ animationDelay: delay, animationDuration: duration }}
       >
         <span
@@ -312,11 +312,11 @@ const FloatingBadges = () => (
 
 export const AnalyticsShowcase = () => (
   <aside className="relative hidden overflow-hidden bg-[linear-gradient(165deg,#ffffff_0%,#f6f9ff_55%,#edf3ff_100%)] lg:flex lg:justify-center lg:px-6 lg:py-10 xl:px-10">
-    <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#dbe7ff]/80 blur-3xl" />
-    <div aria-hidden className="pointer-events-none absolute -left-20 bottom-6 h-64 w-64 rounded-full bg-[#e6eeff]/90 blur-3xl" />
+    <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-96 w-96 rounded-full bg-[radial-gradient(circle,#dbe7ff_0%,rgba(219,231,255,0.55)_45%,rgba(219,231,255,0)_72%)]" />
+    <div aria-hidden className="pointer-events-none absolute -left-20 bottom-6 h-80 w-80 rounded-full bg-[radial-gradient(circle,#e6eeff_0%,rgba(230,238,255,0.6)_45%,rgba(230,238,255,0)_72%)]" />
     <div
       aria-hidden
-      className="pointer-events-none absolute left-1/3 top-1/2 h-52 w-52 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/60 blur-2xl"
+      className="pointer-events-none absolute left-1/3 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0.4)_50%,rgba(255,255,255,0)_75%)]"
     />
 
     <div className="relative z-10 mx-auto flex w-full max-w-[500px] flex-col justify-center">
