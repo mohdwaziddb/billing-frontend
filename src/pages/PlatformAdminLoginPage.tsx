@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { LoginCard } from "../components/login/LoginCard";
 import { LoginShell } from "../components/login/LoginShell";
 import { PUBLIC_APP_TITLE } from "../config/site";
@@ -52,14 +52,6 @@ export const PlatformAdminLoginPage = () => {
           setForm((current) => ({ ...current, password: value }));
         }}
         onSubmit={submit}
-        bottomBox={
-          <p className="text-[13px] font-medium leading-5 text-slate-600">
-            Need company access instead?{" "}
-            <Link className="font-semibold text-[var(--theme-color)] transition hover:opacity-80" to="/login">
-              Go to workspace login
-            </Link>
-          </p>
-        }
       />
     </LoginShell>
   );
