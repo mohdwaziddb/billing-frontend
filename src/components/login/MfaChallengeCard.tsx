@@ -1,4 +1,4 @@
-import { CircleAlert, Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type MfaChallengeCardProps = {
@@ -6,7 +6,6 @@ type MfaChallengeCardProps = {
   subtitle?: string;
   accountLabel?: string | null;
   loading: boolean;
-  error: string;
   onSubmit: (code: string) => void;
   onBack: () => void;
 };
@@ -18,7 +17,6 @@ export const MfaChallengeCard = ({
   subtitle = "Your account is protected with Multi-Factor Authentication (MFA). To continue, please enter the verification code from your MFA device below.",
   accountLabel = null,
   loading,
-  error,
   onSubmit,
   onBack
 }: MfaChallengeCardProps) => {
@@ -66,9 +64,9 @@ export const MfaChallengeCard = ({
   };
 
   return (
-    <div className="w-full max-w-[620px] rounded-[24px] border border-slate-200 bg-white p-6 text-left shadow-[0_24px_64px_-24px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="w-full max-w-[620px] rounded-lg border border-slate-200 bg-white p-6 text-left shadow-[0_24px_64px_-24px_rgba(15,23,42,0.25)] sm:p-8">
       <div className="flex flex-col items-center text-center">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white">
           <ShieldCheck size={22} />
         </span>
         <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Step 2 of 2 — Verification</p>
@@ -99,13 +97,6 @@ export const MfaChallengeCard = ({
         </div>
         <p className="mt-2.5 text-center text-xs text-slate-400">Codes refresh every 30 seconds in your authenticator app.</p>
       </div>
-
-      {error ? (
-        <p className="mt-3 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700">
-          <CircleAlert size={16} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </p>
-      ) : null}
 
       <button
         type="button"

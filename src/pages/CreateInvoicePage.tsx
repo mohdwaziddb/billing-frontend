@@ -24,6 +24,7 @@ import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
+import { isManualPricingPolicy } from "../lib/inventorySettings";
 import { blockNumberStepKeys, blurNumberInputOnWheel } from "../lib/numberInputGuards";
 import { InvoiceCalculationService } from "../services/InvoiceCalculationService";
 import { notificationService } from "../services/notificationService";
@@ -288,6 +289,9 @@ export const CreateInvoicePage = () => {
     if (qty > product.stockQty) {
       issues.push({ message: `Requested quantity exceeds available stock (${product.stockQty}).` });
     }
+    if (!item.rate.trim()) {
+      issues.push({ message: "Rate is required." });
+    }
     if (rate < 0) {
       issues.push({ message: "Rate cannot be negative." });
     }
@@ -346,7 +350,7 @@ export const CreateInvoicePage = () => {
     selectedCustomer?.active &&
     invoiceDateInput &&
     watchedItems.length > 0 &&
-    watchedItems.every((item) => item.productId && numberValue(item.qty) >= 1 && numberValue(item.rate) >= 0) &&
+    watchedItems.every((item) => item.productId && numberValue(item.qty) >= 1 && item.rate.trim() !== "" && numberValue(item.rate) >= 0) &&
     invoiceSummary.paidAmount >= 0 &&
     (invoiceSummary.paidAmount <= 0 || paymentModeInput)
   );
@@ -563,7 +567,7 @@ export const CreateInvoicePage = () => {
       ...current,
       productId,
       qty: currentQty > 0 ? current.qty : "1",
-      rate: String(product.sellingPrice ?? 0)
+      rate: isManualPricingPolicy(user?.company?.inventoryPricingPolicy) ? "" : String(product.sellingPrice ?? 0)
     });
   };
 
@@ -628,17 +632,14 @@ export const CreateInvoicePage = () => {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
+    <div className="space-y-4 pb-6 md:space-y-5">
       <Header title="Create Invoice" subtitle="" />
 
       <form id="create-invoice-form" className="mx-auto grid w-full max-w-[1660px] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]" onSubmit={handleSubmit(onSubmit, onInvalid)}>
         <div className="space-y-4">
           <GlassCard className="p-4 md:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Create Invoice" }]} />
-                <h2 className="mt-1 text-xl font-bold text-slate-950">Create Invoice</h2>
-              </div>
+              <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Create Invoice" }]} />
               <div className="flex flex-col items-end gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" variant="secondary" onClick={() => navigate("/invoices")}>
@@ -737,7 +738,7 @@ export const CreateInvoicePage = () => {
             <input type="hidden" {...register("customerId", { required: "Customer is required" })} />
 
             {selectedCustomer ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Selected Customer</p>
@@ -763,7 +764,7 @@ export const CreateInvoicePage = () => {
             ) : null}
 
             {showNewCustomerForm && !selectedCustomer && can("CUSTOMERS", "ADD") ? (
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-sm font-bold text-slate-950">Add New Customer</p>
                   <Button type="button" variant="ghost" onClick={() => setShowNewCustomerForm(false)}>Close</Button>
@@ -1178,7 +1179,7 @@ export const CreateInvoicePage = () => {
 
               <div className="flex items-center justify-between gap-3 rounded-xl border border-[color:color-mix(in_srgb,var(--theme-color)_24%,#d8e0ec)] bg-white px-3 py-2.5">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Balance Due</p>
-                <p className="text-xl font-extrabold text-rose-600">{formatCurrency(invoiceSummary.outstandingAmount)}</p>
+                <p className="fs-18 font-bold text-rose-600">{formatCurrency(invoiceSummary.outstandingAmount)}</p>
               </div>
             </section>
           </GlassCard>
@@ -1193,13 +1194,13 @@ export const CreateInvoicePage = () => {
         {selectedCustomer ? (
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Customer</p>
                 <p className="mt-2 font-semibold text-white">{selectedCustomer.name}</p>
                 <p className="mt-1 text-sm text-slate-400">{selectedCustomer.mobile}</p>
                 <p className="mt-1 text-sm text-slate-400">{selectedCustomer.state ?? "--"}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Contact</p>
                 <p className="mt-2 font-semibold text-white">{selectedCustomer.email ?? "--"}</p>
                 <p className="mt-1 text-sm text-slate-400">{selectedCustomer.address ?? "--"}</p>
@@ -1208,19 +1209,19 @@ export const CreateInvoicePage = () => {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Total Purchase</p>
                 <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedCustomer.totalPurchaseAmount)}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Total Paid</p>
                 <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedCustomer.totalPaidAmount)}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Discount Given</p>
                 <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedCustomer.totalDiscountGiven)}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Outstanding Balance</p>
                 <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(selectedCustomer.outstandingBalance)}</p>
               </div>
@@ -1235,36 +1236,36 @@ export const CreateInvoicePage = () => {
         onClose={() => setHistoryOpen(false)}
       >
         {historyLoading ? (
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">Loading purchase history...</div>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">Loading purchase history...</div>
         ) : !purchaseHistory || purchaseHistory.invoices.length === 0 ? (
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">No purchase history found for this customer.</div>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-slate-300/80">No purchase history found for this customer.</div>
         ) : (
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Customer Name</p>
                 <p className="mt-2 font-semibold text-white">{purchaseHistory.customerName}</p>
                 <p className="mt-1 text-sm text-slate-400">{purchaseHistory.mobile}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Address</p>
                 <p className="mt-2 font-semibold text-white">{purchaseHistory.address ?? "--"}</p>
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Total Purchase</p>
                 <p className="mt-2 text-xl font-bold text-white">{formatCurrency(purchaseHistory.summary.totalPurchaseAmount)}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Total Paid</p>
                 <p className="mt-2 text-xl font-bold text-white">{formatCurrency(purchaseHistory.summary.totalPaidAmount)}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Total Discount</p>
                 <p className="mt-2 text-xl font-bold text-white">{formatCurrency(purchaseHistory.summary.totalDiscountGiven)}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <p className="text-sm text-slate-400">Outstanding Balance</p>
                 <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(purchaseHistory.summary.outstandingBalance)}</p>
               </div>

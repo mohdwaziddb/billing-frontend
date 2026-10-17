@@ -167,7 +167,7 @@ const TransactionsCard = () => (
 );
 
 const MiniDashboard = () => (
-  <div className="rounded-2xl border border-slate-200 bg-white shadow-[0_32px_64px_rgba(36,83,216,0.16)]">
+  <div className="rounded-lg border border-slate-200 bg-white shadow-[0_32px_64px_rgba(36,83,216,0.16)]">
     <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
       <div className="flex items-center gap-2.5">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#2453d8] text-white shadow-[0_6px_14px_rgba(36,83,216,0.3)]">
@@ -292,7 +292,7 @@ const FloatingBadges = () => (
     {FLOATING_BADGES.map(({ title, value, icon: Icon, color, className, delay, duration }) => (
       <div
         key={title}
-        className={`login-float absolute hidden items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white/95 px-3.5 py-2.5 shadow-[0_16px_32px_rgba(15,23,42,0.10)] md:flex ${className}`}
+        className={`login-float absolute hidden items-center gap-2.5 rounded-lg border border-slate-200/80 bg-white/95 px-3.5 py-2.5 shadow-[0_16px_32px_rgba(15,23,42,0.10)] md:flex ${className}`}
         style={{ animationDelay: delay, animationDuration: duration }}
       >
         <span

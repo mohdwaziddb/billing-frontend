@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
-import { Inbox } from "lucide-react";
+import { EmptyState } from "./EmptyState";
 
-type Column<T> = {
+export type Column<T> = {
   key: string;
   header: string;
   render: (item: T) => ReactNode;
   className?: string;
 };
 
-type TableRowSelection<T> = {
+export type TableRowSelection<T> = {
   selectedRowIds: number[];
   onToggleRow: (rowId: number, checked: boolean) => void;
   onToggleAll: (checked: boolean) => void;
@@ -35,12 +35,12 @@ export const Table = <T,>({
   const someSelected = rowSelection?.someSelected ?? false;
 
   return (
-    <div className="scrollbar-thin min-h-[360px] overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
+    <div className="scrollbar-thin min-h-[360px] overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <table className="min-w-full border-separate border-spacing-0 text-left fs-13 text-slate-700">
         <thead className="sticky top-0 z-10 bg-slate-50">
           <tr className="border-b border-slate-200 text-slate-500">
             {rowSelection ? (
-              <th className="table-header whitespace-nowrap border-b border-slate-200 px-4 py-3 text-xs font-bold uppercase tracking-wide first:pl-5 last:pr-5">
+              <th className="table-header whitespace-nowrap border-b border-slate-200 px-4 py-2.5 fs-11 font-semibold uppercase tracking-[0.08em] first:pl-5 last:pr-5">
                 <input
                   type="checkbox"
                   className="h-4 w-4 accent-sky-500"
@@ -56,7 +56,7 @@ export const Table = <T,>({
               </th>
             ) : null}
             {columns.map((column) => (
-              <th key={column.key} className={`table-header whitespace-nowrap border-b border-slate-200 px-4 py-3 text-xs font-bold uppercase tracking-wide first:pl-5 last:pr-5 ${column.className ?? ""}`}>
+              <th key={column.key} className={`table-header whitespace-nowrap border-b border-slate-200 px-4 py-2.5 fs-11 font-semibold uppercase tracking-[0.08em] first:pl-5 last:pr-5 ${column.className ?? ""}`}>
                 {column.header}
               </th>
             ))}
@@ -66,13 +66,7 @@ export const Table = <T,>({
           {rowCount === 0 ? (
             <tr>
               <td className="h-[320px] px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={columns.length + (rowSelection ? 1 : 0)}>
-                <div className="flex h-full flex-col items-center justify-center gap-3">
-                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400">
-                    <Inbox size={26} />
-                  </span>
-                  <p className="text-sm font-semibold text-slate-500">{emptyText}</p>
-                  {emptyAction ? <div>{emptyAction}</div> : null}
-                </div>
+                <EmptyState title={emptyText} action={emptyAction ?? undefined} />
               </td>
             </tr>
           ) : (
@@ -82,7 +76,7 @@ export const Table = <T,>({
               return (
                 <tr key={index} className="group odd:bg-white even:bg-slate-50/55 transition hover:bg-[color-mix(in_srgb,var(--theme-color)_6%,white)]">
                   {rowSelection ? (
-                    <td className="border-b border-slate-100 px-4 py-4 align-top first:pl-5 last:pr-5">
+                    <td className="border-b border-slate-100 px-4 py-3 align-top first:pl-5 last:pr-5">
                       <input
                         type="checkbox"
                         className="h-4 w-4 accent-sky-500"
@@ -93,7 +87,7 @@ export const Table = <T,>({
                     </td>
                   ) : null}
                   {columns.map((column) => (
-                    <td key={column.key} className={`border-b border-slate-100 px-4 py-4 align-top first:pl-5 last:pr-5 group-last:border-b-0 ${column.className ?? ""}`}>
+                    <td key={column.key} className={`border-b border-slate-100 px-4 py-3 align-top first:pl-5 last:pr-5 group-last:border-b-0 ${column.className ?? ""}`}>
                       {column.render(item)}
                     </td>
                   ))}

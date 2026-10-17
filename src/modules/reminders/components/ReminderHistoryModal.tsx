@@ -59,7 +59,7 @@ export const ReminderHistoryModal = ({
           onPageChange={loadHistory}
         layout="inline" /></div>
         {loading ? (
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-6 text-sm text-slate-300/75">
+          <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-sm text-slate-300/75">
             Loading reminder history...
           </div>
         ) : (

@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
-import { ArrowLeft } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { getCustomers } from "../api/customers";
 import { getInvoices } from "../api/invoices";
 import { getPaymentModes } from "../api/paymentModes";
 import { createPayment } from "../api/payments";
-import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
-import { GlassCard } from "../components/GlassCard";
+import { FormActionBar } from "../components/FormActionBar";
+import { FormSection } from "../components/FormSection";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
@@ -33,7 +31,6 @@ const todayIso = () => {
 };
 
 export const PaymentEntryPage = () => {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -202,30 +199,24 @@ export const PaymentEntryPage = () => {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
+    <div className="space-y-4 pb-6 md:space-y-5">
       <Header
-        title="Payments > Add Payment"
+        title="Add Payment"
         subtitle={lockedInvoice ? `Recording payment for ${lockedInvoice.invoiceNo} | Outstanding ${formatCurrency(lockedInvoice.balanceAmount)}` : "Record customer collections and map them to invoices with consistent validation and clean form layout."}
       />
-      <GlassCard className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col p-4 md:p-5">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CommonBreadcrumb items={[{ label: "Payments", to: "/payments" }, { label: "Add Payment" }]} />
-            <h2 className="mt-1 text-xl font-bold text-white">Add Payment</h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => navigate("/payments")}>
-              <ArrowLeft size={16} />
-              Back
-            </Button>
-            <Button disabled={isSubmitting || !canSavePayment} type="submit" form="payment-form">
-              {isSubmitting ? "Saving..." : "Save Payment"}
-            </Button>
-          </div>
-        </div>
+
+      <div className="space-y-4">
+        <FormActionBar
+          items={[{ label: "Payments", to: "/payments" }, { label: "Add Payment" }]}
+          backTo="/payments"
+          formId="payment-form"
+          saveLabel="Save Payment"
+          saving={isSubmitting}
+          saveDisabled={!canSavePayment}
+        />
+
         <form id="payment-form" className="grid gap-4 lg:grid-cols-3" onSubmit={handleSubmit(onSubmit, onInvalid)}>
-          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500">Customer Information</h3>
+          <FormSection title="Customer Information">
             {/* Controlled: shown option always equals submitted value (async
                 options + setValue autofill used to desync the display). */}
             <Controller
@@ -248,10 +239,9 @@ export const PaymentEntryPage = () => {
                 />
               )}
             />
-          </section>
+          </FormSection>
 
-          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500">Invoice Information</h3>
+          <FormSection title="Invoice Information">
             <Controller
               name="invoiceId"
               control={control}
@@ -270,10 +260,9 @@ export const PaymentEntryPage = () => {
                 />
               )}
             />
-          </section>
+          </FormSection>
 
-          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500">Payment Information</h3>
+          <FormSection title="Payment Information">
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <Input
                 label="Amount"
@@ -330,9 +319,9 @@ export const PaymentEntryPage = () => {
               />
               <Input label="Notes" {...register("remarks")} />
             </div>
-          </section>
+          </FormSection>
         </form>
-      </GlassCard>
+      </div>
     </div>
   );
 };

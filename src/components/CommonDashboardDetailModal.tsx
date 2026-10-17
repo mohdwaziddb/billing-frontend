@@ -55,7 +55,7 @@ export const CommonDashboardDetailModal = <T,>({
 }: CommonDashboardDetailModalProps<T>) => (
   <Modal open={open} title={title} onClose={onClose}>
     <div className="space-y-5">
-      <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+      <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
         <span className="font-semibold text-slate-950">Active Filters:</span>
         <span className="min-w-0 flex-1 text-slate-600">{activeFilters.length ? activeFilters.join(" | ") : "No filters applied"}</span>
         <span className="font-semibold text-slate-950">Records: {totalRecords}</span>
@@ -90,7 +90,7 @@ export const CommonDashboardDetailModal = <T,>({
         </div>
       </div>
 
-      <div className="scrollbar-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+      <div className="scrollbar-thin overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
           <thead className="sticky top-0 z-10 bg-slate-50">
             <tr>

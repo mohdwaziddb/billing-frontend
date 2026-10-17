@@ -228,7 +228,7 @@ export const InvoiceDetailPage = () => {
           <div>
             <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Invoice Details" }]} />
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <h2 className="text-3xl font-black text-slate-950">{invoice?.invoiceNo ?? "--"}</h2>
+              <h2 className="fs-24 font-bold text-slate-950">{invoice?.invoiceNo ?? "--"}</h2>
               {invoice ? <StatusBadge label={invoice.paymentStatus} /> : null}
             </div>
             <p className="mt-2 text-sm font-semibold text-slate-500">Invoice Date: {formatDate(invoice?.invoiceDate)} | Created by {invoice?.createdBy ?? "--"}</p>
@@ -270,7 +270,7 @@ export const InvoiceDetailPage = () => {
             <p>{invoice?.customerMobile ?? "--"}</p>
             <p>{invoice?.customerAddress ?? "--"}</p>
             <p>{invoice?.customerState ?? "--"}</p>
-            <p className="pt-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Refer By</p>
+            <p className="pt-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Refer By</p>
             <p>{invoice?.referByUserName ?? "--"}</p>
           </InfoPanel>
           <InfoPanel icon={<Wallet size={18} />} title="Payment Summary">
@@ -286,7 +286,7 @@ export const InvoiceDetailPage = () => {
           <div className="mb-5 flex items-center gap-3">
             <ReceiptText size={20} className="text-[var(--theme-color)]" />
             <div>
-              <h3 className="text-xl font-extrabold text-slate-950">Invoice Items</h3>
+              <h3 className="fs-18 font-bold text-slate-950">Invoice Items</h3>
               <p className="mt-1 text-sm font-medium text-slate-500">Item-wise billing details and invoice totals.</p>
             </div>
           </div>
@@ -319,7 +319,7 @@ export const InvoiceDetailPage = () => {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <GlassCard className="p-5 md:p-7">
-          <h3 className="mb-4 text-xl font-extrabold text-slate-950">Payment History</h3>
+          <h3 className="mb-4 fs-18 font-bold text-slate-950">Payment History</h3>
           <Table data={payments} emptyText="No payments received for this invoice." columns={[
             { key: "date", header: "Date", render: (item) => formatDate(item.paymentDate) },
             { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-bold text-slate-950">{formatCurrency(item.amount)}</span> },
@@ -330,7 +330,7 @@ export const InvoiceDetailPage = () => {
 
         {profitability ? (
           <GlassCard className="p-5 md:p-7">
-            <h3 className="mb-4 text-xl font-extrabold text-slate-950">Profitability</h3>
+            <h3 className="mb-4 fs-18 font-bold text-slate-950">Profitability</h3>
             <div className="space-y-3">
               <SummaryBox label="Revenue" value={formatCurrency(profitability.revenue)} />
               <SummaryBox label="Expense" value={formatCurrency(profitability.expense)} />
@@ -352,11 +352,11 @@ export const InvoiceDetailPage = () => {
             <textarea className="min-h-[148px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]" value={whatsAppForm.message} onChange={(event) => setWhatsAppForm((current) => ({ ...current, message: event.target.value }))} />
           </label>
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+            <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
               <input type="checkbox" checked={whatsAppForm.includePdf} onChange={(event) => setWhatsAppForm((current) => ({ ...current, includePdf: event.target.checked }))} />
               Attach invoice PDF
             </label>
-            <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+            <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
               <input type="checkbox" checked={whatsAppForm.includeLink} onChange={(event) => setWhatsAppForm((current) => ({ ...current, includeLink: event.target.checked }))} />
               Include invoice link
             </label>
@@ -374,7 +374,7 @@ export const InvoiceDetailPage = () => {
         <div className="space-y-4">
           <Input label="Recipient Email" type="email" value={emailForm.to} onChange={(event) => setEmailForm((current) => ({ ...current, to: event.target.value }))} />
           <Input label="Subject" value={emailForm.subject} onChange={(event) => setEmailForm((current) => ({ ...current, subject: event.target.value }))} />
-          <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
             <input type="checkbox" checked={emailForm.includePdf} onChange={(event) => setEmailForm((current) => ({ ...current, includePdf: event.target.checked }))} />
             Attach invoice PDF
           </label>
@@ -402,7 +402,7 @@ const blobToBase64 = async (blob: Blob) =>
   });
 
 const InfoPanel = ({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) => (
-  <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+  <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
     <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-slate-400">{icon}{title}</div>
     <div className="space-y-1 text-sm font-medium text-slate-600">{children}</div>
   </section>
@@ -416,8 +416,8 @@ const SummaryLine = ({ label, value, danger }: { label: string; value: string; d
 );
 
 const SummaryBox = ({ label, value, strong }: { label: string; value: string; strong?: boolean }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-    <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+  <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
     <p className={`${strong ? "text-xl" : "text-lg"} mt-2 font-black text-slate-950`}>{value}</p>
   </div>
 );

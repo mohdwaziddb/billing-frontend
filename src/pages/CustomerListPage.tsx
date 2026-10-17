@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BookOpen, Download, History, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { deleteCustomer, getCustomerLedger, getCustomersPage } from "../api/customers";
@@ -6,45 +6,39 @@ import { getCustomerProfitability } from "../api/expenses";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
-import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
+import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
-import { GlassCard } from "../components/GlassCard";
-import { Header } from "../components/Header";
-import { Input } from "../components/Input";
+import { CommonListPage } from "../components/CommonListPage";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { Pagination, DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
-import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { useListPage } from "../hooks/useListPage";
 import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import { notificationService } from "../services/notificationService";
-import type { Customer, CustomerLedger, PageResponse, Profitability } from "../types/api";
+import type { Customer, CustomerLedger, Profitability } from "../types/api";
 
-const emptyCustomerPage: PageResponse<Customer> = {
-  records: [],
-  page: 0,
-  size: DEFAULT_PAGE_SIZE,
-  totalRecords: 0,
-  totalPages: 0
+type CustomerFilters = {
+  search: string;
+  status: string;
+};
+
+const emptyFilters: CustomerFilters = {
+  search: "",
+  status: "active"
 };
 
 export const CustomerListPage = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [customerPage, setCustomerPage] = useState<PageResponse<Customer>>(emptyCustomerPage);
   const [selectedLedger, setSelectedLedger] = useState<CustomerLedger | null>(null);
   const [selectedProfitability, setSelectedProfitability] = useState<Profitability | null>(null);
   const [ledgerCustomerId, setLedgerCustomerId] = useState<number | null>(null);
-  const [page, setPage] = useState(0);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("active");
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [logTarget, setLogTarget] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -52,12 +46,17 @@ export const CustomerListPage = () => {
   const { can } = useAuth();
   const { clearMessage, setApiError } = useApiMessage();
 
-  const loadCustomers = async (nextPage = page, searchOverride = search) => {
-    const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    const response = await getCustomersPage({ search: searchOverride.trim() || undefined, active, page: nextPage, size: DEFAULT_PAGE_SIZE });
-    setCustomerPage(response);
-    setCustomers(response.records);
-  };
+  const list = useListPage<Customer, CustomerFilters>({
+    initialFilters: emptyFilters,
+    errorMessage: "Unable to load customers",
+    fetchPage: ({ page, size, search, filters }) =>
+      getCustomersPage({
+        search: search.trim() || undefined,
+        active: filters.status === "active" ? true : filters.status === "inactive" ? false : undefined,
+        page,
+        size
+      })
+  });
 
   const loadLedger = async (customerId: number, nextPage = 0) => {
     setLedgerCustomerId(customerId);
@@ -77,7 +76,7 @@ export const CustomerListPage = () => {
       setDeleting(true);
       clearMessage();
       await deleteCustomer(deleteTarget.id);
-      await loadCustomers(page);
+      list.refreshTable();
       setDeleteTarget(null);
       notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Customer"));
     } catch (err: any) {
@@ -86,11 +85,6 @@ export const CustomerListPage = () => {
       setDeleting(false);
     }
   };
-
-  useEffect(() => {
-    setPage(0);
-    void loadCustomers(0);
-  }, [statusFilter]);
 
   const customerColumns = useMemo(() => [
     {
@@ -161,143 +155,100 @@ export const CustomerListPage = () => {
   ], visibleColumns), [visibleColumns]);
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
-      <Header
-        title="Customers"
-        subtitle="Review purchase totals, payments, discounts, and outstanding balances for every customer from one view."
-      />
-      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
-        <div className="mb-5 flex flex-col gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CommonBreadcrumb items={[{ label: "Customers" }]} />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
-                <>
-                <CommonColumnSelector tableName="CUSTOMERS" availableColumns={customerColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
-                {can("CUSTOMERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!customers.length} onClick={() => exportToExcel("customers.xlsx", customers, customerExportColumns)}>
-                  <Download size={16} />
-                  Export Excel
-                </Button> : null}
-                {can("CUSTOMERS", "ADD") ? <Link to="/customers/new">
-                  <Button>Add customer</Button>
-                </Link> : null}
-                </>
-              ) : null}
-<Pagination
-                page={customerPage.page}
-                size={customerPage.size}
-                totalRecords={customerPage.totalRecords}
-                totalPages={customerPage.totalPages}
-                onPageChange={(nextPage) => {
-                  setPage(nextPage);
-                  void loadCustomers(nextPage);
-                }}
-              layout="inline" />
-            </div>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_160px]">
-            <Input
-              label="Search Customer"
-              placeholder="Enter Customer Name"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onClear={() => {
-                setPage(0);
-                setSearch("");
-                void loadCustomers(0, "");
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  setPage(0);
-                  void loadCustomers(0);
-                }
-              }}
-            />
-            <Select
-              label="Status Filter"
-              placeholder={null}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              options={[
-                { label: "All", value: "all" },
-                { label: "Active Only", value: "active" },
-                { label: "Inactive Only", value: "inactive" }
-              ]}
-            />
-            <div className="flex items-end">
-              <Button className="w-full" variant="secondary" onClick={() => { setPage(0); void loadCustomers(0); }}>
-                Search
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex-1">
-          <Table
-            data={customers}
-            emptyText="No customers match the current filters."
-            columns={[...visibleCustomerColumns, customerActionColumn]}
-          />
-        </div>
-      </GlassCard>
-
-      <Modal open={Boolean(selectedLedger)} title="Customer ledger" onClose={() => { setSelectedLedger(null); setSelectedProfitability(null); }}>
-        <div className="space-y-3">
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-            <p className="font-semibold text-white">{selectedLedger?.customerName}</p>
-            <p className="text-sm text-slate-300/70">Current balance: {formatCurrency(selectedLedger?.currentBalance)}</p>
-          </div>
-          {selectedProfitability ? (
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Total Purchase</p>
-                <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedProfitability.revenue)}</p>
+    <CommonListPage<Customer, CustomerFilters>
+      pageTitle="Customers"
+      pageSubtitle="Review purchase totals, payments, discounts, and outstanding balances for every customer from one view."
+      list={list}
+      searchPlaceholder="Search Customer"
+      activeFilterCount={(filters) => (filters.status !== "active" ? 1 : 0)}
+      filterFields={
+        <Select
+          label="Status Filter"
+          placeholder={null}
+          value={list.formFilters.status}
+          onChange={(event) => list.updateFormFilters({ status: event.target.value })}
+          options={[
+            { label: "All", value: "all" },
+            { label: "Active Only", value: "active" },
+            { label: "Inactive Only", value: "inactive" }
+          ]}
+        />
+      }
+      toolbarButtons={
+        can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
+          <>
+            {can("CUSTOMERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!list.tableData.length} onClick={() => exportToExcel("customers.xlsx", list.tableData, customerExportColumns)}>
+              <Download size={16} />
+              Export Excel
+            </Button> : null}
+            {can("CUSTOMERS", "ADD") ? <Link to="/customers/new">
+              <Button>Add customer</Button>
+            </Link> : null}
+          </>
+        ) : null
+      }
+      columnSelector={{ tableName: "CUSTOMERS", columns: customerColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["name"] }}
+      tableColumns={[...visibleCustomerColumns, customerActionColumn]}
+      emptyMessage="No customers match the current filters."
+      fullHeight
+      modals={
+        <>
+          <Modal open={Boolean(selectedLedger)} title="Customer ledger" onClose={() => { setSelectedLedger(null); setSelectedProfitability(null); }}>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <p className="font-semibold text-white">{selectedLedger?.customerName}</p>
+                <p className="text-sm text-slate-300/70">Current balance: {formatCurrency(selectedLedger?.currentBalance)}</p>
               </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Customer Expense</p>
-                <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(selectedProfitability.expense)}</p>
-              </div>
-              <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <p className="text-sm text-slate-400">Net Revenue</p>
-                <p className="mt-2 text-xl font-bold text-emerald-200">{formatCurrency(selectedProfitability.netRevenue)}</p>
-              </div>
-            </div>
-          ) : null}
-          <div className="flex justify-end">
-            {selectedLedger ? (
-              <div className="flex justify-end"><Pagination
-                page={selectedLedger.page}
-                size={selectedLedger.size}
-                totalRecords={selectedLedger.totalRecords}
-                totalPages={selectedLedger.totalPages}
-                onPageChange={(nextPage) => {
-                  if (ledgerCustomerId) {
-                    void loadLedger(ledgerCustomerId, nextPage);
-                  }
-                }}
-              layout="inline" /></div>
-            ) : null}
-          </div>
-          <div className="max-h-[420px] space-y-2 overflow-auto scrollbar-thin">
-            {selectedLedger?.entries.map((entry, index) => (
-              <div key={`${entry.referenceNo}-${index}`} className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-semibold text-white">{entry.type}</p>
-                    <p className="text-sm text-slate-400">{entry.referenceNo} | {formatDate(entry.entryDate)}</p>
+              {selectedProfitability ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <p className="text-sm text-slate-400">Total Purchase</p>
+                    <p className="mt-2 text-xl font-bold text-white">{formatCurrency(selectedProfitability.revenue)}</p>
                   </div>
-                  <p className="text-sm text-sky-100">{formatCurrency(entry.runningBalance)}</p>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <p className="text-sm text-slate-400">Customer Expense</p>
+                    <p className="mt-2 text-xl font-bold text-rose-200">{formatCurrency(selectedProfitability.expense)}</p>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <p className="text-sm text-slate-400">Net Revenue</p>
+                    <p className="mt-2 text-xl font-bold text-emerald-200">{formatCurrency(selectedProfitability.netRevenue)}</p>
+                  </div>
                 </div>
+              ) : null}
+              <div className="flex justify-end">
+                {selectedLedger ? (
+                  <div className="flex justify-end"><Pagination
+                    page={selectedLedger.page}
+                    size={selectedLedger.size}
+                    totalRecords={selectedLedger.totalRecords}
+                    totalPages={selectedLedger.totalPages}
+                    onPageChange={(nextPage) => {
+                      if (ledgerCustomerId) {
+                        void loadLedger(ledgerCustomerId, nextPage);
+                      }
+                    }}
+                  layout="inline" /></div>
+                ) : null}
               </div>
-            ))}
-          </div>
-        </div>
-      </Modal>
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Customer" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Customer Logs"} onClose={() => setLogTarget(null)} />
-      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
-    </div>
+              <div className="max-h-[420px] space-y-2 overflow-auto scrollbar-thin">
+                {selectedLedger?.entries.map((entry, index) => (
+                  <div key={`${entry.referenceNo}-${index}`} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-white">{entry.type}</p>
+                        <p className="text-sm text-slate-400">{entry.referenceNo} | {formatDate(entry.entryDate)}</p>
+                      </div>
+                      <p className="text-sm text-sky-100">{formatCurrency(entry.runningBalance)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Modal>
+          <AuditLogModal open={Boolean(logTarget)} moduleName="Customer" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Customer Logs"} onClose={() => setLogTarget(null)} />
+          <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
+        </>
+      }
+    />
   );
 };

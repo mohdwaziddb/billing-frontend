@@ -31,6 +31,7 @@ import { Table } from "../components/Table";
 import { TrendBadge } from "../components/TrendBadge";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
+import { formatDate } from "../lib/format";
 import { CHART_PALETTE, getChartTheme } from "../lib/chartTheme";
 import { useIsDarkMode } from "../hooks/useIsDarkMode";
 import type { AnalyticsSummary, Customer, CustomerDue, Expense, Invoice, LowStockProduct, OwnerAnalytics, PageResponse, Payment } from "../types/api";
@@ -234,7 +235,7 @@ export const SalesAnalyticsPage = () => {
           ? "Customer Details"
           : "Revenue Invoice Details";
   const drilldownFilters = useMemo(() => {
-    const rangeLabel = `${activeRange.startDate} - ${activeRange.endDate}`;
+    const rangeLabel = `${formatDate(activeRange.startDate)} - ${formatDate(activeRange.endDate)}`;
     if (activeDrilldown === "customers") {
       return ["Customer records"];
     }
@@ -286,8 +287,8 @@ export const SalesAnalyticsPage = () => {
       <GlassCard className="p-6 md:p-7">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs uppercase text-slate-400">Executive Analytics</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Business health command center</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Executive Analytics</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Business health command center</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {[
@@ -323,8 +324,8 @@ export const SalesAnalyticsPage = () => {
       <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Business Health</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Revenue, collection, and risk mix</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Business Health</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Revenue, collection, and risk mix</h2>
           </div>
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -343,8 +344,8 @@ export const SalesAnalyticsPage = () => {
 
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Revenue vs Expense</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Net profit movement</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Revenue vs Expense</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Net profit movement</h2>
           </div>
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -368,8 +369,8 @@ export const SalesAnalyticsPage = () => {
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase text-slate-400">Revenue Trend</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">Revenue momentum</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Revenue Trend</p>
+              <h2 className="mt-2 fs-18 font-semibold text-white">Revenue momentum</h2>
             </div>
             {summary ? <TrendBadge status={summary.trendStatus} percentage={summary.salesTrendPercentage} /> : null}
           </div>
@@ -388,8 +389,8 @@ export const SalesAnalyticsPage = () => {
 
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Outstanding Trend</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Receivable exposure</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Outstanding Trend</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Receivable exposure</h2>
           </div>
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -408,8 +409,8 @@ export const SalesAnalyticsPage = () => {
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Net Profit Trend</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Profit after expenses</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Net Profit Trend</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Profit after expenses</h2>
           </div>
           <div className="h-80 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -426,25 +427,25 @@ export const SalesAnalyticsPage = () => {
 
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Expense Signals</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Cost and profitability signals</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Expense Signals</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Cost and profitability signals</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("revenue")}>
+            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("revenue")}>
               <p className="text-sm text-slate-400"><TrendingUp className="mr-2 inline" size={16} />Net Revenue</p>
-              <p className="mt-3 text-3xl font-extrabold text-white">{formatCurrency(overview?.netRevenue)}</p>
+              <p className="mt-3 fs-24 font-extrabold text-white">{formatCurrency(overview?.netRevenue)}</p>
             </button>
-            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
+            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
               <p className="text-sm text-slate-400"><Banknote className="mr-2 inline" size={16} />Total Expense</p>
-              <p className="mt-3 text-3xl font-extrabold text-white">{formatCurrency(overview?.totalExpense)}</p>
+              <p className="mt-3 fs-24 font-extrabold text-white">{formatCurrency(overview?.totalExpense)}</p>
             </button>
-            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
+            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
               <p className="text-sm text-slate-400">Expense Categories</p>
-              <p className="mt-3 text-3xl font-extrabold text-white">{overview?.expenseByCategory?.length ?? 0}</p>
+              <p className="mt-3 fs-24 font-extrabold text-white">{overview?.expenseByCategory?.length ?? 0}</p>
             </button>
-            <button type="button" className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("customers")}>
+            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("customers")}>
               <p className="text-sm text-slate-400">Due Customers</p>
-              <p className="mt-3 text-3xl font-extrabold text-white">{summary?.dueCustomers ?? 0}</p>
+              <p className="mt-3 fs-24 font-extrabold text-white">{summary?.dueCustomers ?? 0}</p>
               <p className="mt-2 text-xs text-slate-400">Recovery focus count.</p>
             </button>
           </div>
@@ -454,8 +455,8 @@ export const SalesAnalyticsPage = () => {
       <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Expense By Category</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Where spend is going</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Expense By Category</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Where spend is going</h2>
           </div>
           <Table
             data={overview?.expenseByCategory ?? []}
@@ -470,8 +471,8 @@ export const SalesAnalyticsPage = () => {
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs uppercase text-slate-400">Inventory alert</p>
-              <h2 className="mt-2 text-2xl font-bold text-white">Low stock products</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Inventory alert</p>
+              <h2 className="mt-2 fs-18 font-semibold text-white">Low stock products</h2>
             </div>
             <Pagination
               page={lowStockPage.page}
@@ -496,8 +497,8 @@ export const SalesAnalyticsPage = () => {
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs uppercase text-slate-400">Customer dues</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Due customer list</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Customer dues</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Due customer list</h2>
           </div>
           <Pagination
             page={dueCustomersPage.page}

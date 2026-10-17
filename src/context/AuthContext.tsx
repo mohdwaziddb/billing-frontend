@@ -5,7 +5,7 @@ import { getMyMenus } from "../api/permissions";
 import { getPlatformSettings, defaultPlatformSettings } from "../api/platform";
 import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
 import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest, verifyMfaRequest } from "../api/auth";
-import { compareMenuOrder } from "../services/MenuSearchService";
+import { compareMenuOrder, isMenuGroup } from "../lib/menu";
 import { resetMfaEnrollBanner } from "../lib/mfaBanner";
 import { authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
 import { tenantKeySuffix } from "../lib/hosts";
@@ -382,11 +382,12 @@ const findMenu = (menus: PermissionMatrix["menus"], menuCode: string): Permissio
 const findFirstRoute = (menus: PermissionMatrix["menus"]): string | null => {
   const sorted = [...menus].sort(compareMenuOrder);
   for (const menu of sorted) {
-    if (menu.children?.length) {
-      const childRoute = findFirstRoute(menu.children);
+    if (isMenuGroup(menu)) {
+      const childRoute = findFirstRoute(menu.children ?? []);
       if (childRoute) {
         return childRoute;
       }
+      continue;
     }
     if (menu.canView && menu.menuRoute && menu.actions.some((action) => action.actionCode === "VIEW" && action.allowed)) {
       return menu.menuRoute;

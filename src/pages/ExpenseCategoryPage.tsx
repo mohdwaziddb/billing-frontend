@@ -1,147 +1,192 @@
-import { useEffect, useState } from "react";
-import { Edit3, History, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
+import { History, Pencil } from "lucide-react";
 import { createExpenseCategory, deleteExpenseCategory, getExpenseCategoriesPage, updateExpenseCategory } from "../api/expenseCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
-import { GlassCard } from "../components/GlassCard";
-import { Header } from "../components/Header";
+import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
-import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
-import { useApiMessage } from "../hooks/useApiFeedback";
-import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
-import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { useAddEditForm } from "../hooks/useAddEditForm";
+import { useListPage } from "../hooks/useListPage";
 import { formatDateTime } from "../lib/format";
-import { notificationService } from "../services/notificationService";
-import type { ExpenseCategory, PageResponse } from "../types/api";
+import type { ExpenseCategory, ExpenseCategoryRequest } from "../types/api";
 
-const emptyPage: PageResponse<ExpenseCategory> = { records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 };
+type CategoryFilters = {
+  search: string;
+  status: string;
+};
+
+type FormState = {
+  categoryName: string;
+  description: string;
+  active: string;
+};
+
+const emptyFilters: CategoryFilters = {
+  search: "",
+  status: "active"
+};
+
+const emptyForm: FormState = {
+  categoryName: "",
+  description: "",
+  active: "true"
+};
 
 export const ExpenseCategoryPage = () => {
   const { can } = useAuth();
-  const { setApiError } = useApiMessage();
-  const [pageData, setPageData] = useState<PageResponse<ExpenseCategory>>(emptyPage);
-  const [search, setSearch] = useState("");
-  const [active, setActive] = useState("true");
-  const [editing, setEditing] = useState<ExpenseCategory | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ExpenseCategory | null>(null);
-  const [logTarget, setLogTarget] = useState<ExpenseCategory | null>(null);
-  const [form, setForm] = useState({ categoryName: "", description: "", active: "true" });
-  const canSaveCategory = Boolean(form.categoryName.trim());
+  const canAdd = can("EXPENSE_CATEGORIES", "ADD");
+  const canEdit = can("EXPENSE_CATEGORIES", "EDIT");
+  const canDelete = can("EXPENSE_CATEGORIES", "DELETE");
 
-  const load = async (page = 0) => {
-    const response = await getExpenseCategoriesPage({ search: search || undefined, active: active ? active === "true" : undefined, page, size: DEFAULT_PAGE_SIZE });
-    setPageData(response);
-  };
+  const list = useListPage<ExpenseCategory, CategoryFilters>({
+    initialFilters: emptyFilters,
+    errorMessage: "Unable to load expense categories",
+    fetchPage: ({ page, size, search, filters }) =>
+      getExpenseCategoriesPage({
+        search: search.trim() || undefined,
+        active: filters.status === "active" ? true : filters.status === "inactive" ? false : undefined,
+        page,
+        size
+      })
+  });
 
-  useEffect(() => {
-    void load(0).catch((err: any) => setApiError(err, "Unable to load expense categories"));
-  }, [search, active]);
+  const form = useAddEditForm<ExpenseCategory, FormState, ExpenseCategoryRequest>({
+    emptyForm,
+    entityName: "Expense Category",
+    errorMessage: "Unable to save expense category",
+    toFormValues: (category) => ({
+      categoryName: category.categoryName,
+      description: category.description ?? "",
+      active: category.active ? "true" : "false"
+    }),
+    buildRequest: (values) => ({
+      categoryName: values.categoryName.trim(),
+      description: values.description.trim() || undefined,
+      active: values.active === "true"
+    }),
+    create: createExpenseCategory,
+    update: updateExpenseCategory,
+    remove: deleteExpenseCategory,
+    onSaved: list.refreshTable
+  });
 
-  const openForm = (category?: ExpenseCategory) => {
-    setEditing(category ?? null);
-    setFormOpen(true);
-    setForm({
-      categoryName: category?.categoryName ?? "",
-      description: category?.description ?? "",
-      active: String(category?.active ?? true)
-    });
-  };
-
-  const save = async () => {
-    try {
-      const payload = { categoryName: form.categoryName.trim(), description: form.description.trim() || undefined, active: form.active === "true" };
-      if (editing) {
-        await updateExpenseCategory(editing.id, payload);
-        notificationService.showSuccess(CommonSuccessMessageUtil.updated("Expense Category"));
-      } else {
-        await createExpenseCategory(payload);
-        notificationService.showSuccess(CommonSuccessMessageUtil.created("Expense Category"));
-      }
-      setEditing(null);
-      setFormOpen(false);
-      setForm({ categoryName: "", description: "", active: "true" });
-      await load(pageData.page);
-    } catch (err: any) {
-      setApiError(err, "Unable to save expense category");
-    }
-  };
-
-  const remove = async () => {
-    if (!deleteTarget) return;
-    try {
-      await deleteExpenseCategory(deleteTarget.id);
-      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Expense Category"));
-      setDeleteTarget(null);
-      await load(pageData.page);
-    } catch (err: any) {
-      setApiError(err, CommonErrorMessageUtil.deleteFailed);
-    }
-  };
+  const canSaveCategory = Boolean(form.formValues.categoryName.trim());
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const categoryColumns = useMemo(() => [
+    { key: "name", header: "Category", render: (item: ExpenseCategory) => <span className="font-semibold text-white">{item.categoryName}</span> },
+    { key: "description", header: "Description", render: (item: ExpenseCategory) => item.description ?? "--" },
+    { key: "status", header: "Status", render: (item: ExpenseCategory) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
+    { key: "updated", header: "Updated At", render: (item: ExpenseCategory) => formatDateTime(item.updatedAt) }
+  ], []);
+  const visibleCategoryColumns = useMemo(() => applyVisibleColumns(categoryColumns, visibleColumns), [categoryColumns, visibleColumns]);
 
   return (
-    <div className="space-y-4 pb-6">
-      <Header title="Expense Categories" subtitle="Owner-managed category setup for profit, reporting, and analytics." />
-      <GlassCard className="p-6 md:p-7">
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
-            <Input label="Search" value={search} onChange={(event) => setSearch(event.target.value)} />
-            <Select label="Status" value={active} options={[{ label: "All", value: "" }, { label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => setActive(event.target.value)} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {can("EXPENSE_CATEGORIES", "ADD") ? (
-              <Button type="button" onClick={() => openForm()}>
-                <Plus size={16} />
-                Add Category
-              </Button>
-            ) : null}
-            <Pagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} onPageChange={(page) => void load(page)} layout="inline" />
-          </div>
-        </div>
-        <Table
-          data={pageData.records}
-          columns={[
-            { key: "name", header: "Category", render: (item) => <span className="font-semibold text-slate-950">{item.categoryName}</span> },
-            { key: "description", header: "Description", render: (item) => item.description ?? "--" },
-            { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
-            { key: "updated", header: "Updated At", render: (item) => formatDateTime(item.updatedAt) },
-            {
-              key: "actions",
-              header: "Actions",
-              className: "text-right",
-              render: (item) => (
-                <ActionDropdown actions={[
-                  { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("EXPENSE_CATEGORIES", "EDIT"), onClick: () => openForm(item) },
-                  { label: "Show Logs", icon: <History size={15} />, hidden: !can("EXPENSE_CATEGORIES", "LOGS"), onClick: () => setLogTarget(item) },
-                  { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("EXPENSE_CATEGORIES", "DELETE"), onClick: () => setDeleteTarget(item) }
-                ]} />
-              )
-            }
+    <CommonListPage<ExpenseCategory, CategoryFilters>
+      pageTitle="Expense Categories"
+      pageSubtitle="Owner-managed category setup for profit, reporting, and analytics."
+      list={list}
+      searchPlaceholder="Search Category"
+      activeFilterCount={(filters) => (filters.status !== "active" ? 1 : 0)}
+      filterFields={
+        <Select
+          label="Status Filter"
+          placeholder={null}
+          value={list.formFilters.status}
+          onChange={(event) => list.updateFormFilters({ status: event.target.value })}
+          options={[
+            { label: "All Categories", value: "all" },
+            { label: "Active Only", value: "active" },
+            { label: "Inactive Only", value: "inactive" }
           ]}
         />
-      </GlassCard>
-
-      <Modal open={formOpen} title={editing ? "Edit Expense Category" : "Add Expense Category"} onClose={() => { setFormOpen(false); setEditing(null); setForm({ categoryName: "", description: "", active: "true" }); }}>
-        <div className="grid gap-4">
-          <Input label="Category Name" requiredMark value={form.categoryName} onChange={(event) => setForm((current) => ({ ...current, categoryName: event.target.value }))} />
-          <Input label="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
-          <Select label="Status" value={form.active} options={[{ label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => setForm((current) => ({ ...current, active: event.target.value }))} />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => { setFormOpen(false); setEditing(null); setForm({ categoryName: "", description: "", active: "true" }); }}>Cancel</Button>
-            <Button type="button" disabled={!canSaveCategory} onClick={() => void save()}>Save</Button>
-          </div>
-        </div>
-      </Modal>
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Expense Category" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.categoryName} Logs` : "Expense Category Logs"} onClose={() => setLogTarget(null)} />
-      <CommonDeleteModal open={Boolean(deleteTarget)} onCancel={() => setDeleteTarget(null)} onConfirm={() => void remove()} />
-    </div>
+      }
+      toolbarButtons={canAdd ? <Button onClick={() => form.openAddForm()}>Add Category</Button> : null}
+      columnSelector={{ tableName: "EXPENSE_CATEGORIES", columns: categoryColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["name"] }}
+      tableColumns={[
+        ...visibleCategoryColumns,
+        {
+          key: "actions",
+          header: "Actions",
+          className: "text-right",
+          render: (item: ExpenseCategory) => (
+            <ActionDropdown
+              actions={[
+                {
+                  label: "Edit",
+                  icon: <Pencil size={15} />,
+                  hidden: !canEdit,
+                  onClick: () => form.openEditForm(item)
+                },
+                {
+                  label: "Show Logs",
+                  icon: <History size={15} />,
+                  hidden: !can("EXPENSE_CATEGORIES", "LOGS"),
+                  onClick: () => form.openLogs(item)
+                },
+                {
+                  label: "Delete",
+                  icon: <CommonDeleteIcon />,
+                  danger: true,
+                  hidden: !canDelete,
+                  onClick: () => form.askDelete(item)
+                }
+              ]}
+            />
+          )
+        }
+      ]}
+      emptyMessage="No expense categories found."
+      fullHeight
+      modals={
+        <>
+          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Expense Category" : "Add Expense Category"} onClose={form.closeForm}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Category Name"
+                requiredMark
+                error={form.fieldErrors.categoryName}
+                value={form.formValues.categoryName}
+                onChange={(event) => form.setFormValues((current) => ({ ...current, categoryName: event.target.value }))}
+              />
+              <Select
+                label="Status"
+                placeholder={null}
+                value={form.formValues.active}
+                onChange={(event) => form.setFormValues((current) => ({ ...current, active: event.target.value }))}
+                options={[
+                  { label: "Active", value: "true" },
+                  { label: "Inactive", value: "false" }
+                ]}
+              />
+              <Input
+                label="Description"
+                className="md:col-span-2"
+                error={form.fieldErrors.description}
+                value={form.formValues.description}
+                onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))}
+              />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button disabled={form.saving || !canSaveCategory} onClick={() => void form.saveForm()}>
+                {form.saving ? "Saving..." : form.editingEntity ? "Update Category" : "Create Category"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={form.closeForm}>
+                Cancel
+              </Button>
+            </div>
+          </Modal>
+          <AuditLogModal open={Boolean(form.logsTarget)} moduleName="Expense Category" entityId={form.logsTarget?.id ?? null} title={form.logsTarget ? `${form.logsTarget.categoryName} Logs` : "Expense Category Logs"} onClose={form.closeLogs} />
+          <CommonDeleteModal open={Boolean(form.deleteTarget)} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
+        </>
+      }
+    />
   );
 };

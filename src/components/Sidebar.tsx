@@ -1,68 +1,98 @@
-import {
-  BarChart3,
-  Boxes,
-  Building2,
-  ChevronDown,
-  ChevronLeft,
-  CreditCard,
-  DatabaseBackup,
-  FilePlus2,
-  FileText,
-  LayoutDashboard,
-  Mail,
-  MessageCircle,
-  MessageSquare,
-  Package,
-  ScrollText,
-  ReceiptIndianRupee,
-  ReceiptText,
-  Settings,
-  ShieldCheck,
-  ShoppingCart,
-  Palette,
-  Users,
-  Tags,
-  TrendingUp,
-  Wallet,
-  type LucideIcon
-} from "lucide-react";
+import { ChevronDown, ChevronLeft, Menu, ReceiptText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { resolveAssetUrl } from "../config/env";
+import { resolveMenuIcon } from "../config/menuIcons";
 import { useAuth } from "../context/AuthContext";
-import { compareMenuOrder } from "../services/MenuSearchService";
+import { compareMenuOrder } from "../lib/menu";
 import type { MenuPermission } from "../types/api";
 
-const iconMap: Record<string, LucideIcon> = {
-  BarChart3,
-  Boxes,
-  Building2,
-  CreditCard,
-  DatabaseBackup,
-  FilePlus2,
-  FileText,
-  LayoutDashboard,
-  Mail,
-  MessageCircle,
-  MessageSquare,
-  Package,
-  Palette,
-  ReceiptIndianRupee,
-  Settings,
-  ShieldCheck,
-  ScrollText,
-  ShoppingCart,
-  Tags,
-  TrendingUp,
-  Users,
-  Wallet
+const OPEN_MENUS_KEY = "billing_sidebar_open_menus";
+
+const readOpenMenus = (): Record<string, boolean> => {
+  try {
+    const raw = localStorage.getItem(OPEN_MENUS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
 };
 
-export const Sidebar = () => {
+const routeActive = (pathname: string, route?: string | null) => {
+  if (!route) {
+    return false;
+  }
+  return pathname === route || pathname.startsWith(`${route}/`);
+};
+
+const visibleChildren = (menu: MenuPermission) =>
+  (menu.children ?? []).filter((child) => child.canView).sort(compareMenuOrder);
+
+const menuContainsActive = (menu: MenuPermission, pathname: string): boolean => {
+  if (routeActive(pathname, menu.menuRoute)) {
+    return true;
+  }
+  return visibleChildren(menu).some((child) => menuContainsActive(child, pathname));
+};
+
+const findAncestorKeys = (items: MenuPermission[], targetKey: string, trail: string[] = []): string[] | null => {
+  for (const item of items) {
+    const key = String(item.id);
+    if (key === targetKey) {
+      return trail;
+    }
+    const found = findAncestorKeys(visibleChildren(item), targetKey, [...trail, key]);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+};
+
+type SidebarProps = {
+  collapsed: boolean;
+  mobileOpen: boolean;
+  onToggleCollapsed: () => void;
+  onCloseMobile: () => void;
+};
+
+const navRowClass = ({
+  collapsed,
+  highlighted,
+  filled = false,
+  dense = false
+}: {
+  collapsed: boolean;
+  highlighted: boolean;
+  filled?: boolean;
+  dense?: boolean;
+}) => {
+  const state = highlighted
+    ? filled
+      ? "bg-[image:var(--theme-gradient)] text-[var(--theme-contrast)] shadow-[0_4px_14px_rgba(2,6,23,0.22)]"
+      : "text-white"
+    : "text-[color:var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-white";
+  return [
+    "flex w-full items-center rounded-[5px] transition-all duration-300",
+    collapsed ? "justify-center p-2" : dense ? "gap-0 px-2.5 py-1.5" : "gap-2 px-2.5 py-1.5",
+    state
+  ].join(" ");
+};
+
+const MenuLeading = ({ iconName, depth }: { iconName?: string | null; depth: number }) => {
+  if (depth > 0) {
+    return <span className="sidebar-dot-icon mr-[7px]" />;
+  }
+  const Icon = resolveMenuIcon(iconName);
+  return <Icon className="shrink-0" size={17} />;
+};
+
+export const Sidebar = ({ collapsed, mobileOpen, onToggleCollapsed, onCloseMobile }: SidebarProps) => {
   const { user, permissions, platform, sessionType, isPlatformAdmin } = useAuth();
   const location = useLocation();
-  const [openMenus, setOpenMenus] = useState<Record<number, boolean>>({});
-  const [collapsed, setCollapsed] = useState(false);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>(readOpenMenus);
+  const [tooltip, setTooltip] = useState<{ name: string; top: number } | null>(null);
   const menus = useMemo(() => {
     if (isPlatformAdmin) {
       return [
@@ -81,156 +111,195 @@ export const Sidebar = () => {
             { id: -6, menuName: "Dump Manager", menuIcon: "DatabaseBackup", menuRoute: "/platform-admin/dumps", displayOrder: 4, canView: true, actions: [], children: [] }
           ]
         }
-      ];
+      ] as unknown as MenuPermission[];
     }
     return filterCompanyMenus(permissions?.menus ?? []);
   }, [isPlatformAdmin, permissions?.menus]);
 
   useEffect(() => {
-    const activeParent = menus.find((menu) => (menu.children ?? []).some((child) => child.menuRoute === location.pathname));
-    if (!activeParent) {
-      return;
-    }
-    setOpenMenus((current) => (current[activeParent.id] ? current : { ...current, [activeParent.id]: true }));
+    setOpenMenus((current) => {
+      const wanted: Record<string, boolean> = {};
+      const visit = (items: MenuPermission[]) => {
+        items.forEach((item) => {
+          const children = visibleChildren(item);
+          if (!children.length) {
+            return;
+          }
+          if (children.some((child) => menuContainsActive(child, location.pathname)) || menuContainsActive(item, location.pathname)) {
+            wanted[String(item.id)] = true;
+          }
+          visit(children);
+        });
+      };
+      visit(menus);
+      const currentKeys = Object.keys(current);
+      const wantedKeys = Object.keys(wanted);
+      const changed =
+        currentKeys.length !== wantedKeys.length ||
+        wantedKeys.some((key) => !current[key]);
+      return changed ? wanted : current;
+    });
   }, [location.pathname, menus]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPEN_MENUS_KEY, JSON.stringify(openMenus));
+    } catch {
+      // Storage can be unavailable in private or restricted browser contexts.
+    }
+  }, [openMenus]);
 
   const company = user?.company;
   const companyLogoUrl = resolveAssetUrl(company?.logoUrl);
   const title = sessionType === "platform-admin" ? (platform.platformName || "Platform Admin") : (company?.name ?? "Workspace");
-  // Same rule as Header: super-admin sessions show SUPER ADMIN, not OWNER.
   const subtitle = sessionType === "platform-admin" ? "Platform Administrator" : (user?.superAdmin ? "Super Admin" : (user?.role ?? "User"));
 
-  return (
-    <aside className={`flex w-full flex-col rounded-[24px] bg-[linear-gradient(180deg,var(--theme-dark),color-mix(in_srgb,var(--theme-dark)_76%,#020617))] p-4 text-white shadow-[0_22px_55px_rgba(7,19,48,0.18)] transition-all duration-300 lg:h-full lg:max-h-[calc(100vh-2.5rem)] ${collapsed ? "lg:w-[92px] lg:px-3" : "lg:w-[292px]"}`}>
-      <div className={`relative mb-5 flex shrink-0 ${collapsed ? "justify-center" : "justify-center"}`}>
-        <div className={`min-w-0 ${collapsed ? "lg:w-full" : "w-full"}`}>
-          <div className={`flex flex-col items-center ${collapsed ? "" : "gap-2"}`}>
-            <button
-              type="button"
-              className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-[0_12px_28px_rgba(2,6,23,0.16)] transition duration-200 ${collapsed ? "cursor-pointer hover:scale-105 hover:shadow-[0_14px_34px_rgba(255,255,255,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" : "cursor-default"}`}
-              aria-label={collapsed ? "Expand sidebar" : `${company?.name ?? "Company"} logo`}
-              title={collapsed ? "Expand sidebar" : title}
-              onClick={() => {
-                if (collapsed) {
-                  setCollapsed(false);
-                }
-              }}
-            >
-              {sessionType !== "platform-admin" && companyLogoUrl ? <img src={companyLogoUrl} alt={`${company?.name ?? "Company"} logo`} className="h-full w-full object-contain p-1.5" /> : <ReceiptText className="text-[var(--theme-color)]" size={28} />}
-            </button>
-            {!collapsed ? (
-              <div className="min-w-0 text-center">
-                <h2 className="truncate text-xl font-extrabold tracking-tight text-white">{title}</h2>
-                <p className="mt-0.5 truncate text-sm text-white/68">{subtitle}</p>
-              </div>
-            ) : null}
-          </div>
+  const toggleMenu = (key: string) => {
+    if (collapsed) {
+      onToggleCollapsed();
+      return;
+    }
+    setOpenMenus((current) => {
+      if (current[key]) {
+        return { ...current, [key]: false };
+      }
+      const ancestors = findAncestorKeys(menus, key) ?? [];
+      const next: Record<string, boolean> = {};
+      ancestors.forEach((ancestorKey) => {
+        next[ancestorKey] = true;
+      });
+      next[key] = true;
+      return next;
+    });
+  };
+
+  const handleModuleHover = (name: string, event: { currentTarget: HTMLElement }) => {
+    if (!collapsed) {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTooltip({ name, top: rect.top + rect.height / 2 });
+  };
+
+  const renderLeaf = (item: MenuPermission, depth: number) => {
+    const route = item.menuRoute || "";
+    if (!route) {
+      return null;
+    }
+    const isActive = routeActive(location.pathname, route);
+    return (
+      <li key={item.id}>
+        <NavLink
+          to={route}
+          onClick={onCloseMobile}
+          onMouseEnter={(event) => handleModuleHover(item.menuName, event)}
+          onMouseLeave={() => setTooltip(null)}
+          className={navRowClass({ collapsed, highlighted: isActive, filled: true, dense: depth > 0 })}
+        >
+          <MenuLeading iconName={item.menuIcon} depth={depth} />
+          {!collapsed ? <span className="fs-13 min-w-0 truncate font-medium">{item.menuName}</span> : null}
+        </NavLink>
+      </li>
+    );
+  };
+
+  const renderGroup = (item: MenuPermission, depth: number) => {
+    const children = visibleChildren(item);
+    const key = String(item.id);
+    const isOpen = Boolean(openMenus[key]) && !collapsed;
+    const hasActiveChild = children.some((child) => menuContainsActive(child, location.pathname));
+    return (
+      <li key={item.id}>
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          aria-label={item.menuName}
+          onMouseEnter={(event) => handleModuleHover(item.menuName, event)}
+          onMouseLeave={() => setTooltip(null)}
+          onFocus={(event) => handleModuleHover(item.menuName, event)}
+          onBlur={() => setTooltip(null)}
+          onClick={() => toggleMenu(key)}
+          className={navRowClass({ collapsed, highlighted: hasActiveChild })}
+        >
+          <MenuLeading iconName={item.menuIcon} depth={depth} />
+          {!collapsed ? (
+            <>
+              <span className="fs-13 min-w-0 flex-1 truncate text-left font-medium">{item.menuName}</span>
+              <ChevronDown size={15} className={`shrink-0 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
+            </>
+          ) : null}
+        </button>
+        <div
+          className="overflow-hidden transition-all duration-300 ease-in-out"
+          style={{ maxHeight: isOpen ? 900 : 0, opacity: isOpen ? 1 : 0, visibility: isOpen ? "visible" : "hidden" }}
+        >
+          <ul className={depth === 0 ? "space-y-[4px] pl-3 pt-[4px]" : "space-y-[4px] pl-3 pt-[4px]"}>
+            {children.map((child) => (visibleChildren(child).length ? renderGroup(child, depth + 1) : renderLeaf(child, depth + 1)))}
+          </ul>
         </div>
-        {!collapsed ? (
+      </li>
+    );
+  };
+
+  return (
+    <aside
+      className={[
+        "fixed inset-y-0 left-0 z-50 flex flex-col text-white shadow-[0_22px_55px_rgba(7,19,48,0.18)] transition-[width,transform] duration-300 lg:translate-x-0",
+        collapsed ? "w-[70px]" : "w-[240px]",
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      ].join(" ")}
+      style={{ background: "linear-gradient(180deg, var(--sidebar-bg), var(--sidebar-bg-deep))" }}
+    >
+      <div className={`flex h-[60px] shrink-0 items-center border-b border-white/10 ${collapsed ? "justify-center px-2" : "gap-2.5 px-3"}`}>
+        {collapsed ? (
           <button
             type="button"
-            className="absolute right-1 top-0 hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white/80 transition hover:bg-white/18 hover:text-white lg:inline-flex"
-            aria-label="Collapse sidebar"
-            onClick={() => setCollapsed(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-[5px] text-white/80 transition hover:bg-white/10 hover:text-white"
+            aria-label="Expand sidebar"
+            title={title}
+            onClick={onToggleCollapsed}
           >
-            <ChevronLeft size={17} />
+            <Menu size={18} />
           </button>
-        ) : null}
+        ) : (
+          <>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white">
+              {sessionType !== "platform-admin" && companyLogoUrl ? (
+                <img src={companyLogoUrl} alt={`${company?.name ?? "Company"} logo`} className="h-full w-full object-contain p-0.5" />
+              ) : (
+                <ReceiptText className="text-[var(--theme-color)]" size={20} />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="fs-14 truncate font-bold text-white">{title}</p>
+              <p className="fs-11 truncate text-white/55">{subtitle}</p>
+            </div>
+            <button
+              type="button"
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-[5px] text-white/70 transition hover:bg-white/10 hover:text-white lg:flex"
+              aria-label="Collapse sidebar"
+              onClick={onToggleCollapsed}
+            >
+              <ChevronLeft size={16} />
+            </button>
+          </>
+        )}
       </div>
 
-      <nav className="scrollbar-thin -mr-2 flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden pr-2">
-        {menus.map((item) => {
-          const Icon = item.menuIcon ? iconMap[item.menuIcon] ?? LayoutDashboard : LayoutDashboard;
-          const children = (item.children ?? []).filter((child) => child.canView).sort(compareMenuOrder);
-          if (children.length) {
-            if (collapsed) {
-              return (
-                <div key={item.id} className="space-y-1">
-                  {children.map((child) => {
-                    const ChildIcon = child.menuIcon ? iconMap[child.menuIcon] ?? LayoutDashboard : LayoutDashboard;
-                    return (
-                      <NavLink
-                        key={child.id}
-                        to={child.menuRoute}
-                        title={child.menuName}
-                        className={({ isActive }) =>
-                          [
-                            "flex min-h-11 items-center justify-center rounded-2xl border px-0 py-2.5 text-sm font-semibold transition",
-                            isActive
-                              ? "border-white/18 bg-[var(--theme-color)] text-[var(--theme-contrast)] shadow-[0_12px_24px_rgba(2,6,23,0.18)]"
-                              : "border-transparent text-white/78 hover:bg-white/10 hover:text-white"
-                          ].join(" ")
-                        }
-                      >
-                        <ChildIcon className="shrink-0" size={18} />
-                      </NavLink>
-                    );
-                  })}
-                </div>
-              );
-            }
-            const isOpen = Boolean(openMenus[item.id]);
-            return (
-              <div key={item.id} className="space-y-1">
-                <button
-                  type="button"
-                  title={collapsed ? item.menuName : undefined}
-                  className={`flex min-h-11 w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left text-sm font-semibold text-white/78 transition hover:bg-white/10 hover:text-white ${collapsed ? "lg:justify-center lg:px-0" : ""}`}
-                  onClick={() => setOpenMenus((current) => ({ ...current, [item.id]: !current[item.id] }))}
-                  aria-expanded={isOpen}
-                >
-                  <Icon className="shrink-0" size={18} />
-                  {!collapsed ? <span className="min-w-0 flex-1 truncate">{item.menuName}</span> : null}
-                  {!collapsed ? <ChevronDown className={isOpen ? "shrink-0 rotate-180 transition" : "shrink-0 transition"} size={16} /> : null}
-                </button>
-                {isOpen && !collapsed ? (
-                  <div className="ml-5 flex flex-col gap-1 border-l border-white/10 pl-3 pr-1">
-                    {children.map((child) => {
-                      const ChildIcon = child.menuIcon ? iconMap[child.menuIcon] ?? LayoutDashboard : LayoutDashboard;
-                      return (
-                        <NavLink
-                          key={child.id}
-                          to={child.menuRoute}
-                          className={({ isActive }) =>
-                            [
-                              "min-h-10 rounded-2xl px-4 py-2.5 text-sm font-semibold transition flex items-center gap-3",
-                              isActive
-                                ? "border border-white/18 bg-[var(--theme-color)] text-[var(--theme-contrast)] shadow-[0_12px_24px_rgba(2,6,23,0.18)]"
-                                : "border border-transparent text-white/72 hover:bg-white/10 hover:text-white"
-                            ].join(" ")
-                          }
-                        >
-                          <ChildIcon className="shrink-0" size={16} />
-                          <span className="min-w-0 truncate">{child.menuName}</span>
-                        </NavLink>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          }
-          return (
-          <NavLink
-            key={item.id}
-            to={item.menuRoute}
-            title={collapsed ? item.menuName : undefined}
-            end={item.menuRoute === "/dashboard" || item.menuRoute === "/create-invoice" || item.menuRoute === "/payments" || item.menuRoute === "/outstanding" || item.menuRoute === "/analytics"}
-            className={({ isActive }) =>
-              [
-                `min-h-11 rounded-2xl px-3 py-2.5 text-sm font-semibold transition flex items-center gap-3 ${collapsed ? "lg:justify-center lg:px-0" : ""}`,
-                isActive
-                  ? "border border-white/18 bg-[var(--theme-color)] text-[var(--theme-contrast)] shadow-[0_12px_24px_rgba(2,6,23,0.18)]"
-                  : "border border-transparent text-white/78 hover:bg-white/10 hover:text-white"
-              ].join(" ")
-            }
-          >
-            <Icon className="shrink-0" size={18} />
-            {!collapsed ? <span className="min-w-0 truncate">{item.menuName}</span> : null}
-          </NavLink>
-          );
-        })}
+      <nav className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3">
+        <ul className="space-y-[5px]">
+          {menus.map((item) => (visibleChildren(item).length ? renderGroup(item, 0) : renderLeaf(item, 0)))}
+        </ul>
       </nav>
+
+      {collapsed && tooltip ? (
+        <div
+          className="fs-13 pointer-events-none fixed z-[9999] -translate-y-1/2 whitespace-nowrap rounded bg-[#222222] px-2.5 py-1.5 font-semibold text-white shadow-[0_6px_18px_rgba(0,0,0,0.18)]"
+          style={{ top: tooltip.top, left: 78 }}
+        >
+          {tooltip.name}
+        </div>
+      ) : null}
     </aside>
   );
 };

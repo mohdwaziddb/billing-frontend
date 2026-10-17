@@ -17,7 +17,6 @@ import { getDashboardDetails, getDashboardSummary } from "../api/dashboard";
 import { getInvoicesPage } from "../api/invoices";
 import { Button } from "../components/Button";
 import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
-import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { MfaEnrollBanner } from "../components/MfaEnrollBanner";
 import { Input } from "../components/Input";
@@ -394,6 +393,12 @@ const buildListTotalRow = (rows: DashboardListRow[], config: { columns: Dashboar
   return totalRow;
 };
 
+const Panel = ({ className = "", children }: { className?: string; children: ReactNode }) => (
+  <section className={`rounded-lg border border-slate-200 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.04)] ${className}`}>
+    {children}
+  </section>
+);
+
 const DashboardCompactCard = ({
   label,
   value,
@@ -413,26 +418,26 @@ const DashboardCompactCard = ({
 }) => (
   <button
     type="button"
-    className="group h-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--compact-accent)_30%,white)] hover:shadow-[0_16px_36px_rgba(15,23,42,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--compact-accent)_34%,transparent)]"
+    className="group h-full rounded-lg border border-slate-200 bg-white p-4 text-left shadow-[0_2px_8px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--compact-accent)_30%,#e2e8f0)] hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--compact-accent)_34%,transparent)]"
     style={{ "--compact-accent": accentColor } as CSSProperties}
     onClick={onClick}
   >
-    <span className="flex min-h-[118px] flex-col justify-between gap-3">
+    <span className="flex min-h-[104px] flex-col justify-between gap-2.5">
       <span className="flex items-start justify-between gap-3">
         <span className="min-w-0">
-          <span className="block truncate text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{label}</span>
-          <span className="mt-2 block text-3xl font-extrabold leading-none text-slate-950">{value}</span>
+          <span className="fs-11 block truncate font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span>
+          <span className="fs-24 mt-1.5 block font-extrabold leading-none text-slate-950">{value}</span>
         </span>
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--compact-accent)_11%,white)] text-[var(--compact-accent)] shadow-[0_10px_22px_color-mix(in_srgb,var(--compact-accent)_12%,transparent)]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--compact-accent)_11%,white)] text-[var(--compact-accent)]">
           {icon}
         </span>
       </span>
       <span className="block min-w-0">
-        <span className="block truncate text-xs font-semibold text-slate-500">{caption}</span>
+        <span className="fs-11 block truncate font-medium text-slate-500">{caption}</span>
         {meta?.length ? (
-          <span className="mt-3 flex flex-wrap gap-2">
+          <span className="mt-2.5 flex flex-wrap gap-2">
             {meta.map((item) => (
-              <span key={item.label} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+              <span key={item.label} className="fs-11 rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold text-slate-600">
                 {item.label}: {item.value}
               </span>
             ))}
@@ -737,7 +742,7 @@ export const DashboardPage = () => {
   ].filter(Boolean) as string[];
 
   return (
-    <div className="space-y-5 pb-6">
+    <div className="space-y-4 pb-6 md:space-y-5">
       <Header
         title="Dashboard"
         subtitle="Track sales, collections, open balances, and customer performance with date-based business visibility."
@@ -745,11 +750,11 @@ export const DashboardPage = () => {
 
       <MfaEnrollBanner />
 
-      <GlassCard className="p-5 md:p-6">
+      <Panel className="p-4 md:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Filters</p>
-              <h2 className="mt-2 text-2xl font-bold text-slate-950">Dashboard Filters</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Filters</p>
+              <h2 className="fs-18 mt-1.5 font-semibold text-slate-950">Dashboard Filters</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {DATE_PRESET_OPTIONS.map(({ value, label }) => (
@@ -780,13 +785,14 @@ export const DashboardPage = () => {
             />
           </div>
         ) : null}
-      </GlassCard>
+      </Panel>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {dashboardCards.map((card) => (
           <StatCard
             key={card.label}
             label={card.label}
+            variant="flat"
             value={card.value}
             valueTitle={card.fullValue}
             caption={card.caption}
@@ -799,6 +805,7 @@ export const DashboardPage = () => {
         ))}
         <StatCard
           label="Total Expense"
+          variant="flat"
           value={formatCompactCurrency(summary?.totalExpense)}
           valueTitle={formatCurrency(summary?.totalExpense)}
           caption="Recorded business spend"
@@ -810,6 +817,7 @@ export const DashboardPage = () => {
         />
         <StatCard
           label="Net Revenue"
+          variant="flat"
           value={formatCompactCurrency(summary?.netRevenue)}
           valueTitle={formatCurrency(summary?.netRevenue)}
           caption="Collection minus expense"
@@ -852,11 +860,11 @@ export const DashboardPage = () => {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.55fr_0.85fr]">
-        <GlassCard className="p-5 md:p-6">
+        <Panel className="p-4 md:p-5">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Analytics</p>
-              <h2 className="mt-2 text-xl font-extrabold text-slate-950">Sales Trend</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Analytics</p>
+              <h2 className="mt-2 fs-18 font-bold text-slate-950">Sales Trend</h2>
             </div>
             <Select
               density="sm"
@@ -884,15 +892,15 @@ export const DashboardPage = () => {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </GlassCard>
+        </Panel>
 
-        <GlassCard className="p-5 md:p-6">
+        <Panel className="p-4 md:p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Products</p>
-              <h2 className="mt-2 text-xl font-extrabold text-slate-950">Top Selling Products</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Products</p>
+              <h2 className="mt-2 fs-18 font-bold text-slate-950">Top Selling Products</h2>
             </div>
-            <p className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">Top 7</p>
+            <p className="fs-11 shrink-0 rounded-full bg-slate-100 px-3 py-0.5 font-semibold text-slate-500">Top 7</p>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_1fr] xl:grid-cols-1">
             <div className="h-[210px]">
@@ -907,10 +915,10 @@ export const DashboardPage = () => {
             </div>
             <div className="space-y-3">
               {topProducts.map((product, index) => (
-                <div key={product.productId} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
+                <div key={product.productId} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <span className="h-3 w-3 rounded-full" style={{ backgroundColor: CHART_COLORS.palette[index % CHART_COLORS.palette.length] }} />
-                    <p className="truncate text-sm font-bold text-slate-700">{product.productName}</p>
+                    <p className="truncate fs-13 font-semibold text-slate-700">{product.productName}</p>
                   </div>
                   <Money value={product.totalSalesAmount} align="right" className="shrink-0 text-sm font-bold text-slate-950" />
                 </div>
@@ -922,17 +930,17 @@ export const DashboardPage = () => {
               <Button type="button" variant="secondary" className="w-full" onClick={() => openListDetails("topProducts")}>Show More Records</Button>
             </div>
           ) : null}
-        </GlassCard>
+        </Panel>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <GlassCard className="p-5 md:p-6">
+        <Panel className="p-4 md:p-5">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Recent invoices</p>
-              <h2 className="mt-2 text-xl font-extrabold text-slate-950">Billing activity</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Recent invoices</p>
+              <h2 className="mt-2 fs-18 font-bold text-slate-950">Billing activity</h2>
             </div>
-            <p className="text-sm text-slate-400">{recentInvoicesPage.totalRecords} invoice{recentInvoicesPage.totalRecords === 1 ? "" : "s"}</p>
+            <p className="fs-12 text-slate-400">{recentInvoicesPage.totalRecords} invoice{recentInvoicesPage.totalRecords === 1 ? "" : "s"}</p>
           </div>
           <Table
             data={recentInvoicesPage.records}
@@ -964,25 +972,25 @@ export const DashboardPage = () => {
               <Button type="button" variant="secondary" className="w-full" onClick={() => openListDetails("recentInvoices")}>Show More Records</Button>
             </div>
           ) : null}
-        </GlassCard>
+        </Panel>
 
-        <GlassCard className="p-5 md:p-6">
+        <Panel className="p-4 md:p-5">
           <div className="mb-5">
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Top customers</p>
-            <h2 className="mt-2 text-xl font-extrabold text-slate-950">Highest sales contribution</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Top customers</p>
+            <h2 className="mt-2 fs-18 font-bold text-slate-950">Highest sales contribution</h2>
           </div>
           <div className="space-y-3">
             {summary?.topCustomers?.length ? (
               summary.topCustomers.slice(0, DASHBOARD_ROW_LIMIT).map((customer) => (
-                <div key={customer.customerId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div key={customer.customerId} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-slate-950">{customer.customerName}</p>
-                      <p className="mt-1 text-sm text-slate-400">{customer.mobile}</p>
+                      <p className="mt-1 fs-12 text-slate-400">{customer.mobile}</p>
                       <p className="mt-2 text-xs text-slate-500">Last purchase: {formatDate(customer.lastPurchaseDate)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Sales</p>
+                      <p className="fs-11 uppercase tracking-[0.18em] text-slate-500">Sales</p>
                       <Money value={customer.totalPurchaseAmount} align="right" className="mt-1 font-semibold text-slate-950" />
                       <p className="mt-2 text-xs text-slate-400">Paid: <Money value={customer.totalPaidAmount} /></p>
                       <p className="text-xs font-semibold text-rose-600">Outstanding: <Money value={customer.outstandingBalance} /></p>
@@ -991,7 +999,7 @@ export const DashboardPage = () => {
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
                 No customer activity found for the selected range.
               </div>
             )}
@@ -1001,17 +1009,17 @@ export const DashboardPage = () => {
               <Button type="button" variant="secondary" className="w-full" onClick={() => openListDetails("topCustomers")}>Show More Records</Button>
             </div>
           ) : null}
-        </GlassCard>
+        </Panel>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <GlassCard className="p-5 md:p-6">
+        <Panel className="p-4 md:p-5">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Categories</p>
-              <h2 className="mt-2 text-xl font-extrabold text-slate-950">Sales By Category</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Categories</p>
+              <h2 className="mt-2 fs-18 font-bold text-slate-950">Sales By Category</h2>
             </div>
-            <p className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">Top 7</p>
+            <p className="fs-11 shrink-0 rounded-full bg-slate-100 px-3 py-0.5 font-semibold text-slate-500">Top 7</p>
           </div>
           <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -1034,12 +1042,12 @@ export const DashboardPage = () => {
               <button
                 key={category.categoryId}
                 type="button"
-                className={`flex w-full items-center justify-between gap-3 rounded-2xl border p-3 text-left transition ${activeCategoryId === category.categoryId ? "border-slate-300 bg-slate-100" : "border-transparent bg-slate-50 hover:bg-slate-100"}`}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left transition ${activeCategoryId === category.categoryId ? "border-slate-300 bg-slate-100" : "border-transparent bg-slate-50 hover:bg-slate-100"}`}
                 onClick={() => setActiveCategoryId((current) => (current === category.categoryId ? null : category.categoryId))}
               >
                 <span className="flex min-w-0 items-center gap-3">
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: categoryColorFor(category.categoryName, index) }} />
-                  <span className="truncate text-sm font-bold text-slate-700">{category.categoryName}</span>
+                  <span className="truncate fs-13 font-semibold text-slate-700">{category.categoryName}</span>
                 </span>
                 <span className="shrink-0 text-right">
                   <Money value={category.totalAmount} align="right" className="block text-sm font-extrabold text-slate-950" />
@@ -1047,7 +1055,7 @@ export const DashboardPage = () => {
                 </span>
               </button>
             )) : (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No category sales found for the selected range.</div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No category sales found for the selected range.</div>
             )}
           </div>
           {salesByCategoryPage.totalRecords > DASHBOARD_ROW_LIMIT ? (
@@ -1055,37 +1063,37 @@ export const DashboardPage = () => {
               <Button type="button" variant="secondary" className="w-full" onClick={() => openListDetails("salesByCategory")}>Show More Records</Button>
             </div>
           ) : null}
-        </GlassCard>
+        </Panel>
         <div className="space-y-4">
-          <GlassCard className="p-5 md:p-6">
+          <Panel className="p-4 md:p-5">
           <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
               <Banknote size={20} />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Outstanding</p>
-              <h2 className="mt-1 text-xl font-extrabold text-slate-950">Outstanding Overview</h2>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Outstanding</p>
+              <h2 className="mt-1 fs-18 font-bold text-slate-950">Outstanding Overview</h2>
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-rose-200/70 bg-[rgba(220,38,38,0.12)] p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Total Outstanding</p>
-              <Money value={totalOutstandingBase} className="mt-2 text-lg font-extrabold text-slate-950" />
+            <div className="rounded-lg border border-rose-200/70 bg-[rgba(220,38,38,0.12)] p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Total Outstanding</p>
+              <Money value={totalOutstandingBase} className="mt-2 fs-16 font-bold text-slate-950" />
             </div>
-            <div className="rounded-2xl border border-emerald-200/70 bg-[rgba(22,163,74,0.12)] p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Collected Amount</p>
-              <Money value={collectedAmount} className="mt-2 text-lg font-extrabold text-slate-950" />
+            <div className="rounded-lg border border-emerald-200/70 bg-[rgba(22,163,74,0.12)] p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Collected Amount</p>
+              <Money value={collectedAmount} className="mt-2 fs-16 font-bold text-slate-950" />
             </div>
-            <div className="rounded-2xl border border-orange-200/70 bg-[rgba(249,115,22,0.12)] p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Remaining Amount</p>
-              <Money value={remainingAmount} className="mt-2 text-lg font-extrabold text-slate-950" />
+            <div className="rounded-lg border border-orange-200/70 bg-[rgba(249,115,22,0.12)] p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Remaining Amount</p>
+              <Money value={remainingAmount} className="mt-2 fs-16 font-bold text-slate-950" />
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">Collection Rate</p>
-              <p className="mt-2 truncate text-lg font-extrabold text-slate-950">{collectionRate.toFixed(1)}%</p>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Collection Rate</p>
+              <p className="mt-2 truncate fs-16 font-bold text-slate-950">{collectionRate.toFixed(1)}%</p>
             </div>
           </div>
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
             {hasOutstandingOverviewData ? (
               <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
                 <div className="relative h-[180px]">
@@ -1098,7 +1106,7 @@ export const DashboardPage = () => {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-extrabold text-slate-950">{collectionRate.toFixed(0)}%</span>
+                    <span className="fs-18 font-bold text-slate-950">{collectionRate.toFixed(0)}%</span>
                     <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Collected</span>
                   </div>
                 </div>
@@ -1131,20 +1139,20 @@ export const DashboardPage = () => {
           </div>
           <div className="mt-5">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-sm font-extrabold text-slate-950">Top Outstanding Customers</p>
-              <p className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500">Top 7</p>
+              <p className="fs-14 font-bold text-slate-950">Top Outstanding Customers</p>
+              <p className="fs-11 shrink-0 rounded-full bg-slate-100 px-3 py-0.5 font-semibold text-slate-500">Top 7</p>
             </div>
             <div className="space-y-2">
               {outstandingCustomersPage.records.length ? outstandingCustomersPage.records.map((customer) => (
-                <div key={customer.customerId} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
+                <div key={customer.customerId} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-700">{customer.customerName}</p>
+                    <p className="truncate fs-13 font-semibold text-slate-700">{customer.customerName}</p>
                     <p className="truncate text-xs text-slate-400">{customer.mobile}</p>
                   </div>
                   <Money value={customer.currentBalance} align="right" className="shrink-0 text-sm font-bold text-slate-950" />
                 </div>
               )) : (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No outstanding customers found.</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No outstanding customers found.</div>
               )}
             </div>
             {outstandingCustomersPage.totalRecords > DASHBOARD_ROW_LIMIT ? (
@@ -1153,7 +1161,7 @@ export const DashboardPage = () => {
               </div>
             ) : null}
           </div>
-          </GlassCard>
+          </Panel>
 
         </div>
       </div>
@@ -1184,7 +1192,7 @@ export const DashboardPage = () => {
       <Modal open={Boolean(activeCard)} title={customerDetailOpen ? "Customer Details" : selectedConfig?.title ?? "Dashboard Details"} onClose={() => setActiveCard(null)}>
         <div className="space-y-5">
           {customerDetailOpen ? (
-            <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-3">
+            <div className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 sm:grid-cols-3">
               {([
                 { key: "customers", label: "All Customers", count: summary?.totalCustomers ?? 0 },
                 { key: "newCustomers", label: "New Customers", count: summary?.newCustomers ?? 0 },
@@ -1197,12 +1205,12 @@ export const DashboardPage = () => {
                   onClick={() => switchCustomerDetailTab(tab.key)}
                 >
                   <span className="block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{tab.label}</span>
-                  <span className="mt-1 block text-2xl font-extrabold text-slate-950">{tab.count}</span>
+                  <span className="mt-1 block fs-18 font-bold text-slate-950">{tab.count}</span>
                 </button>
               ))}
             </div>
           ) : null}
-          <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+          <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
             <span className="font-semibold text-slate-950">Active Filters:</span>
             <span className="min-w-0 flex-1 text-slate-600">{modalFilters.join(" | ") || "No filters applied"}</span>
             <span className="font-semibold text-slate-950">Records: {details?.totalElements ?? 0}</span>
@@ -1238,7 +1246,7 @@ export const DashboardPage = () => {
             </div>
           </div>
 
-          <div className="scrollbar-thin overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <div className="scrollbar-thin overflow-x-auto rounded-lg border border-slate-200 bg-white">
             <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
               <thead className="sticky top-0 z-10 bg-slate-50">
                 <tr>

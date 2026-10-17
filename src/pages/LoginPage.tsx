@@ -6,9 +6,9 @@ import { LoginCard } from "../components/login/LoginCard";
 import { MfaChallengeCard } from "../components/login/MfaChallengeCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
-import { getApiErrorMessage } from "../lib/errors";
 import { currentHostname, getSubdomainCompanyCode, isLiveHost, isMainHost, isTenantSubdomainHost, mainSiteHomeUrl } from "../lib/hosts";
 import { isMaintenanceError, notifyMaintenance } from "../lib/tenantMaintenance";
+import { notificationService } from "../services/notificationService";
 import type { ApiResponse } from "../types/api";
 
 const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
@@ -32,13 +32,11 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   // MFA second step: password OK hua par TOTP pending hai. mfaToken sirf
   // memory me rehta hai — storage me kabhi nahi (5 min expiry).
   const [mfaToken, setMfaToken] = useState<string | null>(null);
   const [mfaAccountLabel, setMfaAccountLabel] = useState<string | null>(null);
   const [mfaLoading, setMfaLoading] = useState(false);
-  const [mfaError, setMfaError] = useState("");
   const [company, setCompany] = useState<LoginCompany>(null);
   const [brandingReady, setBrandingReady] = useState(false);
   const [byDomainMissing, setByDomainMissing] = useState(false);
@@ -55,9 +53,12 @@ export const LoginPage = () => {
   const unknownWorkspace =
     isTenantSubdomainHost() && byDomainMissing && brandingMissing;
   const effectiveCanSubmit = unknownWorkspace ? false : canSubmit;
-  const effectiveError = unknownWorkspace
-    ? "This workspace was not found. Please check your subdomain."
-    : error;
+
+  useEffect(() => {
+    if (unknownWorkspace) {
+      notificationService.showError("This workspace was not found. Please check your subdomain.");
+    }
+  }, [unknownWorkspace]);
 
   useEffect(() => {
     if (!auth?.accessToken) {
@@ -152,20 +153,16 @@ export const LoginPage = () => {
     }
     try {
       setLoading(true);
-      setError("");
       clearMessage();
       const result = await login(form);
       if (result.mfaRequired) {
         // Second step: code screen dikhao, session abhi save nahi hui.
         setMfaToken(result.mfaToken ?? null);
         setMfaAccountLabel(result.user?.username ?? result.user?.email ?? null);
-        setMfaError("");
         return;
       }
       navigate(result.route ?? "/no-menu", { replace: true });
     } catch (err: any) {
-      const message = getApiErrorMessage(err, "Unable to sign in. Please check your email and password.");
-      setError(message);
       setApiError(err, "Unable to sign in. Please check your email and password.");
     } finally {
       setLoading(false);
@@ -174,17 +171,16 @@ export const LoginPage = () => {
 
   const submitMfa = async (code: string) => {
     if (!mfaToken) {
-      setMfaError("MFA session expired. Please sign in again.");
+      notificationService.showError("MFA session expired. Please sign in again.");
       return;
     }
     try {
       setMfaLoading(true);
-      setMfaError("");
       clearMessage();
       const route = await completeMfaLogin(mfaToken, code);
       navigate(route ?? "/no-menu", { replace: true });
     } catch (err: any) {
-      setMfaError(getApiErrorMessage(err, "Incorrect code. Enter the 6-digit code from your authenticator app."));
+      setApiError(err, "Incorrect code. Enter the 6-digit code from your authenticator app.");
     } finally {
       setMfaLoading(false);
     }
@@ -193,7 +189,6 @@ export const LoginPage = () => {
   const backToPassword = () => {
     setMfaToken(null);
     setMfaAccountLabel(null);
-    setMfaError("");
   };
 
   return (
@@ -208,7 +203,6 @@ export const LoginPage = () => {
             <MfaChallengeCard
               accountLabel={mfaAccountLabel}
               loading={mfaLoading}
-              error={mfaError}
               onSubmit={(code) => void submitMfa(code)}
               onBack={backToPassword}
             />
@@ -218,7 +212,6 @@ export const LoginPage = () => {
             password={form.password}
             loading={loading}
             canSubmit={effectiveCanSubmit}
-            error={effectiveError}
             company={company}
             brandingReady={brandingReady}
             // Forgot-password hidden for now (validation later) — 1 line revert to restore.
@@ -226,15 +219,9 @@ export const LoginPage = () => {
             subtitle={company?.name ? `Sign in to continue to ${company.name}.` : undefined}
             onUsernameChange={(value) => {
               setForm((current) => ({ ...current, username: value }));
-              if (error) {
-                setError("");
-              }
             }}
             onPasswordChange={(value) => {
               setForm((current) => ({ ...current, password: value }));
-              if (error) {
-                setError("");
-              }
             }}
             onSubmit={submit}
           />

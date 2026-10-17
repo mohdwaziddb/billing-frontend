@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, ReceiptIndianRupee } from "lucide-react";
 import { getGstSummaryReport } from "../api/gstReports";
 import { Button } from "../components/Button";
-import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
+import { ListToolbar } from "../components/ListToolbar";
 import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
@@ -37,25 +37,32 @@ const emptyReport: GstReport = {
 
 export const GstSummaryPage = () => {
   const { setApiError } = useApiMessage();
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [draftFilters, setDraftFilters] = useState({ startDate: "", endDate: "" });
+  const [appliedFilters, setAppliedFilters] = useState({ startDate: "", endDate: "" });
   const [activeTab, setActiveTab] = useState<TabKey>("invoiceWise");
   const [report, setReport] = useState<GstReport>(emptyReport);
 
   useEffect(() => {
-    void getGstSummaryReport({ startDate: startDate || undefined, endDate: endDate || undefined })
+    void getGstSummaryReport({ startDate: appliedFilters.startDate || undefined, endDate: appliedFilters.endDate || undefined })
       .then(setReport)
       .catch((err: any) => setApiError(err, "Unable to load GST summary"));
-  }, [endDate, setApiError, startDate]);
+  }, [appliedFilters, setApiError]);
 
   const activeFilters = useMemo(() => {
     const rows: string[] = [];
-    if (startDate || endDate) {
-      rows.push(`${formatDate(startDate) || "Start"} - ${formatDate(endDate) || "End"}`);
+    if (appliedFilters.startDate || appliedFilters.endDate) {
+      rows.push(`${formatDate(appliedFilters.startDate) || "Start"} - ${formatDate(appliedFilters.endDate) || "End"}`);
     }
     return rows;
-  }, [endDate, startDate]);
+  }, [appliedFilters]);
+
+  const applyFilters = () => setAppliedFilters(draftFilters);
+
+  const resetFilters = () => {
+    const empty = { startDate: "", endDate: "" };
+    setDraftFilters(empty);
+    setAppliedFilters(empty);
+  };
 
   const exportCurrent = () => {
     if (activeTab === "invoiceWise") {
@@ -133,31 +140,27 @@ export const GstSummaryPage = () => {
   return (
     <div className="space-y-4 pb-6">
       <Header title="GST Summary" subtitle="Snapshot-based GST reporting for invoice wise, customer wise, month wise, tax wise, and HSN wise summaries." />
-      <CommonAdvancedFilterPanel
-        title="GST Filters"
-        eyebrow="Report Filters"
-        expanded={filtersOpen}
-        activeFilters={activeFilters}
-        onToggle={() => setFiltersOpen((current) => !current)}
-        onClearAll={() => {
-          setStartDate("");
-          setEndDate("");
-        }}
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="Start Date" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-          <Input label="End Date" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-        </div>
-      </CommonAdvancedFilterPanel>
-
       <GlassCard className="p-6 md:p-7">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="mb-5">
           <CommonBreadcrumb items={[{ label: "Reports" }, { label: "GST Summary" }]} />
-          <Button type="button" variant="secondary" onClick={exportCurrent}>
-            <Download size={16} />
-            Export Current View
-          </Button>
         </div>
+        <ListToolbar
+          showSearch={false}
+          filtersActiveCount={activeFilters.length}
+          onApplyFilters={applyFilters}
+          onCancelFilters={() => setDraftFilters(appliedFilters)}
+          onResetFilters={resetFilters}
+          filtersClassName="grid gap-3 md:grid-cols-2"
+          actions={
+            <Button type="button" variant="secondary" onClick={exportCurrent}>
+              <Download size={16} />
+              Export Current View
+            </Button>
+          }
+        >
+          <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
+          <Input label="End Date" type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} />
+        </ListToolbar>
       </GlassCard>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

@@ -87,8 +87,8 @@ export const SalesReferralsPage = () => {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <CommonBreadcrumb items={[{ label: "Reports" }, { label: "Sales Referrals" }]} />
-            <p className="mt-4 text-xs uppercase tracking-[0.35em] text-slate-400">Filters</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-950">Sales Referral Filters</h2>
+            <p className="mt-4 fs-11 uppercase tracking-[0.18em] text-slate-400">Filters</p>
+            <h2 className="mt-2 fs-18 font-semibold text-slate-950">Sales Referral Filters</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {DATE_PRESET_OPTIONS.map(({ value, label }) => (
@@ -176,8 +176,8 @@ export const SalesReferralsPage = () => {
         <GlassCard className="p-5 md:p-6">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Performance</p>
-              <h3 className="mt-2 text-xl font-extrabold text-slate-950">Referral Analytics</h3>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Performance</p>
+              <h3 className="mt-2 fs-18 font-bold text-slate-950">Referral Analytics</h3>
             </div>
             <p className="text-sm font-semibold text-slate-500">Sorted by highest revenue first</p>
           </div>
@@ -186,12 +186,12 @@ export const SalesReferralsPage = () => {
 
         <GlassCard className="p-5 md:p-6">
           <div className="mb-4 flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
               <Trophy size={20} />
             </span>
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Ranking</p>
-              <h3 className="text-xl font-extrabold text-slate-950">Top 10 Sales Contributors</h3>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Ranking</p>
+              <h3 className="fs-18 font-bold text-slate-950">Top 10 Sales Contributors</h3>
             </div>
           </div>
           <div className="space-y-3">
@@ -199,7 +199,7 @@ export const SalesReferralsPage = () => {
               <button
                 key={item.userId}
                 type="button"
-                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--theme-color)] hover:shadow-sm"
+                className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--theme-color)] hover:shadow-sm"
                 onClick={() => setSelectedUser(item)}
               >
                 <div className="min-w-0">
@@ -208,7 +208,7 @@ export const SalesReferralsPage = () => {
                 </div>
                 <p className="font-black text-[var(--theme-color)]">{formatCurrency(item.totalRevenue)}</p>
               </button>
-            )) : <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No contributors yet.</p>}
+            )) : <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No contributors yet.</p>}
           </div>
         </GlassCard>
       </div>
@@ -245,28 +245,28 @@ const ReferralMetricCard = ({
 }) => (
   <button
     type="button"
-    className="group relative min-h-[178px] overflow-hidden rounded-2xl border border-white/70 bg-white p-5 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
+    className="group relative min-h-[178px] overflow-hidden rounded-lg border border-white/70 bg-white p-5 text-left shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)]"
     onClick={onClick}
   >
     <span className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${tone}`} />
     <span className={`absolute -right-10 -top-12 h-32 w-32 rounded-full bg-gradient-to-br ${tone} opacity-15 transition group-hover:scale-110`} />
-    <span className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-lg`}>
+    <span className={`mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br ${tone} text-white shadow-lg`}>
       {icon}
     </span>
-    <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{title}</p>
-    <p className="mt-3 break-words text-2xl font-black text-slate-950">{value}</p>
+    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{title}</p>
+    <p className="mt-3 break-words fs-20 font-bold text-slate-950">{value}</p>
     <p className="mt-2 text-sm font-semibold text-slate-500">{caption}</p>
   </button>
 );
 
 const ReferralUsersTable = ({ users, onSelect }: { users: SalesReferralUserSummary[]; onSelect: (user: SalesReferralUserSummary) => void }) => {
   if (!users.length) {
-    return <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No referred invoices found for this date range.</p>;
+    return <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No referred invoices found for this date range.</p>;
   }
 
   return (
     <div className="space-y-3">
-      <div className="hidden grid-cols-[1.3fr_1fr_0.75fr_repeat(4,1fr)] gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 xl:grid">
+      <div className="hidden grid-cols-[1.3fr_1fr_0.75fr_repeat(4,1fr)] gap-3 rounded-lg bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 xl:grid">
         <span>User Name</span>
         <span>Username</span>
         <span className="text-right">Invoices</span>
@@ -279,7 +279,7 @@ const ReferralUsersTable = ({ users, onSelect }: { users: SalesReferralUserSumma
         <button
           key={user.userId}
           type="button"
-          className="grid w-full gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-[var(--theme-color)] hover:bg-[color-mix(in_srgb,var(--theme-color)_5%,white)] xl:grid-cols-[1.3fr_1fr_0.75fr_repeat(4,1fr)] xl:items-center"
+          className="grid w-full gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-[var(--theme-color)] hover:bg-[color-mix(in_srgb,var(--theme-color)_5%,white)] xl:grid-cols-[1.3fr_1fr_0.75fr_repeat(4,1fr)] xl:items-center"
           onClick={() => onSelect(user)}
         >
           <span>
@@ -368,12 +368,12 @@ const InvoiceDrilldown = ({ description, invoices }: { description: string; invo
 
 const InvoiceRows = ({ invoices }: { invoices: SalesReferralInvoice[] }) => {
   if (!invoices.length) {
-    return <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No invoices found.</p>;
+    return <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No invoices found.</p>;
   }
 
   return (
     <div className="space-y-3">
-      <div className="hidden grid-cols-[1fr_1.15fr_1.2fr_0.85fr_repeat(3,0.8fr)] gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 lg:grid">
+      <div className="hidden grid-cols-[1fr_1.15fr_1.2fr_0.85fr_repeat(3,0.8fr)] gap-3 rounded-lg bg-slate-50 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 lg:grid">
         <span>Invoice Number</span>
         <span>Customer</span>
         <span>Refer User</span>
@@ -383,7 +383,7 @@ const InvoiceRows = ({ invoices }: { invoices: SalesReferralInvoice[] }) => {
         <span className="text-right">Outstanding</span>
       </div>
       {invoices.map((invoice) => (
-        <div key={invoice.invoiceId} className="grid gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 lg:grid-cols-[1fr_1.15fr_1.2fr_0.85fr_repeat(3,0.8fr)] lg:items-center">
+        <div key={invoice.invoiceId} className="grid gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 lg:grid-cols-[1fr_1.15fr_1.2fr_0.85fr_repeat(3,0.8fr)] lg:items-center">
           <DataCell label="Invoice Number" value={invoice.invoiceNo} strong />
           <DataCell label="Customer" value={invoice.customerName} />
           <DataCell label="Refer User" value={formatInvoiceReferUser(invoice)} />
@@ -425,10 +425,10 @@ const RankingDrilldown = ({ users, onSelectUser }: { users: SalesReferralUserSum
           <button
             key={user.userId}
             type="button"
-            className="grid w-full gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-[var(--theme-color)] lg:grid-cols-[80px_1.3fr_repeat(3,1fr)] lg:items-center"
+            className="grid w-full gap-3 rounded-lg border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-[var(--theme-color)] lg:grid-cols-[80px_1.3fr_repeat(3,1fr)] lg:items-center"
             onClick={() => onSelectUser(user)}
           >
-            <span className="text-xl font-black text-[var(--theme-color)]">#{page * REFERRAL_MODAL_PAGE_SIZE + index + 1}</span>
+            <span className="fs-18 font-bold text-[var(--theme-color)]">#{page * REFERRAL_MODAL_PAGE_SIZE + index + 1}</span>
             <span>
               <span className="block font-extrabold text-slate-950">{user.userName}</span>
               <span className="text-sm text-slate-500">{user.username}</span>
@@ -437,7 +437,7 @@ const RankingDrilldown = ({ users, onSelectUser }: { users: SalesReferralUserSum
             <DataCell label="Invoice Count" value={String(user.totalInvoices)} alignRight />
             <DataCell label="Average Value" value={formatCurrency(user.averageInvoiceValue)} alignRight />
           </button>
-        )) : <p className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No contributors found.</p>}
+        )) : <p className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">No contributors found.</p>}
       </div>
       <div className="flex justify-end"><Pagination page={page} size={REFERRAL_MODAL_PAGE_SIZE} totalRecords={filtered.length} totalPages={totalPages} onPageChange={setPage} layout="inline" /></div>
     </div>
@@ -445,8 +445,8 @@ const RankingDrilldown = ({ users, onSelectUser }: { users: SalesReferralUserSum
 };
 
 const SummaryMini = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-    <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
     <p className="mt-2 text-lg font-black text-slate-950">{value}</p>
   </div>
 );

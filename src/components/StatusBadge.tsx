@@ -7,7 +7,7 @@ export const StatusBadge = ({ label }: { label?: string | null }) => {
   return (
     <span
       className={clsx(
-        "status-badge inline-flex rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
+        "status-badge inline-flex rounded-full border px-2.5 py-0.5 fs-11 font-semibold tracking-wide",
         (normalized === "PAID" || normalized === "SENT") && "status-badge-success",
         (normalized === "PARTIAL" || normalized === "PENDING") && "status-badge-warning",
         (normalized === "UNPAID" || normalized === "FAILED" || normalized === "DELETED") && "status-badge-danger",

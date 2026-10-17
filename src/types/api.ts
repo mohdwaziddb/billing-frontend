@@ -58,7 +58,7 @@ export type CompanySummary = {
   invoiceNotes?: string | null;
   invoiceTerms?: string | null;
   inventoryConsumptionMethod?: "FIFO" | "LIFO" | "WEIGHTED_AVERAGE";
-  inventoryPricingPolicy?: "LATEST_BATCH_SELLING_PRICE" | "PRODUCT_MASTER_SELLING_PRICE" | "MANUAL_PRICE" | "PRICE_LIST";
+  inventoryPricingPolicy?: "LATEST_BATCH_SELLING_PRICE" | "CURRENT_BATCH_SELLING_PRICE" | "PRODUCT_MASTER_SELLING_PRICE" | "MANUAL_PRICE" | "PRICE_LIST";
   chatbotEnabled?: boolean;
   applyMfa?: boolean;
 };

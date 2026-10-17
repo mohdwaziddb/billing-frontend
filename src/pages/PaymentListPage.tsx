@@ -8,22 +8,20 @@ import { deletePayment, getPaymentsPage, restorePayment, type PaymentFilterParam
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
-import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
-import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
+import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
-import { GlassCard } from "../components/GlassCard";
-import { Header } from "../components/Header";
+import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
-import { Table } from "../components/Table";
+import { Table, type Column } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { useListPage } from "../hooks/useListPage";
 import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
@@ -107,12 +105,6 @@ const buildGrandTotal = (rows: Payment[]) => ({
 });
 
 export const PaymentListPage = () => {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [paymentPage, setPaymentPage] = useState<PageResponse<Payment>>(emptyPaymentPage);
-  const [page, setPage] = useState(0);
-  const [draftFilters, setDraftFilters] = useState<PaymentFilters>(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState<PaymentFilters>(emptyFilters);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [exportRows, setExportRows] = useState<Payment[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<Payment | null>(null);
@@ -136,9 +128,30 @@ export const PaymentListPage = () => {
   });
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
-  const baseParams = useMemo(() => buildParams(appliedFilters), [appliedFilters]);
+
+  const list = useListPage<Payment, PaymentFilters>({
+    initialFilters: emptyFilters,
+    errorMessage: "Unable to load payments",
+    fetchPage: ({ page, size, filters }) => getPaymentsPage({ ...buildParams(filters), page, size })
+  });
+
+  const loadExportRows = async (filters: PaymentFilters) => {
+    const response = await getPaymentsPage({ ...buildParams(filters), page: 0, size: 1000 });
+    setExportRows(response.records);
+  };
+
+  useEffect(() => {
+    void loadExportRows(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load payments"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.activeFilters]);
+
+  useEffect(() => {
+    void getPaymentModes({ active: true, size: 1000 }).then(setPaymentModes).catch((err: any) => setApiError(err, "Unable to load payment modes"));
+  }, [setApiError]);
+
+  const baseParams = useMemo(() => buildParams(list.activeFilters), [list.activeFilters]);
   const modeLabelMap = useMemo(() => Object.fromEntries(paymentModes.map((mode) => [mode.modeCode, mode.modeName])), [paymentModes]);
-  const activeFilterSummary = useMemo(() => summarizePaymentFilters(appliedFilters, modeLabelMap), [appliedFilters, modeLabelMap]);
+  const activeFilterSummary = useMemo(() => summarizePaymentFilters(list.activeFilters, modeLabelMap), [list.activeFilters, modeLabelMap]);
   const summary = useMemo(() => ({
     total: exportRows.length,
     collection: exportRows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
@@ -153,33 +166,14 @@ export const PaymentListPage = () => {
   const visiblePaymentColumns = useMemo(() => applyVisibleColumns(paymentColumns, visibleColumns), [paymentColumns, visibleColumns]);
   const visiblePaymentExportColumns = useMemo(() => applyVisibleColumns(paymentExportColumns, visibleColumns), [visibleColumns]);
 
-  const loadPayments = async (nextPage = page, params = baseParams) => {
-    const response = await getPaymentsPage({ ...params, page: nextPage, size: DEFAULT_PAGE_SIZE });
-    setPaymentPage(response);
-    setPayments(response.records);
-  };
-
-  const loadExportRows = async (params = baseParams) => {
-    const response = await getPaymentsPage({ ...params, page: 0, size: 1000 });
-    setExportRows(response.records);
-  };
-
   useEffect(() => {
-    void Promise.all([loadPayments(0), loadExportRows()]).catch((err: any) => setApiError(err, "Unable to load payments"));
-  }, [baseParams]);
-
-  useEffect(() => {
-    void getPaymentModes({ active: true, size: 1000 }).then(setPaymentModes).catch((err: any) => setApiError(err, "Unable to load payment modes"));
-  }, [setApiError]);
-
-  useEffect(() => {
-    const ids = [...new Set([...payments, ...modalPayments].map((payment) => payment.id))];
+    const ids = [...new Set([...list.tableData, ...modalPayments].map((payment) => payment.id))];
     if (!can("PAYMENTS", "LOGS") || !ids.length) {
       setLogCounts({});
       return;
     }
     void loadLogCounts("Payment", ids).then(setLogCounts).catch(() => setLogCounts({}));
-  }, [can, payments, modalPayments]);
+  }, [can, list.tableData, modalPayments]);
 
   useEffect(() => {
     if (!activeSummary) return;
@@ -190,36 +184,15 @@ export const PaymentListPage = () => {
         setModalPayments(response.records);
       })
       .catch((err: any) => setApiError(err, "Unable to load payment details"));
-  }, [activeSummary, baseParams, modalPage, modalSearch]);
-
-  const applyFilters = () => {
-    setPage(0);
-    setAppliedFilters(draftFilters);
-    setFiltersOpen(false);
-  };
-
-  const clearSearchFilter = () => {
-    const nextFilters = { ...draftFilters, search: "" };
-    setPage(0);
-    setDraftFilters(nextFilters);
-    setAppliedFilters(nextFilters);
-    setFiltersOpen(false);
-  };
-
-  const resetFilters = () => {
-    setPage(0);
-    setDraftFilters(emptyFilters);
-    setAppliedFilters(emptyFilters);
-    setFiltersOpen(false);
-  };
+  }, [activeSummary, baseParams, modalPage, modalSearch, setApiError]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
       setDeleting(true);
       await deletePayment(deleteTarget.id);
-      await loadPayments(page);
-      await loadExportRows();
+      list.refreshTable();
+      await loadExportRows(list.activeFilters);
       setDeleteTarget(null);
       notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Payment"));
     } catch (err: any) {
@@ -237,8 +210,8 @@ export const PaymentListPage = () => {
       setRestoringId(restoreTarget.id);
       await restorePayment(restoreTarget.id);
       setRestoreTarget(null);
-      await loadPayments(page);
-      await loadExportRows();
+      list.refreshTable();
+      await loadExportRows(list.activeFilters);
       notificationService.showSuccess(CommonSuccessMessageUtil.updated("Payment"));
     } catch (err: any) {
       setApiError(err, "Unable to restore payment");
@@ -307,41 +280,61 @@ export const PaymentListPage = () => {
     setModalSearch("");
   };
 
+  const buildTableColumns = (canDelete: boolean): Column<Payment>[] => [
+    ...visiblePaymentColumns,
+    {
+      key: "actions",
+      header: "Actions",
+      className: "text-right",
+      render: (item) => (
+        <ActionDropdown actions={[
+          {
+            label: "Send Reminder",
+            icon: <Send size={15} />,
+            hidden: item.deleted || !(can("EMAIL_TEMPLATES", "EMAIL_SEND") || can("SMS_TEMPLATES", "SMS_SEND") || can("COMMUNICATION", "WHATSAPP_SEND")) || (!item.customerEmail && !item.customerMobile),
+            onClick: () => openReminder(item)
+          },
+          { label: "Show Logs", icon: <History size={15} />, hidden: !can("PAYMENTS", "LOGS") || !logCounts[item.id], onClick: () => setLogTarget(item) },
+          { label: restoringId === item.id ? "Restoring..." : "Restore", icon: <RotateCcw size={15} />, hidden: !item.deleted || !can("PAYMENTS", "RESTORE"), onClick: () => setRestoreTarget(item) },
+          { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: item.deleted || !canDelete, onClick: () => setDeleteTarget(item) }
+        ]} />
+      )
+    }
+  ];
+
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
-      <Header title="Payments" subtitle="Review customer collections and invoice-linked payment activity." />
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Total Payments" value={String(summary.total)} caption="Current filtered payments" icon={<CreditCard size={18} />} onClick={() => openSummary("total")} />
-        <StatCard label="Total Collection" value={formatCurrency(summary.collection)} caption="All payment modes" icon={<Wallet size={18} />} onClick={() => openSummary("collection")} />
-        {paymentModes.slice(0, 2).map((mode) => (
-          <StatCard key={mode.modeCode} label={`${mode.modeName} Collection`} value={formatCurrency(summary.byMode[mode.modeCode] ?? 0)} caption={`${mode.modeName} payments`} icon={<CreditCard size={18} />} onClick={() => openSummary(`mode:${mode.modeCode}`)} />
-        ))}
-        <StatCard label="Outstanding Collection" value={formatCurrency(summary.outstandingCollection)} caption="Invoice-linked payments" icon={<AlertCircle size={18} />} onClick={() => openSummary("outstanding")} />
-      </div>
-
-      <CommonAdvancedFilterPanel
-        title="Advanced Payment Search"
-        eyebrow="Payment Filters"
-        expanded={filtersOpen}
-        activeFilters={activeFilterSummary}
-        onToggle={() => setFiltersOpen((current) => !current)}
-        onClearAll={resetFilters}
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="Search Payment" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} onClear={clearSearchFilter} />
-          <Select label="Payment Status" value={draftFilters.paymentStatus} options={[
+    <CommonListPage<Payment, PaymentFilters>
+      pageTitle="Payments"
+      pageSubtitle="Review customer collections and invoice-linked payment activity."
+      list={list}
+      searchPlaceholder="Search Payment"
+      activeFilterCount={() => activeFilterSummary.length}
+      filterPanelWidth="max-w-[720px]"
+      filtersClassName="grid gap-3 md:grid-cols-2"
+      statCards={
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <StatCard label="Total Payments" value={String(summary.total)} caption="Current filtered payments" icon={<CreditCard size={18} />} onClick={() => openSummary("total")} />
+          <StatCard label="Total Collection" value={formatCurrency(summary.collection)} caption="All payment modes" icon={<Wallet size={18} />} onClick={() => openSummary("collection")} />
+          {paymentModes.slice(0, 2).map((mode) => (
+            <StatCard key={mode.modeCode} label={`${mode.modeName} Collection`} value={formatCurrency(summary.byMode[mode.modeCode] ?? 0)} caption={`${mode.modeName} payments`} icon={<CreditCard size={18} />} onClick={() => openSummary(`mode:${mode.modeCode}`)} />
+          ))}
+          <StatCard label="Outstanding Collection" value={formatCurrency(summary.outstandingCollection)} caption="Invoice-linked payments" icon={<AlertCircle size={18} />} onClick={() => openSummary("outstanding")} />
+        </div>
+      }
+      filterFields={
+        <>
+          <Select label="Payment Status" value={list.formFilters.paymentStatus} options={[
             { label: "All", value: "" },
             { label: "Success", value: "SUCCESS" },
             { label: "Pending", value: "PENDING" },
             { label: "Failed", value: "FAILED" },
             { label: "Cancelled", value: "CANCELLED" }
-          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, paymentStatus: event.target.value }))} />
-          <Select label="Payment Method" value={draftFilters.mode} options={[
+          ]} onChange={(event) => list.updateFormFilters({ paymentStatus: event.target.value })} />
+          <Select label="Payment Method" value={list.formFilters.mode} options={[
             { label: "All", value: "" },
             ...paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))
-          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, mode: event.target.value }))} />
-          <Select label="Payment Date" value={draftFilters.datePreset} options={[
+          ]} onChange={(event) => list.updateFormFilters({ mode: event.target.value })} />
+          <Select label="Payment Date" value={list.formFilters.datePreset} options={[
             { label: "All", value: "" },
             { label: "Today", value: "today" },
             { label: "Yesterday", value: "yesterday" },
@@ -349,250 +342,157 @@ export const PaymentListPage = () => {
             { label: "This Month", value: "thisMonth" },
             { label: "This Year", value: "thisYear" },
             { label: "Custom Date Range", value: "custom" }
-          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, datePreset: event.target.value as DatePreset }))} />
-          {draftFilters.datePreset === "custom" ? (
+          ]} onChange={(event) => list.updateFormFilters({ datePreset: event.target.value as DatePreset })} />
+          {list.formFilters.datePreset === "custom" ? (
             <>
-              <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
-              <Input label="End Date" type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} />
+              <Input label="Start Date" type="date" value={list.formFilters.startDate} onChange={(event) => list.updateFormFilters({ startDate: event.target.value })} />
+              <Input label="End Date" type="date" value={list.formFilters.endDate} onChange={(event) => list.updateFormFilters({ endDate: event.target.value })} />
             </>
           ) : null}
-          <Input label="Min Amount" placeholder="Enter minimum amount" type="number" value={draftFilters.minAmount} onChange={(event) => setDraftFilters((current) => ({ ...current, minAmount: event.target.value }))} />
-          <Input label="Max Amount" placeholder="Enter maximum amount" type="number" value={draftFilters.maxAmount} onChange={(event) => setDraftFilters((current) => ({ ...current, maxAmount: event.target.value }))} />
-          <Select label="Created By" value={draftFilters.createdByRole} options={[
+          <Input label="Min Amount" placeholder="Enter minimum amount" type="number" value={list.formFilters.minAmount} onChange={(event) => list.updateFormFilters({ minAmount: event.target.value })} />
+          <Input label="Max Amount" placeholder="Enter maximum amount" type="number" value={list.formFilters.maxAmount} onChange={(event) => list.updateFormFilters({ maxAmount: event.target.value })} />
+          <Select label="Created By" value={list.formFilters.createdByRole} options={[
             { label: "All Users", value: "" },
             { label: "Owner", value: "OWNER" },
             { label: "Admin", value: "ADMIN" },
             { label: "User", value: "USER" }
-          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
-          <Select label="Record Status" value={draftFilters.recordStatus} options={[
+          ]} onChange={(event) => list.updateFormFilters({ createdByRole: event.target.value })} />
+          <Select label="Record Status" value={list.formFilters.recordStatus} options={[
             { label: "Active", value: "ACTIVE" },
             { label: "Deleted", value: "DELETED" },
             { label: "All", value: "ALL" }
-          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, recordStatus: event.target.value as PaymentFilters["recordStatus"] }))} />
-          <div className="flex items-end">
-            <Button type="button" className="w-full" onClick={applyFilters}>Apply Filters</Button>
-          </div>
-          <div className="flex items-end">
-            <Button type="button" variant="secondary" className="w-full" onClick={resetFilters}>Reset Filters</Button>
-          </div>
-        </div>
-      </CommonAdvancedFilterPanel>
-
-      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <CommonBreadcrumb items={[{ label: "Payments" }]} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
-              <>
-              <CommonColumnSelector tableName="PAYMENTS" availableColumns={paymentColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
-              {can("PAYMENTS", "EXPORT") ? (
-                <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportPayments("payments.xlsx", exportRows)}>
-                  <Download size={16} />
+          ]} onChange={(event) => list.updateFormFilters({ recordStatus: event.target.value as PaymentFilters["recordStatus"] })} />
+        </>
+      }
+      toolbarButtons={
+        can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
+          <>
+            {can("PAYMENTS", "EXPORT") ? (
+              <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportPayments("payments.xlsx", exportRows)}>
+                <Download size={16} />
+                Export Excel
+              </Button>
+            ) : null}
+            {can("PAYMENTS", "ADD") ? (
+              <Link to="/payments/new">
+                <Button>Add Payment</Button>
+              </Link>
+            ) : null}
+          </>
+        ) : null
+      }
+      columnSelector={{ tableName: "PAYMENTS", columns: paymentColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["ref"] }}
+      tableColumns={buildTableColumns(can("PAYMENTS", "DELETE"))}
+      emptyMessage="No payments match the selected filters."
+      fullHeight
+      modals={
+        <>
+          <Modal open={Boolean(activeSummary)} title={summaryTitle(activeSummary)} onClose={() => setActiveSummary(null)}>
+            <div className="space-y-5">
+              <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                <span className="font-semibold text-slate-950">Active Filters:</span>
+                <span className="min-w-0 flex-1 text-slate-600">
+                  {[summaryTitle(activeSummary), ...activeFilterSummary].filter(Boolean).join(" | ")}
+                </span>
+                <span className="font-semibold text-slate-950">Records: {modalPaymentPage.totalRecords}</span>
+                <span className="font-semibold text-slate-950">Grand Total: {formatCurrency(modalGrandTotal)}</span>
+              </div>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <Input label="Search Modal Payments" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={modalSearch} onChange={(event) => {
+                  setModalPage(0);
+                  setModalSearch(event.target.value);
+                }} />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Button type="button" variant="secondary" disabled={!modalPayments.length} onClick={() => exportPayments(`${activeSummary ?? "payment"}-details.xlsx`, modalPayments)}>
+                  <Download size={17} />
                   Export Excel
                 </Button>
+                <div className="flex justify-end"><Pagination
+                  page={modalPaymentPage.page}
+                  size={modalPaymentPage.size}
+                  totalRecords={modalPaymentPage.totalRecords}
+                  totalPages={modalPaymentPage.totalPages}
+                  onPageChange={setModalPage}
+                layout="inline" /></div>
+              </div>
+              </div>
+              <Table
+                data={modalPayments}
+                emptyText="No payments match the selected filters."
+                columns={buildTableColumns(false)}
+              />
+            </div>
+          </Modal>
+
+          <Modal open={Boolean(restoreTarget)} title="Restore Payment" onClose={() => restoringId === null && setRestoreTarget(null)}>
+            <p className="text-sm leading-6 text-slate-600">
+              Restore this payment? It will become active again and re-apply to its invoice.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="ghost" disabled={restoringId !== null} onClick={() => setRestoreTarget(null)}>
+                Cancel
+              </Button>
+              <Button type="button" disabled={restoringId !== null} onClick={() => void handleRestore()}>
+                {restoringId !== null ? "Restoring..." : "Restore"}
+              </Button>
+            </div>
+          </Modal>
+
+          <Modal open={Boolean(reminderTarget)} title="Send Reminder" onClose={() => setReminderTarget(null)}>
+            <div className="space-y-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-950">{reminderTarget?.customerName ?? "--"}</p>
+                <p>{reminderTarget?.customerEmail ?? reminderTarget?.customerMobile ?? "--"}</p>
+                <p className="mt-2">Reference: {reminderTarget ? reminderTarget.invoiceNo ?? paymentRef(reminderTarget) : "--"}</p>
+              </div>
+              <Select
+                label="Reminder Channel"
+                value={reminderForm.channel}
+                options={[
+                  { label: "Email", value: "EMAIL" },
+                  { label: "SMS", value: "SMS" },
+                  { label: "WhatsApp", value: "WHATSAPP" }
+                ]}
+                onChange={(event) => setReminderForm((current) => ({ ...current, channel: event.target.value as "EMAIL" | "SMS" | "WHATSAPP" }))}
+              />
+              {reminderForm.channel === "EMAIL" ? (
+                <Input label="Subject" value={reminderForm.subject} onChange={(event) => setReminderForm((current) => ({ ...current, subject: event.target.value }))} />
               ) : null}
-              {can("PAYMENTS", "ADD") ? (
-                <Link to="/payments/new">
-                  <Button>Add Payment</Button>
-                </Link>
+              <label className="block space-y-2">
+                <span className="block text-sm font-semibold text-slate-700">Message</span>
+                <textarea className="min-h-[144px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]" value={reminderForm.message} onChange={(event) => setReminderForm((current) => ({ ...current, message: event.target.value }))} />
+              </label>
+              {reminderForm.channel === "EMAIL" && !reminderTarget?.customerEmail ? (
+                <p className="text-sm text-rose-700">Customer email missing.</p>
               ) : null}
-              </>
-            ) : null}
-            <Pagination page={paymentPage.page} size={paymentPage.size} totalRecords={paymentPage.totalRecords} totalPages={paymentPage.totalPages} onPageChange={(nextPage) => { setPage(nextPage); void loadPayments(nextPage); }} layout="inline" />
-          </div>
-        </div>
-        <div className="flex-1">
-          <PaymentTable
-            payments={payments}
-            columns={visiblePaymentColumns}
-            logCounts={logCounts}
-            canDelete={can("PAYMENTS", "DELETE")}
-            canRestore={can("PAYMENTS", "RESTORE")}
-            canViewLogs={can("PAYMENTS", "LOGS")}
-            canAdd={can("PAYMENTS", "ADD")}
-            canSendEmail={can("EMAIL_TEMPLATES", "EMAIL_SEND")}
-            canSendSms={can("SMS_TEMPLATES", "SMS_SEND")}
-            canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
-            restoringId={restoringId}
-            onDelete={setDeleteTarget}
-            onRestore={setRestoreTarget}
-            onShowLogs={setLogTarget}
-            onSendReminder={openReminder}
-          />
-        </div>
-      </GlassCard>
+              {(reminderForm.channel === "SMS" || reminderForm.channel === "WHATSAPP") && !reminderTarget?.customerMobile ? (
+                <p className="text-sm text-rose-700">Customer mobile number missing.</p>
+              ) : null}
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="secondary" onClick={() => setReminderTarget(null)}>Cancel</Button>
+                <Button
+                  type="button"
+                  disabled={
+                    sendingReminder
+                    || !reminderForm.message.trim()
+                    || (reminderForm.channel === "EMAIL" && (!reminderForm.subject.trim() || !reminderTarget?.customerEmail))
+                    || ((reminderForm.channel === "SMS" || reminderForm.channel === "WHATSAPP") && !reminderTarget?.customerMobile)
+                  }
+                  onClick={() => void sendReminder()}
+                >
+                  {sendingReminder ? "Sending..." : "Send Reminder"}
+                </Button>
+              </div>
+            </div>
+          </Modal>
 
-      <Modal open={Boolean(restoreTarget)} title="Restore Payment" onClose={() => restoringId === null && setRestoreTarget(null)}>
-        <p className="text-sm leading-6 text-slate-600">
-          Restore this payment? It will become active again and re-apply to its invoice.
-        </p>
-        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button type="button" variant="ghost" disabled={restoringId !== null} onClick={() => setRestoreTarget(null)}>
-            Cancel
-          </Button>
-          <Button type="button" disabled={restoringId !== null} onClick={() => void handleRestore()}>
-            {restoringId !== null ? "Restoring..." : "Restore"}
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal open={Boolean(activeSummary)} title={summaryTitle(activeSummary)} onClose={() => setActiveSummary(null)}>
-        <div className="space-y-5">
-          <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-            <span className="font-semibold text-slate-950">Active Filters:</span>
-            <span className="min-w-0 flex-1 text-slate-600">
-              {[summaryTitle(activeSummary), ...activeFilterSummary].filter(Boolean).join(" | ")}
-            </span>
-            <span className="font-semibold text-slate-950">Records: {modalPaymentPage.totalRecords}</span>
-            <span className="font-semibold text-slate-950">Grand Total: {formatCurrency(modalGrandTotal)}</span>
-          </div>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <Input label="Search Modal Payments" placeholder="Search by payment ref no, invoice no, customer name or mobile number" value={modalSearch} onChange={(event) => {
-              setModalPage(0);
-              setModalSearch(event.target.value);
-            }} />
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button type="button" variant="secondary" disabled={!modalPayments.length} onClick={() => exportPayments(`${activeSummary ?? "payment"}-details.xlsx`, modalPayments)}>
-              <Download size={17} />
-              Export Excel
-            </Button>
-            <div className="flex justify-end"><Pagination page={modalPaymentPage.page} size={modalPaymentPage.size} totalRecords={modalPaymentPage.totalRecords} totalPages={modalPaymentPage.totalPages} onPageChange={setModalPage} layout="inline" /></div>
-          </div>
-          </div>
-          <PaymentTable
-            payments={modalPayments}
-            columns={visiblePaymentColumns}
-            logCounts={logCounts}
-            canDelete={false}
-            canRestore={can("PAYMENTS", "RESTORE")}
-            canViewLogs={can("PAYMENTS", "LOGS")}
-            canSendEmail={can("EMAIL_TEMPLATES", "EMAIL_SEND")}
-            canSendSms={can("SMS_TEMPLATES", "SMS_SEND")}
-            canSendWhatsApp={can("COMMUNICATION", "WHATSAPP_SEND")}
-            restoringId={restoringId}
-            onDelete={setDeleteTarget}
-            onRestore={setRestoreTarget}
-            onShowLogs={setLogTarget}
-            onSendReminder={openReminder}
-          />
-        </div>
-      </Modal>
-
-      <Modal open={Boolean(reminderTarget)} title="Send Reminder" onClose={() => setReminderTarget(null)}>
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            <p className="font-semibold text-slate-950">{reminderTarget?.customerName ?? "--"}</p>
-            <p>{reminderTarget?.customerEmail ?? reminderTarget?.customerMobile ?? "--"}</p>
-            <p className="mt-2">Reference: {reminderTarget ? reminderTarget.invoiceNo ?? paymentRef(reminderTarget) : "--"}</p>
-          </div>
-          <Select
-            label="Reminder Channel"
-            value={reminderForm.channel}
-            options={[
-              { label: "Email", value: "EMAIL" },
-              { label: "SMS", value: "SMS" },
-              { label: "WhatsApp", value: "WHATSAPP" }
-            ]}
-            onChange={(event) => setReminderForm((current) => ({ ...current, channel: event.target.value as "EMAIL" | "SMS" | "WHATSAPP" }))}
-          />
-          {reminderForm.channel === "EMAIL" ? (
-            <Input label="Subject" value={reminderForm.subject} onChange={(event) => setReminderForm((current) => ({ ...current, subject: event.target.value }))} />
-          ) : null}
-          <label className="block space-y-2">
-            <span className="block text-sm font-semibold text-slate-700">Message</span>
-            <textarea className="min-h-[144px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]" value={reminderForm.message} onChange={(event) => setReminderForm((current) => ({ ...current, message: event.target.value }))} />
-          </label>
-          {reminderForm.channel === "EMAIL" && !reminderTarget?.customerEmail ? (
-            <p className="text-sm text-rose-700">Customer email missing.</p>
-          ) : null}
-          {(reminderForm.channel === "SMS" || reminderForm.channel === "WHATSAPP") && !reminderTarget?.customerMobile ? (
-            <p className="text-sm text-rose-700">Customer mobile number missing.</p>
-          ) : null}
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={() => setReminderTarget(null)}>Cancel</Button>
-            <Button
-              type="button"
-              disabled={
-                sendingReminder
-                || !reminderForm.message.trim()
-                || (reminderForm.channel === "EMAIL" && (!reminderForm.subject.trim() || !reminderTarget?.customerEmail))
-                || ((reminderForm.channel === "SMS" || reminderForm.channel === "WHATSAPP") && !reminderTarget?.customerMobile)
-              }
-              onClick={() => void sendReminder()}
-            >
-              {sendingReminder ? "Sending..." : "Send Reminder"}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Payment" entityId={logTarget?.id ?? null} title={logTarget ? `${paymentRef(logTarget)} Logs` : "Payment Logs"} onClose={() => setLogTarget(null)} />
-      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
-    </div>
+          <AuditLogModal open={Boolean(logTarget)} moduleName="Payment" entityId={logTarget?.id ?? null} title={logTarget ? `${paymentRef(logTarget)} Logs` : "Payment Logs"} onClose={() => setLogTarget(null)} />
+          <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
+        </>
+      }
+    />
   );
 };
-
-const PaymentTable = ({
-  payments,
-  columns,
-  logCounts,
-  canDelete,
-  canRestore,
-  canViewLogs = false,
-  canAdd = false,
-  canSendEmail = false,
-  canSendSms = false,
-  canSendWhatsApp = false,
-  restoringId = null,
-  onDelete,
-  onRestore,
-  onShowLogs,
-  onSendReminder
-}: {
-  payments: Payment[];
-  columns: ReturnType<typeof basePaymentColumns>;
-  logCounts: Record<number, number>;
-  canDelete: boolean;
-  canRestore: boolean;
-  canViewLogs?: boolean;
-  canAdd?: boolean;
-  canSendEmail?: boolean;
-  canSendSms?: boolean;
-  canSendWhatsApp?: boolean;
-  restoringId?: number | null;
-  onDelete: (payment: Payment) => void;
-  onRestore: (payment: Payment) => void;
-  onShowLogs?: (payment: Payment) => void;
-  onSendReminder?: (payment: Payment) => void;
-}) => (
-  <Table
-    data={payments}
-    emptyText="No payments match the selected filters."
-    columns={[
-      ...columns,
-      {
-        key: "actions",
-        header: "Actions",
-        className: "text-right",
-        render: (item) => (
-          <ActionDropdown actions={[
-            {
-              label: "Send Reminder",
-              icon: <Send size={15} />,
-              hidden: item.deleted || !(canSendEmail || canSendSms || canSendWhatsApp) || (!item.customerEmail && !item.customerMobile),
-              onClick: () => onSendReminder?.(item)
-            },
-            { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs || !logCounts[item.id], onClick: () => onShowLogs?.(item) },
-            { label: restoringId === item.id ? "Restoring..." : "Restore", icon: <RotateCcw size={15} />, hidden: !item.deleted || !canRestore, onClick: () => onRestore(item) },
-            { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: item.deleted || !canDelete, onClick: () => onDelete(item) }
-          ]} />
-        )
-      }
-    ]}
-  />
-);
 
 const basePaymentColumns = () => [
   { key: "ref", header: "Payment Ref", render: (item: Payment) => <span className="font-semibold text-white">{paymentRef(item)}</span> },

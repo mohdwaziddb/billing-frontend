@@ -1,4 +1,4 @@
-import { applyThemeColor, DEFAULT_THEME_COLOR, normalizeHexColor } from "../lib/theme";
+import { applyThemeColor, DEFAULT_THEME_COLOR, normalizeThemeValue } from "../lib/theme";
 import { tenantKeySuffix } from "../lib/hosts";
 import type { CompanyTheme, UserPreference } from "../types/api";
 
@@ -23,7 +23,7 @@ const read = (): ThemeBootstrapState => {
     }
     const parsed = JSON.parse(raw) as Partial<ThemeBootstrapState>;
     return {
-      themeColor: normalizeHexColor(parsed.themeColor ?? DEFAULT_THEME_COLOR),
+      themeColor: normalizeThemeValue(parsed.themeColor ?? DEFAULT_THEME_COLOR),
       darkModeEnabled: Boolean(parsed.darkModeEnabled)
     };
   } catch {
@@ -34,7 +34,7 @@ const read = (): ThemeBootstrapState => {
 const write = (state: ThemeBootstrapState) => {
   try {
     localStorage.setItem(THEME_BOOTSTRAP_KEY, JSON.stringify({
-      themeColor: normalizeHexColor(state.themeColor),
+      themeColor: normalizeThemeValue(state.themeColor),
       darkModeEnabled: state.darkModeEnabled
     }));
   } catch {
@@ -53,7 +53,7 @@ export const ThemeBootstrapService = {
   },
   save(theme: CompanyTheme, preferences: UserPreference) {
     const state = {
-      themeColor: normalizeHexColor(theme.themeColor ?? DEFAULT_THEME_COLOR),
+      themeColor: normalizeThemeValue(theme.themeColor ?? DEFAULT_THEME_COLOR),
       darkModeEnabled: Boolean(preferences.darkModeEnabled)
     };
     write(state);
@@ -63,7 +63,7 @@ export const ThemeBootstrapService = {
   },
   remember(theme: CompanyTheme, preferences: UserPreference) {
     const state = {
-      themeColor: normalizeHexColor(theme.themeColor ?? DEFAULT_THEME_COLOR),
+      themeColor: normalizeThemeValue(theme.themeColor ?? DEFAULT_THEME_COLOR),
       darkModeEnabled: Boolean(preferences.darkModeEnabled)
     };
     write(state);

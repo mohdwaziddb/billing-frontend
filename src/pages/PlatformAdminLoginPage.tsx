@@ -4,7 +4,6 @@ import { AnalyticsShowcase } from "../components/login/AnalyticsShowcase";
 import { LoginCard } from "../components/login/LoginCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
-import { getApiErrorMessage } from "../lib/errors";
 
 const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
 
@@ -14,7 +13,6 @@ export const PlatformAdminLoginPage = () => {
   const location = useLocation();
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
   const canSubmit = Boolean(form.username.trim() && form.password.trim());
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/platform-admin/dashboard";
@@ -26,13 +24,10 @@ export const PlatformAdminLoginPage = () => {
   const submit = async () => {
     try {
       setLoading(true);
-      setError("");
       clearMessage();
       const nextRoute = await loginPlatformAdmin(form);
       navigate(from.startsWith("/platform-admin") ? from : nextRoute, { replace: true });
     } catch (err: any) {
-      const message = getApiErrorMessage(err, "Unable to sign in as platform admin");
-      setError(message);
       setApiError(err, "Unable to sign in as platform admin");
     } finally {
       setLoading(false);
@@ -52,7 +47,6 @@ export const PlatformAdminLoginPage = () => {
             password={form.password}
             loading={loading}
             canSubmit={canSubmit}
-            error={error}
             title="Platform Admin Sign in"
             subtitle="Sign in to manage companies and platform settings from a separate protected session."
             fieldLabel="Username"
@@ -61,15 +55,9 @@ export const PlatformAdminLoginPage = () => {
             showForgotPassword={false}
             onUsernameChange={(value) => {
               setForm((current) => ({ ...current, username: value }));
-              if (error) {
-                setError("");
-              }
             }}
             onPasswordChange={(value) => {
               setForm((current) => ({ ...current, password: value }));
-              if (error) {
-                setError("");
-              }
             }}
             onSubmit={submit}
             bottomBox={

@@ -806,7 +806,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
             <div className="md:col-span-2">
               <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
                 <span>Platform Tagline</span>
-                <textarea className="min-h-[108px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--theme-color)_18%,transparent)]" rows={3} value={settingsForm.platformTagline} onChange={(event) => setSettingsForm((current) => ({ ...current, platformTagline: event.target.value }))} />
+                <textarea className="min-h-[108px] rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--theme-color)_18%,transparent)]" rows={3} value={settingsForm.platformTagline} onChange={(event) => setSettingsForm((current) => ({ ...current, platformTagline: event.target.value }))} />
               </label>
             </div>
             <PasswordInput label="New Password" autoComplete="new-password" value={settingsForm.password} onChange={(event) => setSettingsForm((current) => ({ ...current, password: event.target.value }))} />
@@ -817,7 +817,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
             </div>
           </div>
           {settings ? (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               Active username: <span className="font-semibold text-slate-900">{settings.username}</span>
             </div>
           ) : null}
@@ -827,31 +827,31 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       {mode === "dumps" ? (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="flex items-center gap-4 rounded-2xl bg-blue-50 p-5">
+            <div className="flex items-center gap-4 rounded-lg bg-blue-50 p-5">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600"><Database size={22} /></span>
               <span>
-                <span className="block text-2xl font-extrabold text-blue-600">{dumpStats?.totalDumps ?? 0}</span>
+                <span className="block fs-18 font-bold text-blue-600">{dumpStats?.totalDumps ?? 0}</span>
                 <span className="text-sm font-medium text-slate-500">Total Dumps</span>
               </span>
             </div>
-            <div className="flex items-center gap-4 rounded-2xl bg-emerald-50 p-5">
+            <div className="flex items-center gap-4 rounded-lg bg-emerald-50 p-5">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><CheckCircle2 size={22} /></span>
               <span>
-                <span className="block text-2xl font-extrabold text-emerald-600">{dumpStats?.completed ?? 0}</span>
+                <span className="block fs-18 font-bold text-emerald-600">{dumpStats?.completed ?? 0}</span>
                 <span className="text-sm font-medium text-slate-500">Completed</span>
               </span>
             </div>
-            <div className="flex items-center gap-4 rounded-2xl bg-amber-50 p-5">
+            <div className="flex items-center gap-4 rounded-lg bg-amber-50 p-5">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600"><LoaderCircle size={22} /></span>
               <span>
-                <span className="block text-2xl font-extrabold text-amber-600">{dumpStats?.inProgress ?? 0}</span>
+                <span className="block fs-18 font-bold text-amber-600">{dumpStats?.inProgress ?? 0}</span>
                 <span className="text-sm font-medium text-slate-500">In Progress</span>
               </span>
             </div>
-            <div className="flex items-center gap-4 rounded-2xl bg-rose-50 p-5">
+            <div className="flex items-center gap-4 rounded-lg bg-rose-50 p-5">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600"><XCircle size={22} /></span>
               <span>
-                <span className="block text-2xl font-extrabold text-rose-600">{dumpStats?.failed ?? 0}</span>
+                <span className="block fs-18 font-bold text-rose-600">{dumpStats?.failed ?? 0}</span>
                 <span className="text-sm font-medium text-slate-500">Failed</span>
               </span>
             </div>
@@ -860,7 +860,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
           <GlassCard className="p-6 md:p-7">
             <SectionHeader title="New Dump Request" subtitle="Configure and queue a database dump." />
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-              <p className="whitespace-nowrap rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
+              <p className="whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
                 Server: <span className="text-slate-950">{(dumpForm.instance || dumpInstances[0]) ?? "localhost:3306"}</span>
               </p>
               {dumpInstances.length > 1 ? (
@@ -1081,7 +1081,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
 
 const SectionHeader = ({ title, subtitle }: { title: string; subtitle: string }) => (
   <div className="mb-5 flex flex-col gap-1">
-    <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#2453d8]">{title}</p>
+    <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#2453d8]">{title}</p>
     <p className="max-w-3xl text-sm leading-6 text-slate-500">{subtitle}</p>
   </div>
 );
@@ -1184,7 +1184,7 @@ const DeactivateCompanyModal = ({
         Users of this company will lose access immediately. Do you want to continue?
       </p>
       {statusAction?.company ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           Company: <span className="font-semibold text-slate-950">{statusAction.company.name}</span>
         </div>
       ) : null}
@@ -1238,7 +1238,7 @@ const ResetSuperAdminModal = ({
           Set a new password for this company's super-admin login. The previous password stops working immediately.
         </p>
         {resetAction?.company ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
             Company: <span className="font-semibold text-slate-950">{resetAction.company.name} ({resetAction.company.code})</span>
           </div>
         ) : null}
@@ -1258,7 +1258,7 @@ const ResetSuperAdminModal = ({
   );
 };
 
-const LoadingPanel = ({ label }: { label: string }) => (  <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
+const LoadingPanel = ({ label }: { label: string }) => (  <div className="mb-4 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-600">
     <LoaderCircle className="animate-spin text-[var(--theme-color)]" size={18} />
     <span>{label}</span>
   </div>
@@ -1266,7 +1266,7 @@ const LoadingPanel = ({ label }: { label: string }) => (  <div className="mb-4 f
 
 const CompanySummaryTable = ({ companies, onView }: { companies: PlatformAdminCompany[]; onView: (company: PlatformAdminCompany) => void }) => (
   <div className="h-full space-y-3">
-    <div className="hidden min-h-[360px] overflow-hidden rounded-2xl border border-slate-200 md:block">
+    <div className="hidden min-h-[360px] overflow-hidden rounded-lg border border-slate-200 md:block">
       <table className="min-w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
         <thead className="bg-slate-50">
           <tr>
@@ -1301,7 +1301,7 @@ const CompanySummaryTable = ({ companies, onView }: { companies: PlatformAdminCo
     </div>
     <div className="grid min-h-[360px] gap-3 md:hidden">
       {companies.length ? companies.map((company) => (
-        <div key={company.code} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div key={company.code} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <button type="button" className="text-left text-base font-bold text-slate-950 transition hover:text-[var(--theme-color)]" onClick={() => onView(company)}>
               {company.name}
@@ -1315,13 +1315,13 @@ const CompanySummaryTable = ({ companies, onView }: { companies: PlatformAdminCo
             <CompactInfo label="Created Date" value={formatDateTime(company.createdAt)} />
           </div>
         </div>
-      )) : <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-medium text-slate-500">No companies found.</div>}
+      )) : <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm font-medium text-slate-500">No companies found.</div>}
     </div>
   </div>
 );
 
 const CompactInfo = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
     <p className="mt-1 text-sm font-bold text-slate-950 break-words">{value}</p>
   </div>

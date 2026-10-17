@@ -37,7 +37,7 @@ export const ContactUsSection = () => (
           <a
             key={label}
             href={href}
-            className="group rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#2453d8]/30 hover:shadow-md"
+            className="group rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#2453d8]/30 hover:shadow-md"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 items-center gap-3">

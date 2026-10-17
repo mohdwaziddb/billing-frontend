@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { MenuCodeProvider } from "../context/MenuContext";
 import { notificationService } from "../services/notificationService";
 
 export const PermissionRoute = ({
@@ -32,5 +33,5 @@ export const PermissionRoute = ({
     return <Navigate replace to={nextRoute && nextRoute !== location.pathname ? nextRoute : "/no-menu"} />;
   }
 
-  return children;
+  return <MenuCodeProvider value={menuCode}>{children}</MenuCodeProvider>;
 };

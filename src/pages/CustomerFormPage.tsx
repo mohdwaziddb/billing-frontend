@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
-import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createCustomer, getCustomer, getCustomers, updateCustomer } from "../api/customers";
 import { getStates } from "../api/states";
-import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
-import { GlassCard } from "../components/GlassCard";
+import { FormActionBar } from "../components/FormActionBar";
+import { FormSection } from "../components/FormSection";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
@@ -184,34 +182,24 @@ export const CustomerFormPage = () => {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
+    <div className="space-y-4 pb-6 md:space-y-5">
       <Header
-        title={editing ? "Customers > Edit Customer" : "Customers > Add Customer"}
+        title={editing ? "Edit Customer" : "Add Customer"}
         subtitle="Create and update customer records with clear validation, balanced spacing, and consistent controls."
       />
 
-      <GlassCard className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col p-4 md:p-5">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CommonBreadcrumb items={[{ label: "Customers", to: "/customers" }, { label: editing ? "Edit Customer" : "Add Customer" }]} />
-            <h2 className="mt-1 text-xl font-bold text-white">
-              {editing ? "Edit Customer" : "Add Customer"}
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => navigate("/customers")}>
-              <ArrowLeft size={16} />
-              Back
-            </Button>
-            <Button disabled={isSubmitting || !canSaveCustomer} type="submit" form="customer-form">
-              {isSubmitting ? "Saving..." : "Save Customer"}
-            </Button>
-          </div>
-        </div>
+      <div className="space-y-4">
+        <FormActionBar
+          items={[{ label: "Customers", to: "/customers" }, { label: editing ? "Edit Customer" : "Add Customer" }]}
+          backTo="/customers"
+          formId="customer-form"
+          saveLabel="Save Customer"
+          saving={isSubmitting}
+          saveDisabled={!canSaveCustomer}
+        />
 
         <form id="customer-form" className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
-          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500">Customer Details</h3>
+          <FormSection title="Customer Details">
             <div className="grid gap-3 md:grid-cols-2">
               <Input
                 label="Customer Name"
@@ -284,10 +272,9 @@ export const CustomerFormPage = () => {
                 )}
               />
             </div>
-          </section>
+          </FormSection>
 
-          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500">Address Information</h3>
+          <FormSection title="Address Information">
             <div className="grid gap-3 md:grid-cols-2">
               <Input
                 label="Address"
@@ -322,10 +309,9 @@ export const CustomerFormPage = () => {
               <Input label="Country" {...register("country")} />
               <Input label="Pincode" {...register("pincode")} />
             </div>
-          </section>
-
+          </FormSection>
         </form>
-      </GlassCard>
+      </div>
     </div>
   );
 };

@@ -202,8 +202,8 @@ export const RolePermissionsPage = () => {
       <GlassCard className="p-6 md:p-7">
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Permissions</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Role and user access</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Permissions</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Role and user access</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant={permissionMode === "role" ? "primary" : "secondary"} onClick={() => setPermissionMode("role")}>Role-wise</Button>

@@ -19,7 +19,7 @@ export const CommonBulkActionToolbar = ({
   }
 
   return (
-    <div className="mb-4 rounded-[24px] border border-white/10 bg-slate-950/80 p-4 text-sm text-slate-200 shadow-sm">
+    <div className="mb-4 rounded-lg border border-white/10 bg-slate-950/80 p-4 text-sm text-slate-200 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="font-semibold text-white">{selectedCount} selected</p>

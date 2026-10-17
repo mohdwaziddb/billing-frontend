@@ -6,7 +6,7 @@ import { getExpensesPage, getProfitLossReport, type ExpenseFilterParams } from "
 import { getCustomers } from "../api/customers";
 import { getInvoices, getInvoicesPage, type InvoiceFilterParams } from "../api/invoices";
 import { Button } from "../components/Button";
-import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
+import { ListToolbar } from "../components/ListToolbar";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -80,8 +80,8 @@ export const ProfitLossReportPage = () => {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<ProfitLossFilters>(emptyFilters);
+  const [draftFilters, setDraftFilters] = useState<ProfitLossFilters>(emptyFilters);
   const [activeDetail, setActiveDetail] = useState<DetailType | null>(null);
   const [detailPage, setDetailPage] = useState(0);
   const [invoicePage, setInvoicePage] = useState<PageResponse<Invoice>>(emptyPage());
@@ -142,19 +142,27 @@ export const ProfitLossReportPage = () => {
     if (activeDetail === "net") exportToExcel("profit-loss-net.xlsx", netRows, netColumns);
   };
 
+  const applyFilters = () => setFilters(draftFilters);
+
+  const resetFilters = () => {
+    setDraftFilters(emptyFilters);
+    setFilters(emptyFilters);
+  };
+
   return (
     <div className="space-y-4 pb-6">
       <Header title="Profit & Loss" subtitle="Revenue, expense, and net profit reporting with expense attribution filters." />
-      <CommonAdvancedFilterPanel
-        title="Profit & Loss Filters"
-        eyebrow="Report Filters"
-        expanded={filtersOpen}
-        activeFilters={activeFilters}
-        onToggle={() => setFiltersOpen((current) => !current)}
-        onClearAll={() => setFilters(emptyFilters)}
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Select label="Date Range" value={filters.datePreset} options={[
+      <GlassCard className="p-6 md:p-7">
+        <ListToolbar
+          showSearch={false}
+          filtersActiveCount={activeFilters.length}
+          onApplyFilters={applyFilters}
+          onCancelFilters={() => setDraftFilters(filters)}
+          onResetFilters={resetFilters}
+          filterPanelWidth="max-w-[720px]"
+          filtersClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+        >
+          <Select label="Date Range" value={draftFilters.datePreset} options={[
             { label: "All", value: "" },
             { label: "Today", value: "today" },
             { label: "Yesterday", value: "yesterday" },
@@ -162,20 +170,20 @@ export const ProfitLossReportPage = () => {
             { label: "This Month", value: "thisMonth" },
             { label: "This Year", value: "thisYear" },
             { label: "Custom Date Range", value: "custom" }
-          ]} onChange={(event) => setFilters((current) => ({ ...current, datePreset: event.target.value as DatePreset, startDate: event.target.value === "custom" ? current.startDate : "", endDate: event.target.value === "custom" ? current.endDate : "" }))} />
-          {filters.datePreset === "custom" ? (
+          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, datePreset: event.target.value as DatePreset, startDate: event.target.value === "custom" ? current.startDate : "", endDate: event.target.value === "custom" ? current.endDate : "" }))} />
+          {draftFilters.datePreset === "custom" ? (
             <>
-              <Input label="Start Date" type="date" value={filters.startDate} onChange={(event) => setFilters((current) => ({ ...current, startDate: event.target.value }))} />
-              <Input label="End Date" type="date" value={filters.endDate} onChange={(event) => setFilters((current) => ({ ...current, endDate: event.target.value }))} />
+              <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
+              <Input label="End Date" type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} />
             </>
           ) : null}
-          <Select label="Expense Type" value={filters.expenseType} options={[{ label: "All", value: "" }, { label: "General", value: "GENERAL" }, { label: "Customer Related", value: "CUSTOMER_RELATED" }, { label: "Invoice Related", value: "INVOICE_RELATED" }]} onChange={(event) => setFilters((current) => ({ ...current, expenseType: event.target.value }))} />
-          <Select label="Category" value={filters.categoryId} options={[{ label: "All", value: "" }, ...categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))]} onChange={(event) => setFilters((current) => ({ ...current, categoryId: event.target.value }))} />
-          <Select label="Customer" value={filters.customerId} options={[{ label: "All", value: "" }, ...customers.map((item) => ({ label: item.name, value: String(item.id) }))]} onChange={(event) => setFilters((current) => ({ ...current, customerId: event.target.value }))} />
-          <Select label="Invoice" value={filters.invoiceId} options={[{ label: "All", value: "" }, ...invoices.map((item) => ({ label: item.invoiceNo, value: String(item.id) }))]} onChange={(event) => setFilters((current) => ({ ...current, invoiceId: event.target.value }))} />
-          <Select label="Created By" value={filters.createdByRole} options={[{ label: "All", value: "" }, { label: "Owner", value: "OWNER" }, { label: "Admin", value: "ADMIN" }, { label: "User", value: "USER" }]} onChange={(event) => setFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
-        </div>
-      </CommonAdvancedFilterPanel>
+          <Select label="Expense Type" value={draftFilters.expenseType} options={[{ label: "All", value: "" }, { label: "General", value: "GENERAL" }, { label: "Customer Related", value: "CUSTOMER_RELATED" }, { label: "Invoice Related", value: "INVOICE_RELATED" }]} onChange={(event) => setDraftFilters((current) => ({ ...current, expenseType: event.target.value }))} />
+          <Select label="Category" value={draftFilters.categoryId} options={[{ label: "All", value: "" }, ...categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, categoryId: event.target.value }))} />
+          <Select label="Customer" value={draftFilters.customerId} options={[{ label: "All", value: "" }, ...customers.map((item) => ({ label: item.name, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, customerId: event.target.value }))} />
+          <Select label="Invoice" value={draftFilters.invoiceId} options={[{ label: "All", value: "" }, ...invoices.map((item) => ({ label: item.invoiceNo, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, invoiceId: event.target.value }))} />
+          <Select label="Created By" value={draftFilters.createdByRole} options={[{ label: "All", value: "" }, { label: "Owner", value: "OWNER" }, { label: "Admin", value: "ADMIN" }, { label: "User", value: "USER" }]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
+        </ListToolbar>
+      </GlassCard>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Revenue" value={formatCurrency(report.revenue)} caption="Invoice revenue in selected period" icon={<TrendingUp size={18} />} onClick={() => openDetail("revenue")} />
@@ -188,8 +196,8 @@ export const ProfitLossReportPage = () => {
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Revenue vs Expense</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Net profit trend</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Revenue vs Expense</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Net profit trend</h2>
           </div>
           <div className="h-80">
             <ChartContainer width="100%" height="100%">
@@ -208,8 +216,8 @@ export const ProfitLossReportPage = () => {
         </GlassCard>
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="text-xs uppercase text-slate-400">Expense Summary</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Expense by category</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Expense Summary</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Expense by category</h2>
           </div>
           <Table data={report.expenseByCategory} emptyText="No expense data in this range." columns={[
             { key: "category", header: "Category", render: (item) => item.label },
@@ -220,7 +228,7 @@ export const ProfitLossReportPage = () => {
 
       <Modal open={Boolean(activeDetail)} title={detailTitle(activeDetail)} onClose={() => setActiveDetail(null)}>
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <span className="text-sm font-semibold text-slate-700">{activeFilters.join(" | ") || "No filters applied"}</span>
             <div className="flex flex-wrap items-center gap-3">
               {activeDetail === "revenue" ? <div className="flex justify-end"><Pagination page={invoicePage.page} size={invoicePage.size} totalRecords={invoicePage.totalRecords} totalPages={invoicePage.totalPages} onPageChange={setDetailPage} layout="inline" /></div> : null}

@@ -225,7 +225,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     return (
       <div className={clsx("block space-y-2", wrapperClassName)}>
         {label ? (
-          <span className="block text-sm font-semibold text-slate-700">
+          <span className="block fs-12 font-semibold text-slate-700">
             {label}
             {requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}
           </span>
@@ -245,8 +245,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               }
             }}
             className={clsx(
-              "flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border bg-white text-sm font-medium outline-none transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
-              density === "sm" ? "px-3 py-2 text-[13px]" : "px-4 py-3",
+              "flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border bg-white fs-13 font-medium outline-none transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
+              density === "sm" ? "px-3 py-2 fs-12" : "px-3.5 py-2.5",
               error ? "border-rose-400/70" : "border-slate-200",
               hasSelection ? "text-slate-900" : "text-slate-400",
               className
@@ -273,7 +273,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder={searchPlaceholder}
                       aria-label={searchPlaceholder}
-                      className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-9 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--theme-color)]"
+                      className="w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-9 fs-13 font-medium text-slate-900 outline-none placeholder:text-slate-400 focus:border-[var(--theme-color)]"
                     />
                     {query ? (
                       <button
@@ -300,7 +300,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 className="max-h-64 overflow-auto p-1.5"
               >
                 {filtered.length === 0 ? (
-                  <li className="px-3 py-2.5 text-sm font-medium text-slate-400">{emptyText}</li>
+                  <li className="px-3 py-2.5 fs-13 font-medium text-slate-400">{emptyText}</li>
                 ) : null}
                 {filtered.map((option, index) => {
                   const optionValue = String(option.value);
@@ -317,7 +317,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                       onClick={() => choose(optionValue)}
                       onMouseEnter={() => setActiveIndex(index)}
                       className={clsx(
-                        "flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition",
+                        "flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 fs-13 font-medium transition",
                         selected
                           ? "bg-[color:color-mix(in_srgb,var(--theme-color)_12%,transparent)] text-slate-900"
                           : active

@@ -1,4 +1,4 @@
-import { Building2, CheckCircle2, CircleAlert, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
+import { Building2, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { resolveAssetUrl } from "../../config/env";
 import { ForgotPasswordModal } from "../ForgotPasswordModal";
@@ -21,7 +21,6 @@ type LoginCardProps = {
   password: string;
   loading: boolean;
   canSubmit: boolean;
-  error: string;
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: () => void;
@@ -41,7 +40,6 @@ export const LoginCard = ({
   password,
   loading,
   canSubmit,
-  error,
   onUsernameChange,
   onPasswordChange,
   onSubmit,
@@ -79,7 +77,7 @@ export const LoginCard = ({
 
   return (
     <>
-      <div className="w-full max-w-[620px] rounded-[24px] border border-slate-200 bg-white p-8 text-left shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-12">
+      <div className="w-full max-w-[620px] rounded-lg border border-slate-200 bg-white p-8 text-left shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-12">
         {!brandingReady && !company?.name ? (
           <div className="flex items-center gap-2.5" aria-label="Loading workspace">
             <span className="h-9 w-9 animate-pulse rounded-xl bg-slate-200" />
@@ -92,10 +90,10 @@ export const LoginCard = ({
                 <img
                   src={companyLogoUrl}
                   alt={`${company.name} logo`}
-                  className="h-16 w-16 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain shadow-[0_10px_24px_rgba(36,83,216,0.20)]"
+                  className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-white object-contain shadow-[0_10px_24px_rgba(36,83,216,0.20)]"
                 />
               ) : (
-                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#1f4ed8,#2b5dff)] text-white shadow-[0_10px_24px_rgba(36,83,216,0.28)]">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#1f4ed8,#2b5dff)] text-white shadow-[0_10px_24px_rgba(36,83,216,0.28)]">
                   <Building2 size={30} />
                 </span>
               )}
@@ -143,11 +141,7 @@ export const LoginCard = ({
                 placeholder={fieldPlaceholder}
                 value={username}
                 disabled={loading}
-                aria-invalid={Boolean(error)}
-                aria-describedby={error ? "login-error" : undefined}
-                className={`${inputBaseClass} pl-10 ${
-                  error ? "border-red-300 focus:border-[#DC2626] focus:ring-[rgba(220,38,38,0.10)]" : "border-slate-200"
-                }`}
+                className={`${inputBaseClass} pl-10 border-slate-200`}
                 onChange={(event) => onUsernameChange(event.target.value)}
               />
             </div>
@@ -166,11 +160,7 @@ export const LoginCard = ({
                 placeholder="Enter your password"
                 value={password}
                 disabled={loading}
-                aria-invalid={Boolean(error)}
-                aria-describedby={error ? "login-error" : undefined}
-                className={`${inputBaseClass} pl-10 pr-12 ${
-                  error ? "border-red-300 focus:border-[#DC2626] focus:ring-[rgba(220,38,38,0.10)]" : "border-slate-200"
-                }`}
+                className={`${inputBaseClass} pl-10 pr-12 border-slate-200`}
                 onChange={(event) => onPasswordChange(event.target.value)}
               />
               <button
@@ -207,17 +197,6 @@ export const LoginCard = ({
               </button>
             ) : null}
           </div>
-
-          {error ? (
-            <div
-              id="login-error"
-              role="alert"
-              className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
-            >
-              <CircleAlert size={17} className="mt-0.5 shrink-0 text-[#DC2626]" />
-              <p className="text-sm font-medium leading-5 text-[#DC2626]">{error}</p>
-            </div>
-          ) : null}
 
           <button
             type="submit"

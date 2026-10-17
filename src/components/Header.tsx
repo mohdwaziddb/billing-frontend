@@ -1,49 +1,30 @@
 import {
-  BarChart3,
-  Boxes,
-  Building2,
   ChevronDown,
-  CreditCard,
-  FilePlus2,
-  FileText,
   KeyRound,
-  LayoutDashboard,
   LogOut,
+  Menu,
   Moon,
   Palette,
   Search,
-  Settings,
   ShieldCheck,
-  Sun,
-  Tags,
-  Users,
-  Wallet,
-  type LucideIcon
+  Sun
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getMfaStatus } from "../api/mfa";
 import { resolveAssetUrl } from "../config/env";
+import { resolveMenuIcon } from "../config/menuIcons";
 import { useAuth } from "../context/AuthContext";
+import { TOGGLE_SIDEBAR_EVENT } from "../layouts/DashboardLayout";
 import { MenuSearchService, type MenuSearchResult } from "../services/MenuSearchService";
 import { ForgotPasswordModal } from "./ForgotPasswordModal";
 import { Modal } from "./Modal";
 
-const iconMap: Record<string, LucideIcon> = {
-  BarChart3,
-  Boxes,
-  Building2,
-  CreditCard,
-  FilePlus2,
-  FileText,
-  LayoutDashboard,
-  Palette,
-  Settings,
-  ShieldCheck,
-  Tags,
-  Users,
-  Wallet
-};
+const headerIconButtonClass =
+  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition hover:text-[var(--theme-color)]";
+
+const profileMenuItemClass =
+  "mt-1 flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold transition";
 
 export const Header = ({ title, subtitle }: { title: string; subtitle: string }) => {
   const { auth, user, can, logout, permissions, platform, preferences, setDarkMode, sessionType, platformAdmin } = useAuth();
@@ -146,25 +127,32 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
   }, [auth?.accessToken, sessionType]);
 
   return (
-    <header className="sticky top-3 z-40 rounded-[22px] border border-slate-200 bg-white/92 px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.08)] backdrop-blur-xl md:px-5">
+    <header className="sticky top-0 z-30 -mx-3 -mt-3 flex min-h-[60px] flex-col justify-center border-b border-slate-200 bg-white px-4 py-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.06)] md:-mx-5 md:-mt-5 md:px-5">
       <div className="grid gap-3 xl:grid-cols-[minmax(220px,0.75fr)_minmax(280px,0.9fr)_auto] xl:items-center">
         <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            className={`${headerIconButtonClass} lg:hidden`}
+            aria-label="Toggle menu"
+            onClick={() => window.dispatchEvent(new Event(TOGGLE_SIDEBAR_EVENT))}
+          >
+            <Menu size={19} />
+          </button>
           {platformLogoUrl ? (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_4px_12px_rgba(15,23,42,0.05)]">
               <img src={platformLogoUrl} alt={headerTitle} className="h-full w-full object-contain p-1.5" />
             </div>
           ) : null}
           <div className="min-w-0">
-            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{title}</p>
-            <h1 className="page-title truncate text-xl tracking-tight text-slate-950 md:text-2xl">{headerTitle}</h1>
-            <p className="mt-0.5 truncate text-sm text-slate-500">{subtitle}</p>
+            <h1 className="page-title fs-20 truncate font-semibold tracking-tight text-slate-950">{headerTitle}</h1>
+            <p className="fs-12 mt-0.5 line-clamp-2 text-slate-500" title={subtitle}>{subtitle}</p>
           </div>
         </div>
         <label ref={searchRef} className="relative hidden min-w-0 lg:block">
           <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             ref={searchInputRef}
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-20 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] focus:bg-white focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_12%,transparent)]"
+            className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 py-3 pl-11 pr-20 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] focus:bg-white focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_12%,transparent)]"
             placeholder="Search menu..."
             value={searchValue}
             onChange={(event) => {
@@ -192,11 +180,11 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
           />
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-400">Ctrl + K</span>
           {searchOpen ? (
-            <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white p-2 shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
               {searchResults.length ? (
                 <div className="space-y-1">
                   {searchResults.map((result, index) => {
-                    const Icon = result.icon ? iconMap[result.icon] ?? LayoutDashboard : LayoutDashboard;
+                    const Icon = resolveMenuIcon(result.icon);
                     const active = index === activeSearchIndex;
                     return (
                       <button
@@ -209,7 +197,12 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[var(--theme-color)]">
                           <Icon size={17} />
                         </span>
-                        <span className="min-w-0 truncate">{result.label}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{result.label}</span>
+                          {result.parentPath ? (
+                            <span className="fs-11 mt-0.5 block truncate font-medium text-slate-400">{result.parentPath}</span>
+                          ) : null}
+                        </span>
                       </button>
                     );
                   })}
@@ -224,7 +217,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:text-[var(--theme-color)]"
+              className={headerIconButtonClass}
               aria-label={preferences.darkModeEnabled ? "Switch to light mode" : "Switch to dark mode"}
               title={preferences.darkModeEnabled ? "Light Mode" : "Dark Mode"}
               onClick={() => void setDarkMode(!preferences.darkModeEnabled)}
@@ -232,7 +225,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
               {preferences.darkModeEnabled ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             {can("THEME_SETTINGS", "VIEW") ? (
-              <Link to="/setup/theme-settings" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:text-[var(--theme-color)]" aria-label="Theme settings">
+              <Link to="/setup/theme-settings" className={headerIconButtonClass} aria-label="Theme settings">
                 <Palette size={18} />
               </Link>
             ) : null}
@@ -240,31 +233,31 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
           <div ref={profileRef} className="relative">
             <button
               type="button"
-              className="flex min-w-0 items-center gap-3 rounded-2xl bg-slate-50 px-2.5 py-2 transition hover:bg-slate-100"
+              className="flex min-w-0 items-center gap-3 rounded-lg bg-slate-50 px-2.5 py-1.5 transition hover:bg-slate-100"
               aria-haspopup="menu"
               aria-expanded={profileOpen}
               onClick={() => setProfileOpen((current) => !current)}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--theme-color)] text-sm font-bold text-[var(--theme-contrast)]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--theme-color)] bg-[image:var(--theme-gradient)] text-sm font-bold text-[var(--theme-contrast)]">
                 {profileInitial}
               </div>
               <div className="hidden min-w-0 text-left sm:block">
-                <p className="truncate text-sm font-bold text-slate-950">{profileName}</p>
-                <p className="truncate text-xs text-slate-500">{profileRole}</p>
+                <p className="fs-13 truncate font-bold text-slate-950">{profileName}</p>
+                <p className="fs-11 truncate text-slate-500">{profileRole}</p>
               </div>
               <ChevronDown className={`hidden text-slate-400 transition sm:block ${profileOpen ? "rotate-180" : ""}`} size={16} />
             </button>
 
             {profileOpen ? (
-              <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_24px_70px_rgba(15,23,42,0.16)]" role="menu">
-                <div className="border-b border-slate-100 px-3 py-3">
-                  <p className="truncate text-sm font-bold text-slate-950">{profileName}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">{profileEmail}</p>
+              <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white p-2 shadow-[0_24px_70px_rgba(15,23,42,0.16)]" role="menu">
+                <div className="border-b border-slate-100 px-3 py-2.5">
+                  <p className="fs-13 truncate font-bold text-slate-950">{profileName}</p>
+                  <p className="fs-11 mt-0.5 truncate text-slate-500">{profileEmail}</p>
                 </div>
                 <button
                   type="button"
                   role="menuitem"
-                  className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                  className={`${profileMenuItemClass} text-slate-700 hover:bg-slate-50 hover:text-slate-950`}
                   onClick={() => {
                     setProfileOpen(false);
                     setForgotPasswordOpen(true);
@@ -277,7 +270,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
                   <button
                     type="button"
                     role="menuitem"
-                    className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                    className={`${profileMenuItemClass} text-slate-700 hover:bg-slate-50 hover:text-slate-950`}
                     onClick={() => {
                       setProfileOpen(false);
                       navigate("/setup/two-step-verification");
@@ -290,7 +283,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
                 <button
                   type="button"
                   role="menuitem"
-                  className="mt-1 flex min-h-10 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                  className={`${profileMenuItemClass} text-rose-600 hover:bg-rose-50`}
                   onClick={() => {
                     setProfileOpen(false);
                     setLogoutConfirmOpen(true);

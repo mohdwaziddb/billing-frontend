@@ -7,46 +7,41 @@ import { deleteProduct, deleteProductsBulk, getProductsPage } from "../api/produ
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
-import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
+import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
-import { GlassCard } from "../components/GlassCard";
-import { Header } from "../components/Header";
-import { Input } from "../components/Input";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { CommonListPage } from "../components/CommonListPage";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
-import { Table } from "../components/Table";
 import { CommonBulkActionToolbar } from "../components/CommonBulkActionToolbar";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { useBulkSelection } from "../hooks/useBulkSelection";
+import { useListPage } from "../hooks/useListPage";
 import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { notificationService } from "../services/notificationService";
-import type { PageResponse, Product, ProductCategory, ProductSubCategory } from "../types/api";
+import type { Product, ProductCategory, ProductSubCategory } from "../types/api";
 
-const emptyProductPage: PageResponse<Product> = {
-  records: [],
-  page: 0,
-  size: DEFAULT_PAGE_SIZE,
-  totalRecords: 0,
-  totalPages: 0
+type ProductFilters = {
+  search: string;
+  categoryId: string;
+  subCategoryId: string;
+  status: string;
+};
+
+const emptyFilters: ProductFilters = {
+  search: "",
+  categoryId: "",
+  subCategoryId: "",
+  status: "active"
 };
 
 export const ProductListPage = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productPage, setProductPage] = useState<PageResponse<Product>>(emptyProductPage);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [subCategories, setSubCategories] = useState<ProductSubCategory[]>([]);
-  const [page, setPage] = useState(0);
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [subCategoryFilter, setSubCategoryFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("active");
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [logTarget, setLogTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -55,21 +50,21 @@ export const ProductListPage = () => {
   const { can } = useAuth();
   const { clearMessage, setApiError } = useApiMessage();
 
-  const bulkSelection = useBulkSelection<Product>(products);
+  const list = useListPage<Product, ProductFilters>({
+    initialFilters: emptyFilters,
+    errorMessage: "Unable to load products",
+    fetchPage: ({ page, size, search, filters }) =>
+      getProductsPage({
+        search: search.trim() || undefined,
+        active: filters.status === "active" ? true : filters.status === "inactive" ? false : undefined,
+        categoryId: filters.categoryId ? Number(filters.categoryId) : undefined,
+        subCategoryId: filters.subCategoryId ? Number(filters.subCategoryId) : undefined,
+        page,
+        size
+      })
+  });
 
-  const loadProducts = async (nextPage = page, searchOverride = search) => {
-    const active = statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
-    const response = await getProductsPage({
-      search: searchOverride.trim() || undefined,
-      active,
-      categoryId: categoryFilter ? Number(categoryFilter) : undefined,
-      subCategoryId: subCategoryFilter ? Number(subCategoryFilter) : undefined,
-      page: nextPage,
-      size: DEFAULT_PAGE_SIZE
-    });
-    setProductPage(response);
-    setProducts(response.records);
-  };
+  const bulkSelection = useBulkSelection<Product>(list.tableData);
 
   const handleDelete = async () => {
     if (!deleteTarget) {
@@ -79,7 +74,7 @@ export const ProductListPage = () => {
       setDeleting(true);
       clearMessage();
       await deleteProduct(deleteTarget.id);
-      await loadProducts(page);
+      list.refreshTable();
       setDeleteTarget(null);
       notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Product"));
     } catch (err: any) {
@@ -97,7 +92,7 @@ export const ProductListPage = () => {
       setDeleting(true);
       clearMessage();
       const resp = await deleteProductsBulk(bulkSelection.selectedIds);
-      await loadProducts(page);
+      list.refreshTable();
       bulkSelection.clearSelection();
       setBulkDeleteOpen(false);
       const message = `${resp.deleted} products deleted successfully${resp.failed ? `, ${resp.failed} failed` : ""}`;
@@ -120,21 +115,15 @@ export const ProductListPage = () => {
   }, [setApiError]);
 
   useEffect(() => {
-    if (!categoryFilter) {
+    if (!list.formFilters.categoryId) {
       setSubCategories([]);
-      setSubCategoryFilter("");
       return;
     }
-    setSubCategoryFilter("");
-    void getProductSubCategories({ active: true, categoryId: Number(categoryFilter), size: 1000 })
+    void getProductSubCategories({ active: true, categoryId: Number(list.formFilters.categoryId), size: 1000 })
       .then((subCategoryData) => setSubCategories(subCategoryData.filter((subCategory) => subCategory.active)))
       .catch((err: any) => setApiError(err, "Unable to load product sub categories"));
-  }, [categoryFilter, setApiError]);
-
-  useEffect(() => {
-    setPage(0);
-    void loadProducts(0);
-  }, [statusFilter, categoryFilter, subCategoryFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.formFilters.categoryId, setApiError]);
 
   const productColumns = useMemo(() => [
     {
@@ -213,138 +202,101 @@ export const ProductListPage = () => {
   ], visibleColumns), [visibleColumns]);
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
-      <Header
-        title="Products"
-        subtitle="Manage product master data while viewing batch-derived stock, inventory value, and default selling price."
-      />
-      <GlassCard className="flex flex-1 flex-col p-6 md:p-7">
-        <div className="mb-5 flex flex-col gap-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CommonBreadcrumb items={[{ label: "Products" }]} />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") || can("PRODUCT_DATAPORT", "VIEW") ? (
-                <>
-                <CommonColumnSelector tableName="PRODUCTS" availableColumns={productColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
-                {can("PRODUCTS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!products.length} onClick={() => exportToExcel("products.xlsx", products, productExportColumns)}>
-                  <Download size={16} />
-                  Export Excel
-                </Button> : null}
-                {can("PRODUCT_DATAPORT", "VIEW") ? <Link to="/data-port/products">
-                  <Button type="button" variant="secondary">
-                    <Upload size={16} />
-                    Product DataPort
-                  </Button>
-                </Link> : null}
-                {can("PRODUCTS", "ADD") ? <Link to="/products/new">
-                  <Button>Add product</Button>
-                </Link> : null}
-                </>
-              ) : null}
-<Pagination
-                page={productPage.page}
-                size={productPage.size}
-                totalRecords={productPage.totalRecords}
-                totalPages={productPage.totalPages}
-                onPageChange={(nextPage) => {
-                  setPage(nextPage);
-                  void loadProducts(nextPage);
-                }}
-              layout="inline" />
-            </div>
-          </div>
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_220px_180px_160px]">
-            <Input
-              label="Search Product"
-              placeholder="Enter Product, SKU, Category, or Sub Category"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onClear={() => {
-                setPage(0);
-                setSearch("");
-                void loadProducts(0, "");
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  setPage(0);
-                  void loadProducts(0);
-                }
-              }}
-            />
-            <Select
-              label="Category Filter"
-              placeholder={null}
-              value={categoryFilter}
-              onChange={(event) => setCategoryFilter(event.target.value)}
-              options={[
-                { label: "All Categories", value: "" },
-                ...categories.map((category) => ({ label: category.categoryName, value: String(category.id) }))
-              ]}
-            />
-            <Select
-              label="Sub Category Filter"
-              placeholder={null}
-              value={subCategoryFilter}
-              disabled={!categoryFilter}
-              onChange={(event) => setSubCategoryFilter(event.target.value)}
-              options={[
-                { label: "All Sub Categories", value: "" },
-                ...subCategories.map((subCategory) => ({ label: subCategory.subCategoryName, value: String(subCategory.id) }))
-              ]}
-            />
-            <Select
-              label="Status Filter"
-              placeholder={null}
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              options={[
-                { label: "All", value: "all" },
-                { label: "Active Only", value: "active" },
-                { label: "Inactive Only", value: "inactive" }
-              ]}
-            />
-            <div className="flex items-end">
-              <Button className="w-full" variant="secondary" onClick={() => { setPage(0); void loadProducts(0); }}>
-                Search
+    <CommonListPage<Product, ProductFilters>
+      pageTitle="Products"
+      pageSubtitle="Manage product master data while viewing batch-derived stock, inventory value, and default selling price."
+      list={list}
+      searchPlaceholder="Search Product"
+      activeFilterCount={(filters) => (filters.categoryId ? 1 : 0) + (filters.subCategoryId ? 1 : 0) + (filters.status !== "active" ? 1 : 0)}
+      filterFields={
+        <>
+          <Select
+            label="Category Filter"
+            placeholder={null}
+            value={list.formFilters.categoryId}
+            onChange={(event) => list.updateFormFilters({ categoryId: event.target.value, subCategoryId: "" })}
+            options={[
+              { label: "All Categories", value: "" },
+              ...categories.map((category) => ({ label: category.categoryName, value: String(category.id) }))
+            ]}
+          />
+          <Select
+            label="Sub Category Filter"
+            placeholder={null}
+            value={list.formFilters.subCategoryId}
+            disabled={!list.formFilters.categoryId}
+            onChange={(event) => list.updateFormFilters({ subCategoryId: event.target.value })}
+            options={[
+              { label: "All Sub Categories", value: "" },
+              ...subCategories.map((subCategory) => ({ label: subCategory.subCategoryName, value: String(subCategory.id) }))
+            ]}
+          />
+          <Select
+            label="Status Filter"
+            placeholder={null}
+            value={list.formFilters.status}
+            onChange={(event) => list.updateFormFilters({ status: event.target.value })}
+            options={[
+              { label: "All", value: "all" },
+              { label: "Active Only", value: "active" },
+              { label: "Inactive Only", value: "inactive" }
+            ]}
+          />
+        </>
+      }
+      toolbarButtons={
+        can("PRODUCTS", "EXPORT") || can("PRODUCTS", "ADD") || can("PRODUCT_DATAPORT", "VIEW") ? (
+          <>
+            {can("PRODUCTS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!list.tableData.length} onClick={() => exportToExcel("products.xlsx", list.tableData, productExportColumns)}>
+              <Download size={16} />
+              Export Excel
+            </Button> : null}
+            {can("PRODUCT_DATAPORT", "VIEW") ? <Link to="/data-port/products">
+              <Button type="button" variant="secondary">
+                <Upload size={16} />
+                Product DataPort
               </Button>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1">
-          <CommonBulkActionToolbar
-            selectedCount={bulkSelection.selectedCount}
-            canDelete={can("PRODUCTS", "DELETE")}
-            onClearSelection={bulkSelection.clearSelection}
-            onDeleteSelected={() => setBulkDeleteOpen(true)}
+            </Link> : null}
+            {can("PRODUCTS", "ADD") ? <Link to="/products/new">
+              <Button>Add product</Button>
+            </Link> : null}
+          </>
+        ) : null
+      }
+      columnSelector={{ tableName: "PRODUCTS", columns: productColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["product"] }}
+      aboveTable={
+        <CommonBulkActionToolbar
+          selectedCount={bulkSelection.selectedCount}
+          canDelete={can("PRODUCTS", "DELETE")}
+          onClearSelection={bulkSelection.clearSelection}
+          onDeleteSelected={() => setBulkDeleteOpen(true)}
+        />
+      }
+      rowSelection={can("PRODUCTS", "DELETE") ? {
+        selectedRowIds: bulkSelection.selectedIds,
+        onToggleRow: bulkSelection.toggleRow,
+        onToggleAll: (checked) => checked ? bulkSelection.selectAll() : bulkSelection.clearSelection(),
+        allSelected: bulkSelection.selectedCount > 0 && bulkSelection.selectedIds.length === list.tableData.length,
+        someSelected: bulkSelection.selectedCount > 0 && bulkSelection.selectedIds.length < list.tableData.length,
+        getRowId: (item: Product) => item.id
+      } : undefined}
+      tableColumns={[...visibleProductColumns, productActionColumn]}
+      emptyMessage="No products match the current filters."
+      fullHeight
+      modals={
+        <>
+          <AuditLogModal open={Boolean(logTarget)} moduleName="Product" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Product Logs"} onClose={() => setLogTarget(null)} />
+          <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
+          <CommonDeleteModal
+            open={bulkDeleteOpen}
+            loading={deleting}
+            onCancel={() => setBulkDeleteOpen(false)}
+            onConfirm={() => void handleBulkDelete()}
+            title={`Delete ${bulkSelection.selectedCount} selected record${bulkSelection.selectedCount === 1 ? "" : "s"}`}
+            description={`This action will permanently delete ${bulkSelection.selectedCount} selected record${bulkSelection.selectedCount === 1 ? "" : "s"}. Are you sure you want to continue?`}
           />
-          <Table
-            data={products}
-            emptyText="No products match the current filters."
-            rowSelection={can("PRODUCTS", "DELETE") ? {
-              selectedRowIds: bulkSelection.selectedIds,
-              onToggleRow: bulkSelection.toggleRow,
-              onToggleAll: (checked) => checked ? bulkSelection.selectAll() : bulkSelection.clearSelection(),
-              allSelected: bulkSelection.selectedCount > 0 && bulkSelection.selectedIds.length === products.length,
-              someSelected: bulkSelection.selectedCount > 0 && bulkSelection.selectedIds.length < products.length,
-              getRowId: (item: Product) => item.id
-            } : undefined}
-            columns={[...visibleProductColumns, productActionColumn]}
-          />
-        </div>
-      </GlassCard>
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Product" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.name} Logs` : "Product Logs"} onClose={() => setLogTarget(null)} />
-      <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
-      <CommonDeleteModal
-        open={bulkDeleteOpen}
-        loading={deleting}
-        onCancel={() => setBulkDeleteOpen(false)}
-        onConfirm={() => void handleBulkDelete()}
-        title={`Delete ${bulkSelection.selectedCount} selected record${bulkSelection.selectedCount === 1 ? "" : "s"}`}
-        description={`This action will permanently delete ${bulkSelection.selectedCount} selected record${bulkSelection.selectedCount === 1 ? "" : "s"}. Are you sure you want to continue?`}
-      />
-    </div>
+        </>
+      }
+    />
   );
 };

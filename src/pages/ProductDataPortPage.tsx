@@ -175,21 +175,15 @@ export const ProductDataPortPage = () => {
   const canImport = can("PRODUCT_DATAPORT", "ADD") && counts.validRows > 0 && !importing;
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
+    <div className="space-y-4 pb-6 md:space-y-5">
       <Header
-        title="DataPort > Product DataPort"
+        title="Product DataPort"
         subtitle="Upload product master data with sample download, preview edits, validation, and controlled import. Inventory batches must be created separately through Purchases."
       />
 
       <GlassCard className="flex flex-col gap-5 p-6 md:p-7">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <CommonBreadcrumb items={[{ label: "DataPort" }, { label: "Product DataPort" }]} />
-            <h2 className="mt-1 text-xl font-bold text-white">Product DataPort</h2>
-            <p className="mt-2 max-w-3xl text-sm text-slate-300">
-              Download the sample Excel, fill in product records, preview the data, fix anything that is off, and import only the rows that pass validation.
-            </p>
-          </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CommonBreadcrumb items={[{ label: "DataPort" }, { label: "Product DataPort" }]} />
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="secondary" onClick={() => void handleSampleDownload()} disabled={downloading}>
               {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
@@ -215,7 +209,7 @@ export const ProductDataPortPage = () => {
         />
 
         <section
-          className={`rounded-2xl border border-dashed p-5 transition ${dragActive ? "border-[var(--theme-color)] bg-[color:color-mix(in_srgb,var(--theme-color)_10%,white)]" : "border-white/15 bg-white/5"}`}
+          className={`rounded-lg border border-dashed p-5 transition ${dragActive ? "border-[var(--theme-color)] bg-[color:color-mix(in_srgb,var(--theme-color)_10%,white)]" : "border-white/15 bg-white/5"}`}
           onDragOver={(event) => {
             event.preventDefault();
             setDragActive(true);
@@ -235,7 +229,7 @@ export const ProductDataPortPage = () => {
         >
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[var(--theme-color)] shadow-sm">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-[var(--theme-color)] shadow-sm">
                 <FileSpreadsheet size={22} />
               </div>
               <div>
@@ -265,7 +259,7 @@ export const ProductDataPortPage = () => {
           </section>
         ) : null}
 
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <section className="rounded-lg border border-white/10 bg-white/5 p-4">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-base font-semibold text-white">Preview & Edit Data</h3>
@@ -287,7 +281,7 @@ export const ProductDataPortPage = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
             <table className="min-w-[1080px] w-full border-separate border-spacing-0 text-left text-sm text-slate-700">
               <thead className="sticky top-0 bg-slate-50">
                 <tr>
@@ -382,7 +376,7 @@ export const ProductDataPortPage = () => {
       <Modal open={confirmOpen} title="Confirm Import" eyebrow="Product DataPort" onClose={() => !importing && setConfirmOpen(false)} maxWidthClass="max-w-lg">
         <div className="space-y-5">
           <p className="text-sm text-slate-600">Do you want to import this data?</p>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             <div className="flex items-center justify-between gap-4">
               <span>Total Rows</span>
               <span className="font-semibold text-slate-950">{counts.totalRows}</span>
@@ -449,9 +443,9 @@ const SummaryTile = ({ label, value, tone }: { label: string; value: number; ton
       : "border-white/10 bg-white/5 text-white";
 
   return (
-    <div className={`rounded-2xl border p-4 ${toneClasses}`}>
+    <div className={`rounded-lg border p-4 ${toneClasses}`}>
       <p className="text-sm font-semibold">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+      <p className="mt-2 fs-18 font-semibold">{value}</p>
     </div>
   );
 };
@@ -465,12 +459,12 @@ const ResultTile = ({ label, value, tone }: { label: string; value: number; tone
       : "border-slate-200 bg-white text-slate-700";
 
   return (
-    <div className={`rounded-2xl border p-4 ${toneClasses}`}>
+    <div className={`rounded-lg border p-4 ${toneClasses}`}>
       <div className="flex items-center gap-2 text-sm font-semibold">
         {icon}
         <span>{label}</span>
       </div>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+      <p className="mt-2 fs-18 font-semibold">{value}</p>
     </div>
   );
 };

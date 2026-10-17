@@ -237,7 +237,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
           style={{ fontFamily: isBrand ? "Manrope, Inter, system-ui, sans-serif" : undefined }}
           onSubmit={sendOtp}
         >
-          <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--theme-color)] shadow-sm">
               <KeyRound size={18} />
             </span>
@@ -320,7 +320,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
           style={{ fontFamily: isBrand ? "Manrope, Inter, system-ui, sans-serif" : undefined }}
           onSubmit={verifyOtp}
         >
-          <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--theme-color)] shadow-sm">
               <KeyRound size={18} />
             </span>
@@ -355,7 +355,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
                 placeholder="6-digit OTP"
                 value={otp}
                 disabled={saving}
-                className="h-[50px] w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[0.3em] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] disabled:bg-slate-50"
+                className="h-[50px] w-full rounded-xl border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[0.18em] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] disabled:bg-slate-50"
                 onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
               />
             </div>
@@ -413,7 +413,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
           style={{ fontFamily: isBrand ? "Manrope, Inter, system-ui, sans-serif" : undefined }}
           onSubmit={confirmReset}
         >
-          <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--theme-color)] shadow-sm">
               <Lock size={16} />
             </span>

@@ -8,6 +8,7 @@ import { useAuth } from "../context/AuthContext";
 import { useIsDarkMode } from "../hooks/useIsDarkMode";
 import { getChartTheme } from "../lib/chartTheme";
 import { sanitizeHtml } from "../lib/sanitizeHtml";
+import { gradientSurfaceClass } from "../lib/theme";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -152,7 +153,7 @@ export const AiAssistantWidget = () => {
   return (
     <>
       {open ? (
-        <div className="fixed bottom-5 right-5 z-50 flex w-[min(92vw,24rem)] flex-col overflow-hidden rounded-[22px] border border-[var(--panel-border)] bg-[var(--panel-bg)] shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+        <div className="fixed bottom-5 right-5 z-50 flex w-[min(92vw,24rem)] flex-col overflow-hidden rounded-lg border border-[var(--panel-border)] bg-[var(--panel-bg)] shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
           <div className="flex items-center justify-between bg-[linear-gradient(135deg,#0f172a,#155e75)] px-4 py-3 text-white">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15">
@@ -194,8 +195,8 @@ export const AiAssistantWidget = () => {
                     <div
                       className={
                         item.role === "user"
-                          ? "whitespace-pre-wrap rounded-2xl rounded-br-md bg-[var(--theme-color)] px-3.5 py-2.5 text-sm font-medium text-[var(--theme-contrast)]"
-                          : "whitespace-pre-wrap rounded-2xl rounded-bl-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3.5 py-2.5 text-sm text-[var(--text-primary)]"
+                          ? "whitespace-pre-wrap rounded-lg rounded-br-md bg-[var(--theme-color)] px-3.5 py-2.5 text-sm font-medium text-[var(--theme-contrast)]"
+                          : "whitespace-pre-wrap rounded-lg rounded-bl-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3.5 py-2.5 text-sm text-[var(--text-primary)]"
                       }
                     >
                       {item.content}
@@ -237,7 +238,7 @@ export const AiAssistantWidget = () => {
             )}
             {loading ? (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3.5 py-2.5 text-sm text-[var(--text-tertiary)]">
+                <div className="rounded-lg rounded-bl-md border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3.5 py-2.5 text-sm text-[var(--text-tertiary)]">
                   <span className="inline-flex items-center gap-2">
                     <span className="inline-flex items-center gap-1">
                       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
@@ -276,7 +277,7 @@ export const AiAssistantWidget = () => {
               type="button"
               aria-label="Send message"
               disabled={!input.trim() || loading}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] bg-[var(--theme-color)] text-[var(--theme-contrast)] transition hover:bg-[var(--theme-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] ${gradientSurfaceClass} transition disabled:cursor-not-allowed disabled:opacity-60`}
               onClick={() => void send()}
             >
               <Send size={17} />

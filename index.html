@@ -17,6 +17,15 @@
         var normalize = function (value) {
           return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim()) ? String(value).trim().toUpperCase() : fallback;
         };
+        var parseTheme = function (value) {
+          var parts = String(value || "").toUpperCase().split(",");
+          var primary = normalize(parts[0]);
+          var accent = parts.length > 1 && /^#[0-9a-fA-F]{6}$/.test(parts[1].trim()) ? parts[1].trim() : null;
+          return { primary: primary, accent: accent };
+        };
+        var gradient = function (from, to) {
+          return "linear-gradient(135deg, " + from + " 0%, " + to + " 100%)";
+        };
         var hexToRgb = function (hex) {
           var value = hex.replace("#", "");
           return {
@@ -50,12 +59,15 @@
         };
         try {
           var cached = JSON.parse(localStorage.getItem(key) || "{}");
-          var color = normalize(cached.themeColor);
+          var theme = parseTheme(cached.themeColor);
+          var color = theme.primary;
+          var accent = theme.accent || theme.primary;
           var light = mix(color, { r: 255, g: 255, b: 255 }, 0.38);
           var dark = mix(color, { r: 2, g: 6, b: 23 }, 0.42);
           var hover = mix(color, { r: 255, g: 255, b: 255 }, 0.22);
           var border = mix(color, { r: 255, g: 255, b: 255 }, 0.58);
           root.style.setProperty("--theme-color", color);
+          root.style.setProperty("--theme-accent", accent);
           root.style.setProperty("--theme-light", light);
           root.style.setProperty("--theme-dark", dark);
           root.style.setProperty("--theme-hover", hover);
@@ -63,6 +75,11 @@
           root.style.setProperty("--theme-contrast", contrast(color));
           root.style.setProperty("--theme-light-contrast", contrast(light));
           root.style.setProperty("--theme-dark-contrast", contrast(dark));
+          root.style.setProperty("--theme-gradient", gradient(color, accent));
+          root.style.setProperty("--theme-gradient-hover", gradient(mix(color, { r: 255, g: 255, b: 255 }, 0.22), mix(accent, { r: 255, g: 255, b: 255 }, 0.22)));
+          root.style.setProperty("--theme-gradient-deep", gradient(mix(color, { r: 2, g: 6, b: 23 }, 0.16), mix(accent, { r: 2, g: 6, b: 23 }, 0.16)));
+          root.style.setProperty("--sidebar-bg", mix(color, { r: 5, g: 9, b: 20 }, 0.62));
+          root.style.setProperty("--sidebar-bg-deep", mix(accent, { r: 5, g: 9, b: 20 }, 0.66));
           root.classList.toggle("dark", Boolean(cached.darkModeEnabled));
         } catch (error) {
           root.classList.remove("dark");
@@ -71,7 +88,7 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   </head>
   <body class="bg-slate-950">
     <div id="root"></div>

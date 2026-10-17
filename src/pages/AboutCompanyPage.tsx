@@ -13,6 +13,14 @@ import { Select } from "../components/Select";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import {
+  DEFAULT_INVENTORY_CONSUMPTION_METHOD,
+  DEFAULT_INVENTORY_PRICING_POLICY,
+  inventoryConsumptionOptions,
+  inventoryPricingOptions,
+  resolveInventoryConsumptionMethod,
+  resolveInventoryPricingPolicy
+} from "../lib/inventorySettings";
 import { resolveAssetUrl } from "../config/env";
 import { notificationService } from "../services/notificationService";
 
@@ -47,6 +55,8 @@ const emptyForm: FormState = {
   upiId: "",
   invoiceNotes: "",
   invoiceTerms: "",
+  inventoryConsumptionMethod: DEFAULT_INVENTORY_CONSUMPTION_METHOD,
+  inventoryPricingPolicy: DEFAULT_INVENTORY_PRICING_POLICY,
 };
 
 const logoSrc = (url?: string | null) => resolveAssetUrl(url);
@@ -63,13 +73,11 @@ export const AboutCompanyPage = () => {
   const [statesLoadFailed, setStatesLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState("");
   const { clearMessage, setApiError } = useApiMessage();
   const [deletingLogo, setDeletingLogo] = useState(false);
   const [confirmRemoveLogo, setConfirmRemoveLogo] = useState(false);
   const [mfaApply, setMfaApply] = useState<boolean | null>(null);
   const [mfaSaving, setMfaSaving] = useState(false);
-  const [mfaMsg, setMfaMsg] = useState("");
   const [mfaConfirmOff, setMfaConfirmOff] = useState(false);
   const canSaveProfile = Boolean(form.name.trim() && form.phone.trim() && form.email.trim() && (!form.gstRegistered || (form.gstin ?? form.taxId ?? "").trim()));
 
@@ -110,6 +118,8 @@ export const AboutCompanyPage = () => {
         upiId: company.upiId ?? "",
         invoiceNotes: company.invoiceNotes ?? "",
         invoiceTerms: company.invoiceTerms ?? "",
+        inventoryConsumptionMethod: resolveInventoryConsumptionMethod(company.inventoryConsumptionMethod),
+        inventoryPricingPolicy: resolveInventoryPricingPolicy(company.inventoryPricingPolicy),
       });
       setLogoUrl(company.logoUrl ?? null);
       setSignatureUrl(company.signatureUrl ?? null);
@@ -156,10 +166,9 @@ export const AboutCompanyPage = () => {
   const applyMfaUpdate = async (next: boolean) => {
     try {
       setMfaSaving(true);
-      setMfaMsg("");
       const updated = await updateCompanyMfaSettings(next);
       setMfaApply(Boolean(updated.applyMfa));
-      setMfaMsg(next ? "MFA has been turned ON. Users can now enroll in Two-Step Verification." : "MFA has been turned OFF.");
+      notificationService.showSuccess(next ? "MFA has been turned ON. Users can now enroll in Two-Step Verification." : "MFA has been turned OFF.");
     } catch (err: any) {
       setApiError(err, "Unable to update MFA setting.");
     } finally {
@@ -185,7 +194,6 @@ export const AboutCompanyPage = () => {
 
   const saveProfile = async () => {
     clearMessage();
-    setSuccess("");
     setSaving(true);
     try {
       const normalizedGstin = form.gstRegistered ? (form.gstin ?? form.taxId ?? "").trim() : "";
@@ -199,7 +207,6 @@ export const AboutCompanyPage = () => {
       setSignatureUrl(updated.signatureUrl ?? null);
       await refreshProfile();
       const message = CommonSuccessMessageUtil.updated("Company Profile");
-      setSuccess(message);
       notificationService.showSuccess(message);
     } catch (err: any) {
       setApiError(err, "Unable to update company profile");
@@ -210,7 +217,6 @@ export const AboutCompanyPage = () => {
 
   const removeLogo = async () => {
     clearMessage();
-    setSuccess("");
     setDeletingLogo(true);
     try {
       const updated = await deleteCompanyLogo();
@@ -230,7 +236,6 @@ export const AboutCompanyPage = () => {
       return;
     }
     clearMessage();
-    setSuccess("");
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setApiError({ message: "Only JPG, PNG, and WEBP logos are allowed" }, "Only JPG, PNG, and WEBP logos are allowed");
       return;
@@ -250,7 +255,6 @@ export const AboutCompanyPage = () => {
       return;
     }
     clearMessage();
-    setSuccess("");
     try {
       const updated = await uploadCompanySignature(file);
       setSignatureUrl(updated.signatureUrl ?? null);
@@ -263,7 +267,6 @@ export const AboutCompanyPage = () => {
 
   const removeSignature = async () => {
     clearMessage();
-    setSuccess("");
     try {
       const updated = await deleteCompanySignature();
       setSignatureUrl(updated.signatureUrl ?? null);
@@ -278,21 +281,19 @@ export const AboutCompanyPage = () => {
     <div className="space-y-4 pb-6">
       <Header title="About Company" subtitle="Manage company identity, contact details, branding, and invoice communication settings." />
 
-      {success ? <div className="glass rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm text-emerald-200">{success}</div> : null}
-
       <GlassCard className="p-6 md:p-7">
         {loading ? (
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-6 text-sm text-slate-300">Loading company profile...</div>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-sm text-slate-300">Loading company profile...</div>
         ) : (
           <div className="space-y-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[24px] border border-white/10 bg-white/5">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5">
                   {logoSrc(logoUrl) ? <img className="h-full w-full object-contain" src={logoSrc(logoUrl) ?? ""} alt="Company logo" /> : <Building2 className="text-sky-100" size={30} />}
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Branding</p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">{form.name || "Company Profile"}</h2>
+                  <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Branding</p>
+                  <h2 className="mt-2 fs-18 font-semibold text-white">{form.name || "Company Profile"}</h2>
                   <p className="mt-1 text-sm text-slate-400">Company profile settings</p>
                 </div>
               </div>
@@ -319,7 +320,7 @@ export const AboutCompanyPage = () => {
             </div>
 
             <section className="grid gap-4 md:grid-cols-2">
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Basic details</p>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Basic details</p>
               <Input disabled={!canEdit} requiredMark label="Company Name" value={form.name} onChange={(event) => setField("name", event.target.value)} />
               <Input disabled={!canEdit} label="Legal Company Name" value={form.legalName} onChange={(event) => setField("legalName", event.target.value)} />
               <Input disabled={!canEdit || !form.gstRegistered} requiredMark={form.gstRegistered} label="GST Number" value={form.gstin ?? form.taxId} onChange={(event) => {
@@ -361,7 +362,7 @@ export const AboutCompanyPage = () => {
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Contact details</p>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Contact details</p>
               <Input disabled={!canEdit} requiredMark label="Mobile Number" value={form.phone} onChange={(event) => setField("phone", event.target.value)} />
               <Input disabled={!canEdit} label="Alternate Mobile" value={form.alternatePhone} onChange={(event) => setField("alternatePhone", event.target.value)} />
               <Input disabled={!canEdit} requiredMark type="email" label="Email Address" value={form.email} onChange={(event) => setField("email", event.target.value)} />
@@ -369,7 +370,7 @@ export const AboutCompanyPage = () => {
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Banking & Invoice</p>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Banking & Invoice</p>
               <Input disabled={!canEdit} label="Bank Name" value={form.bankName ?? ""} onChange={(event) => setField("bankName", event.target.value)} />
               <Input disabled={!canEdit} label="Account Name" value={form.bankAccountName ?? ""} onChange={(event) => setField("bankAccountName", event.target.value)} />
               <Input disabled={!canEdit} label="Account Number" value={form.bankAccountNumber ?? ""} onChange={(event) => setField("bankAccountNumber", event.target.value)} />
@@ -381,7 +382,30 @@ export const AboutCompanyPage = () => {
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Address</p>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Inventory settings</p>
+              <Select
+                disabled={!canEdit}
+                label="Stock consumption method"
+                placeholder={null}
+                value={form.inventoryConsumptionMethod ?? DEFAULT_INVENTORY_CONSUMPTION_METHOD}
+                onChange={(event) => setForm((current) => ({ ...current, inventoryConsumptionMethod: event.target.value as FormState["inventoryConsumptionMethod"] }))}
+                options={inventoryConsumptionOptions}
+              />
+              <Select
+                disabled={!canEdit}
+                label="Default selling price"
+                placeholder={null}
+                value={form.inventoryPricingPolicy ?? DEFAULT_INVENTORY_PRICING_POLICY}
+                onChange={(event) => setForm((current) => ({ ...current, inventoryPricingPolicy: event.target.value as FormState["inventoryPricingPolicy"] }))}
+                options={inventoryPricingOptions}
+              />
+              <p className="text-xs text-slate-400 md:col-span-2">
+                Stock consumption method decides which batch is reduced first when an invoice is saved. Default selling price decides what rate appears on a new invoice line — you can still change the rate on any line. These settings apply to new invoices only; existing invoices and stock allocations are not affected.
+              </p>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2">
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Address</p>
               <Input disabled={!canEdit} label="Address Line 1" value={form.addressLine1} onChange={(event) => setField("addressLine1", event.target.value)} />
               <Input disabled={!canEdit} label="Address Line 2" value={form.addressLine2} onChange={(event) => setField("addressLine2", event.target.value)} />
               <Input disabled={!canEdit} label="City" value={form.city} onChange={(event) => setField("city", event.target.value)} />
@@ -400,8 +424,7 @@ export const AboutCompanyPage = () => {
                   }));
                 }}
                 options={[{ label: "Select State", value: "" }, ...states.map((state) => ({ label: state.stateName, value: String(state.id) }))]}
-                hint={statesLoadFailed ? "State list could not be loaded from the server." : undefined}
-              />
+                hint={statesLoadFailed ? "State list could not be loaded from the server." : undefined}              />
               <Input disabled={!canEdit} label="Country" value={form.country} onChange={(event) => setField("country", event.target.value)} />
               <Input disabled={!canEdit} label="Pincode" value={form.pincode} onChange={(event) => setField("pincode", event.target.value)} />
             </section>
@@ -412,7 +435,7 @@ export const AboutCompanyPage = () => {
             </div>
 
             <section className="grid gap-4 md:grid-cols-2">
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-400 md:col-span-2">Security — Multi-Factor Authentication</p>
+              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Security — Multi-Factor Authentication</p>
               <div className="md:col-span-2 rounded-[var(--radius-control)] border border-white/10 bg-white/5 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -435,7 +458,6 @@ export const AboutCompanyPage = () => {
                 {!isOwner ? (
                   <p className="mt-2 text-sm text-slate-400">Only the OWNER can change this setting.</p>
                 ) : null}
-                {mfaMsg ? <p className="mt-2 text-sm font-medium text-emerald-300">{mfaMsg}</p> : null}
               </div>
             </section>
           </div>

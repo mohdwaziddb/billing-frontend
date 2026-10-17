@@ -223,7 +223,7 @@ export const InvoiceTemplatesPage = () => {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">Loading invoice templates...</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">Loading invoice templates...</div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
             <GlassCard className="space-y-4 p-4">
@@ -238,10 +238,10 @@ export const InvoiceTemplatesPage = () => {
                 }}
               />
               {selectedTemplate ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-sm font-bold text-slate-900">{selectedTemplate.templateName}</p>
                   <p className="mt-1 text-xs text-slate-500">{selectedTemplate.description}</p>
-                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Version {selectedTemplate.version}</p>
+                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Version {selectedTemplate.version}</p>
                 </div>
               ) : null}
               <div className="grid gap-3">
@@ -295,8 +295,8 @@ export const InvoiceTemplatesPage = () => {
             <GlassCard className="space-y-4 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Preview</p>
-                  <h3 className="mt-1 text-xl font-extrabold text-slate-950">{previewName || selectedTemplate?.templateName || "Invoice Template"}</h3>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Preview</p>
+                  <h3 className="mt-1 fs-18 font-bold text-slate-950">{previewName || selectedTemplate?.templateName || "Invoice Template"}</h3>
                   <p className="mt-1 text-sm text-slate-500">Compact demo invoice preview with reduced empty space.</p>
                 </div>
                 <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm">
@@ -309,9 +309,9 @@ export const InvoiceTemplatesPage = () => {
                   </Button>
                 </div>
               </div>
-              <div className="rounded-[28px] border border-slate-200 bg-slate-100 p-3">
-                {loadingPreview ? <div className="mb-3 rounded-2xl bg-white/80 px-4 py-2 text-sm font-medium text-slate-500">Refreshing preview with current template settings...</div> : null}
-                <div className="overflow-auto rounded-[24px] border border-slate-200 bg-white">
+              <div className="rounded-lg border border-slate-200 bg-slate-100 p-3">
+                {loadingPreview ? <div className="mb-3 rounded-lg bg-white/80 px-4 py-2 text-sm font-medium text-slate-500">Refreshing preview with current template settings...</div> : null}
+                <div className="overflow-auto rounded-lg border border-slate-200 bg-white">
                   <iframe
                     ref={iframeRef}
                     title={previewName || "Invoice template preview"}
@@ -326,7 +326,7 @@ export const InvoiceTemplatesPage = () => {
                     // print() silently fail hota hai) — printPreview hidden
                     // same-origin iframe banakar print karta hai.
                     sandbox="allow-modals"
-                    className="preview-surface rounded-[24px] border-0 bg-white"
+                    className="preview-surface rounded-lg border-0 bg-white"
                     style={{
                       width: iframeWidth,
                       height: iframeHeight,
@@ -345,14 +345,14 @@ export const InvoiceTemplatesPage = () => {
 };
 
 const Toggle = ({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) => (
-  <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+  <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
     <span>{label}</span>
     <input type="checkbox" checked={value} onChange={(event) => onChange(event.target.checked)} />
   </label>
 );
 
 const TextAreaField = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => (
-  <label className="space-y-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+  <label className="space-y-2 rounded-lg border border-slate-200 bg-white px-4 py-3">
     <span className="block text-sm font-semibold text-slate-700">{label}</span>
     <textarea
       value={value}

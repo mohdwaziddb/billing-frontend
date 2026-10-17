@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Columns3, Settings2 } from "lucide-react";
+import { Lock, SlidersHorizontal } from "lucide-react";
 import { getColumnPreference, saveColumnPreference } from "../api/columnPreferences";
+import { useAnchoredPanel } from "../hooks/useAnchoredPanel";
 import { platformAdminColumnPrefsStorage } from "../lib/storage";
 import { notificationService } from "../services/notificationService";
 
@@ -27,21 +28,25 @@ export const CommonColumnSelector = ({
   const defaultColumns = useMemo(() => availableColumns.map((column) => column.key), [availableColumns]);
   const lockedColumns = useMemo(() => availableColumns.filter((column) => column.locked).map((column) => column.key), [availableColumns]);
   const selectableColumns = useMemo(() => availableColumns.filter((column) => !column.locked).map((column) => column.key), [availableColumns]);
-  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>(visibleColumns.length ? visibleColumns : defaultColumns);
-  const selectorRef = useRef<HTMLDivElement | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  const [panelStyle, setPanelStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const saveSequence = useRef(0);
+  const { open, toggle: togglePanel, buttonRef, panelRef, panelStyle } = useAnchoredPanel({
+    panelWidth: 288,
+    panelHeight: (panel) => panel?.offsetHeight ?? 380
+  });
 
   const normalizeColumns = (keys: string[]) => {
     const validKeys = availableColumns
       .filter((column) => keys.includes(column.key))
       .map((column) => column.key);
 
-    if (validKeys.length) {
-      return validKeys;
+    const merged = new Set(validKeys);
+    lockedColumns.forEach((key) => merged.add(key));
+
+    if (merged.size) {
+      return availableColumns
+        .filter((column) => merged.has(column.key))
+        .map((column) => column.key);
     }
 
     const firstUnlocked = availableColumns.find((column) => !column.locked)?.key;
@@ -114,66 +119,6 @@ export const CommonColumnSelector = ({
     setDraft(visibleColumns.length ? visibleColumns : defaultColumns);
   }, [visibleColumns, defaultColumns]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    // Portal me render hota hai taaki card/table ke overflow me kate nahi.
-    // Neeche jagah na ho to button ke upar khulta hai.
-    const place = () => {
-      const rect = buttonRef.current?.getBoundingClientRect();
-      if (!rect) {
-        return;
-      }
-      const width = 288;
-      const height = 380;
-      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const top = spaceBelow >= height + 8 || rect.top < height + 8
-        ? Math.min(rect.bottom + 8, window.innerHeight - 120)
-        : Math.max(8, rect.top - height - 8);
-      setPanelStyle({ top, left });
-    };
-    place();
-
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node;
-      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) {
-        return;
-      }
-      setOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    const handleScroll = (event: Event) => {
-      // Panel ke andar ka scroll (lambi column list) ignore — warna panel
-      // kholte hi uska apna scrollbar use karte band ho jata hai.
-      // Sirf bahar (page/table) ke scroll par band karo.
-      if (panelRef.current?.contains(event.target as Node)) {
-        return;
-      }
-      setOpen(false);
-    };
-    const dismiss = () => setOpen(false);
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", handleScroll, true);
-    window.addEventListener("resize", dismiss);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", handleScroll, true);
-      window.removeEventListener("resize", dismiss);
-    };
-  }, [open]);
-
   const updateColumns = (next: string[]) => {
     const previous = visibleColumns.length ? normalizeColumns(visibleColumns) : normalizeColumns(defaultColumns);
     const normalized = normalizeColumns(next);
@@ -211,7 +156,7 @@ export const CommonColumnSelector = ({
           style={{ top: panelStyle.top, left: panelStyle.left }}
         >
           <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5">
-            <Settings2 size={15} className="text-[var(--theme-color)]" />
+            <SlidersHorizontal size={15} className="text-[var(--theme-color)]" />
             <p className="text-sm font-bold text-slate-950">Select Column</p>
           </div>
           <div className="flex gap-2 border-b border-slate-100 px-3 py-2.5">
@@ -232,14 +177,21 @@ export const CommonColumnSelector = ({
           </div>
           <div className="max-h-72 overflow-y-auto p-2">
             {availableColumns.map((column) => (
-              <label key={column.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-[var(--theme-color)]"
-                  checked={draft.includes(column.key)}
-                  disabled={column.locked}
-                  onChange={() => toggle(column.key)}
-                />
+              <label
+                key={column.key}
+                title={column.locked ? "Always visible — cannot be unselected" : undefined}
+                className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-slate-700 ${column.locked ? "cursor-default" : "cursor-pointer hover:bg-slate-50"}`}
+              >
+                {column.locked ? (
+                  <Lock size={14} className="shrink-0 text-slate-400" />
+                ) : (
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-[var(--theme-color)]"
+                    checked={draft.includes(column.key)}
+                    onChange={() => toggle(column.key)}
+                  />
+                )}
                 <span className="min-w-0 flex-1 truncate">{column.header}</span>
               </label>
             ))}
@@ -250,15 +202,16 @@ export const CommonColumnSelector = ({
     : null;
 
   return (
-    <div ref={selectorRef} className="relative">
+    <div className="relative">
       <button
         ref={buttonRef}
         type="button"
-        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-slate-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 transition hover:border-[var(--theme-color)] hover:bg-slate-50 hover:text-slate-950"
-        onClick={() => setOpen((current) => !current)}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-control)] border border-slate-200 bg-white text-slate-700 transition hover:border-[var(--theme-color)] hover:bg-slate-50 hover:text-slate-950"
+        aria-label="Select Column"
+        title="Select Column"
+        onClick={togglePanel}
       >
-        <Columns3 size={15} />
-        Select Column
+        <SlidersHorizontal size={16} />
       </button>
       {panel}
     </div>

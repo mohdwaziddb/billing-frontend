@@ -4,8 +4,9 @@ import { confirmMfaSetup, deleteMfaDevice, getMfaStatus, startMfaSetup } from ".
 import { Button } from "../components/Button";
 import { Header } from "../components/Header";
 import { Modal } from "../components/Modal";
-import { getApiErrorMessage } from "../lib/errors";
+import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatDate } from "../lib/format";
+import { notificationService } from "../services/notificationService";
 import type { MfaDevice, MfaStatus } from "../types/api";
 
 const DEVICE_SUGGESTIONS = ["Phone", "Desktop"];
@@ -13,7 +14,6 @@ const DEVICE_SUGGESTIONS = ["Phone", "Desktop"];
 export const TwoStepVerificationPage = () => {
   const [status, setStatus] = useState<MfaStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [deviceName, setDeviceName] = useState("Phone");
@@ -21,22 +21,21 @@ export const TwoStepVerificationPage = () => {
   const [manualSecret, setManualSecret] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [stepLoading, setStepLoading] = useState(false);
-  const [stepError, setStepError] = useState("");
   const [secretCopied, setSecretCopied] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteDevice, setConfirmDeleteDevice] = useState<MfaDevice | null>(null);
+  const { setApiError } = useApiMessage();
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      setError("");
       setStatus(await getMfaStatus());
     } catch (err: any) {
-      setError(getApiErrorMessage(err, "Unable to load MFA status."));
+      setApiError(err, "Unable to load MFA status.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setApiError]);
 
   useEffect(() => {
     void load();
@@ -47,7 +46,6 @@ export const TwoStepVerificationPage = () => {
     setQrBase64(null);
     setManualSecret(null);
     setCode("");
-    setStepError("");
     setSecretCopied(false);
     setAddOpen(true);
   };
@@ -55,18 +53,17 @@ export const TwoStepVerificationPage = () => {
   const handleStart = async () => {
     const name = deviceName.trim();
     if (!name) {
-      setStepError("Device name is required (e.g. Phone or Desktop).");
+      notificationService.showError("Device name is required (e.g. Phone or Desktop).");
       return;
     }
     try {
       setStepLoading(true);
-      setStepError("");
       const started = await startMfaSetup(name);
       setQrBase64(started.qrBase64);
       setManualSecret(started.secret);
       setDeviceName(started.deviceName);
     } catch (err: any) {
-      setStepError(getApiErrorMessage(err, "Unable to generate QR. Please try again."));
+      setApiError(err, "Unable to generate QR. Please try again.");
     } finally {
       setStepLoading(false);
     }
@@ -75,17 +72,17 @@ export const TwoStepVerificationPage = () => {
   const handleConfirm = async () => {
     const cleanCode = code.trim();
     if (cleanCode.length !== 6) {
-      setStepError("Enter the 6-digit code shown in your authenticator app.");
+      notificationService.showError("Enter the 6-digit code shown in your authenticator app.");
       return;
     }
     try {
       setStepLoading(true);
-      setStepError("");
       await confirmMfaSetup(deviceName.trim(), cleanCode);
       setAddOpen(false);
+      notificationService.showSuccess("MFA device added successfully.");
       await load();
     } catch (err: any) {
-      setStepError(getApiErrorMessage(err, "Incorrect code. Enter the 6-digit code from your authenticator app."));
+      setApiError(err, "Incorrect code. Enter the 6-digit code from your authenticator app.");
     } finally {
       setStepLoading(false);
     }
@@ -100,9 +97,10 @@ export const TwoStepVerificationPage = () => {
       setDeletingId(id);
       await deleteMfaDevice(id);
       setConfirmDeleteDevice(null);
+      notificationService.showSuccess("MFA device removed successfully.");
       await load();
     } catch (err: any) {
-      setError(getApiErrorMessage(err, "Unable to remove device."));
+      setApiError(err, "Unable to remove device.");
     } finally {
       setDeletingId(null);
     }
@@ -117,7 +115,7 @@ export const TwoStepVerificationPage = () => {
       setSecretCopied(true);
       window.setTimeout(() => setSecretCopied(false), 2000);
     } catch {
-      setStepError("Could not copy — please note down the secret manually.");
+      notificationService.showError("Could not copy — please note down the secret manually.");
     }
   };
 
@@ -132,8 +130,6 @@ export const TwoStepVerificationPage = () => {
         <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-5 text-sm font-medium text-slate-500">
           <Loader2 size={16} className="animate-spin" /> Loading MFA status…
         </div>
-      ) : error && !status ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-5 text-sm font-medium text-rose-700">{error}</div>
       ) : status ? (
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -199,8 +195,6 @@ export const TwoStepVerificationPage = () => {
               </p>
             ) : null}
           </div>
-
-          {error ? <p className="mt-3 text-sm font-medium text-rose-600">{error}</p> : null}
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {status.devices.map((device) => (
@@ -312,7 +306,6 @@ export const TwoStepVerificationPage = () => {
               placeholder="Device name"
               className="mt-3 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm font-medium outline-none focus:border-slate-900"
             />
-            {stepError ? <p className="mt-2 text-sm font-medium text-rose-600">{stepError}</p> : null}
             <div className="mt-4 flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setAddOpen(false)}>
                 Cancel
@@ -361,9 +354,8 @@ export const TwoStepVerificationPage = () => {
                 }
               }}
               placeholder="6-digit code"
-              className="mt-3 h-12 w-full rounded-xl border border-slate-300 text-center text-xl font-bold tracking-[0.4em] outline-none focus:border-slate-900"
+              className="mt-3 h-12 w-full rounded-xl border border-slate-300 text-center text-xl font-bold tracking-[0.18em] outline-none focus:border-slate-900"
             />
-            {stepError ? <p className="mt-2 text-sm font-medium text-rose-600">{stepError}</p> : null}
             <p className="mt-2 text-[13px] leading-snug text-amber-700">
               This QR will not be shown again after confirmation. Do not delete the entry from your authenticator
               app — if lost, ask your OWNER to reset MFA so you can enroll again.

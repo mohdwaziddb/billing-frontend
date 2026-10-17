@@ -4,7 +4,7 @@ export const MaintenancePage = () => {
   return (
     <main className="flex min-h-screen items-center justify-center bg-white px-4 py-10">
       <section className="w-full max-w-xl text-center">
-        <p className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-400">Bizio</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Bizio</p>
         <h1 className="mt-4 text-4xl font-extrabold text-slate-900 md:text-5xl">
           We&rsquo;ll be back soon!
         </h1>

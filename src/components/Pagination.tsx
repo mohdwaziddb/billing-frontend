@@ -27,7 +27,7 @@ export const Pagination = ({
 
   return (
     <div className={layout === "inline" ? "flex items-center gap-3" : "mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"}>
-      <p className="text-sm text-slate-500">
+      <p className="fs-12 text-slate-500">
         {fromRecord}-{toRecord} of {totalRecords}
       </p>
       <div className="flex gap-2">

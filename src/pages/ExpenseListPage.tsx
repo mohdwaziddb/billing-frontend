@@ -7,31 +7,27 @@ import { getInvoices } from "../api/invoices";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
-import { CommonAdvancedFilterPanel } from "../components/CommonAdvancedFilterPanel";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
-import { CommonColumnSelector, applyVisibleColumns } from "../components/CommonColumnSelector";
+import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
-import { GlassCard } from "../components/GlassCard";
-import { Header } from "../components/Header";
+import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
-import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
+import { useAddEditForm } from "../hooks/useAddEditForm";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { useListPage } from "../hooks/useListPage";
 import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
-import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import { notificationService } from "../services/notificationService";
-import type { Customer, Expense, ExpenseCategory, ExpenseType, Invoice, PageResponse } from "../types/api";
+import type { Customer, Expense, ExpenseCategory, ExpenseRequest, ExpenseType, Invoice } from "../types/api";
 
-const emptyPage: PageResponse<Expense> = { records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 };
 const todayIso = () => {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -58,6 +54,28 @@ type ExpenseFilters = {
 const emptyExpenseFilters: ExpenseFilters = { search: "", expenseType: "", categoryId: "", datePreset: "", startDate: "", endDate: "", customerId: "", invoiceId: "", createdByRole: "" };
 type ExpenseDrilldownKey = "total" | "thisMonth" | "today" | "category";
 
+type ExpenseFormState = {
+  expenseType: ExpenseType;
+  categoryId: string;
+  customerId: string;
+  invoiceId: string;
+  amount: string;
+  expenseDate: string;
+  description: string;
+  attachmentUrl: string;
+};
+
+const getEmptyForm = (): ExpenseFormState => ({
+  expenseType: "GENERAL",
+  categoryId: "",
+  customerId: "",
+  invoiceId: "",
+  amount: "",
+  expenseDate: todayIso(),
+  description: "",
+  attachmentUrl: ""
+});
+
 const toIso = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 
 const dateRangeForPreset = (preset: DatePreset) => {
@@ -80,70 +98,68 @@ const dateRangeForPreset = (preset: DatePreset) => {
   return { startDate: "", endDate: "" };
 };
 
+const paramsFor = (filters: ExpenseFilters): ExpenseFilterParams => {
+  const dateRange = filters.datePreset === "custom"
+    ? { startDate: filters.startDate, endDate: filters.endDate }
+    : dateRangeForPreset(filters.datePreset);
+  return {
+    search: filters.search || undefined,
+    expenseType: filters.expenseType || undefined,
+    categoryId: filters.categoryId || undefined,
+    customerId: filters.customerId || undefined,
+    invoiceId: filters.invoiceId || undefined,
+    startDate: dateRange.startDate || undefined,
+    endDate: dateRange.endDate || undefined,
+    createdByRole: filters.createdByRole || undefined
+  };
+};
+
+const getFormWarning = (values: ExpenseFormState, invoices: Invoice[]): string | null => {
+  const amount = Number(values.amount);
+  if (!values.categoryId) {
+    return "Please select an expense category.";
+  }
+  if (!values.amount || Number.isNaN(amount) || amount <= 0) {
+    return "Please enter a valid expense amount.";
+  }
+  if (!values.expenseDate) {
+    return "Please select an expense date.";
+  }
+  if (values.expenseType === "CUSTOMER_RELATED" && !values.customerId) {
+    return "Please select a customer for this expense.";
+  }
+  if (values.expenseType === "INVOICE_RELATED") {
+    const selectedInvoice = invoices.find((invoice) => String(invoice.id) === values.invoiceId);
+    if (!values.invoiceId || !selectedInvoice) {
+      return "Please select an invoice for this expense.";
+    }
+  }
+  return null;
+};
+
 export const ExpenseListPage = () => {
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
-  const [pageData, setPageData] = useState<PageResponse<Expense>>(emptyPage);
   const [exportRows, setExportRows] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [dashboardRows, setDashboardRows] = useState<Expense[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [draftFilters, setDraftFilters] = useState(emptyExpenseFilters);
-  const [appliedFilters, setAppliedFilters] = useState(emptyExpenseFilters);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Expense | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
-  const [logTarget, setLogTarget] = useState<Expense | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [activeDrilldown, setActiveDrilldown] = useState<ExpenseDrilldownKey | null>(null);
-  const [drilldownPage, setDrilldownPage] = useState<PageResponse<Expense>>(emptyPage);
+  const [drilldownPage, setDrilldownPage] = useState<{ records: Expense[]; page: number; size: number; totalRecords: number; totalPages: number }>({ records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 });
   const [drilldownPageNumber, setDrilldownPageNumber] = useState(0);
   const [drilldownSearch, setDrilldownSearch] = useState("");
   const [drilldownLoading, setDrilldownLoading] = useState(false);
-  const [form, setForm] = useState({ expenseType: "GENERAL" as ExpenseType, categoryId: "", customerId: "", invoiceId: "", amount: "", expenseDate: todayIso(), description: "", attachmentUrl: "" });
 
-  const params = useMemo<ExpenseFilterParams>(() => {
-    const dateRange = appliedFilters.datePreset === "custom"
-      ? { startDate: appliedFilters.startDate, endDate: appliedFilters.endDate }
-      : dateRangeForPreset(appliedFilters.datePreset);
-    return {
-      search: appliedFilters.search || undefined,
-      expenseType: appliedFilters.expenseType || undefined,
-      categoryId: appliedFilters.categoryId || undefined,
-      customerId: appliedFilters.customerId || undefined,
-      invoiceId: appliedFilters.invoiceId || undefined,
-      startDate: dateRange.startDate || undefined,
-      endDate: dateRange.endDate || undefined,
-      createdByRole: appliedFilters.createdByRole || undefined
-    };
-  }, [appliedFilters]);
+  const list = useListPage<Expense, ExpenseFilters>({
+    initialFilters: emptyExpenseFilters,
+    errorMessage: "Unable to load expenses",
+    fetchPage: ({ page, size, filters }) => getExpensesPage({ ...paramsFor(filters), page, size })
+  });
 
-  const activeFilterSummary = useMemo(() => summarizeExpenseFilters(appliedFilters, categories, customers, invoices), [appliedFilters, categories, customers, invoices]);
-  const selectedCategory = categories.find((category) => String(category.id) === appliedFilters.categoryId) ?? null;
-  const dashboardSummary = useMemo(() => {
-    const today = todayIso();
-    const monthStart = monthStartIso();
-    const todayRows = dashboardRows.filter((item) => item.expenseDate === today);
-    const monthRows = dashboardRows.filter((item) => item.expenseDate >= monthStart && item.expenseDate <= today);
-    const categoryRows = selectedCategory ? dashboardRows.filter((item) => item.categoryId === selectedCategory.id) : dashboardRows;
-    return {
-      total: sumExpenses(dashboardRows),
-      today: sumExpenses(todayRows),
-      thisMonth: sumExpenses(monthRows),
-      category: sumExpenses(categoryRows),
-      categoryCount: categoryRows.length
-    };
-  }, [dashboardRows, selectedCategory]);
-
-  const load = async (page = 0) => {
-    const response = await getExpensesPage({ ...params, page, size: DEFAULT_PAGE_SIZE });
-    setPageData(response);
-  };
-
-  const loadExport = async () => {
-    const response = await getExpensesPage({ ...params, page: 0, size: 1000 });
+  const loadExportRows = async (filters: ExpenseFilters) => {
+    const response = await getExpensesPage({ ...paramsFor(filters), page: 0, size: 1000 });
     setExportRows(response.records);
   };
 
@@ -159,37 +175,67 @@ export const ExpenseListPage = () => {
       getInvoices({ size: 1000 }).then(setInvoices),
       loadDashboardRows()
     ]).catch((err: any) => setApiError(err, "Unable to load expense setup"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    void Promise.all([load(0), loadExport()]).catch((err: any) => setApiError(err, "Unable to load expenses"));
-  }, [params]);
+    void loadExportRows(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load expenses"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.activeFilters]);
 
-  const openForm = (expense?: Expense) => {
-    setEditing(expense ?? null);
-    setForm({
-      expenseType: expense?.expenseType ?? "GENERAL",
-      categoryId: expense ? String(expense.categoryId) : "",
-      customerId: expense?.customerId ? String(expense.customerId) : "",
-      invoiceId: expense?.invoiceId ? String(expense.invoiceId) : "",
-      amount: expense ? String(expense.amount) : "",
-      expenseDate: expense?.expenseDate ?? todayIso(),
-      description: expense?.description ?? "",
-      attachmentUrl: expense?.attachmentUrl ?? ""
-    });
-    setFormOpen(true);
-  };
+  const form = useAddEditForm<Expense, ExpenseFormState, ExpenseRequest>({
+    emptyForm: getEmptyForm(),
+    entityName: "Expense",
+    errorMessage: "Unable to save expense",
+    toFormValues: (expense) => ({
+      expenseType: expense.expenseType,
+      categoryId: String(expense.categoryId),
+      customerId: expense.customerId ? String(expense.customerId) : "",
+      invoiceId: expense.invoiceId ? String(expense.invoiceId) : "",
+      amount: String(expense.amount),
+      expenseDate: expense.expenseDate,
+      description: expense.description ?? "",
+      attachmentUrl: expense.attachmentUrl ?? ""
+    }),
+    buildRequest: (values) => {
+      const selectedInvoice = invoices.find((invoice) => String(invoice.id) === values.invoiceId);
+      return {
+        expenseType: values.expenseType,
+        categoryId: Number(values.categoryId),
+        customerId: values.expenseType === "CUSTOMER_RELATED" ? Number(values.customerId) : values.expenseType === "INVOICE_RELATED" ? selectedInvoice?.customerId : undefined,
+        invoiceId: values.expenseType === "INVOICE_RELATED" ? Number(values.invoiceId) : undefined,
+        amount: Number(values.amount),
+        expenseDate: values.expenseDate,
+        description: values.description.trim() || undefined,
+        attachmentUrl: values.attachmentUrl.trim() || undefined
+      };
+    },
+    create: createExpense,
+    update: updateExpense,
+    remove: deleteExpense,
+    onSaved: () => {
+      list.refreshTable();
+      void loadExportRows(list.activeFilters);
+      void loadDashboardRows();
+    }
+  });
 
-  const applyFilters = () => {
-    setAppliedFilters(draftFilters);
-    setFiltersOpen(false);
-  };
-
-  const resetFilters = () => {
-    setDraftFilters(emptyExpenseFilters);
-    setAppliedFilters(emptyExpenseFilters);
-    setFiltersOpen(false);
-  };
+  const activeFilterSummary = useMemo(() => summarizeExpenseFilters(list.activeFilters, categories, customers, invoices), [list.activeFilters, categories, customers, invoices]);
+  const selectedCategory = categories.find((category) => String(category.id) === list.activeFilters.categoryId) ?? null;
+  const dashboardSummary = useMemo(() => {
+    const today = todayIso();
+    const monthStart = monthStartIso();
+    const todayRows = dashboardRows.filter((item) => item.expenseDate === today);
+    const monthRows = dashboardRows.filter((item) => item.expenseDate >= monthStart && item.expenseDate <= today);
+    const categoryRows = selectedCategory ? dashboardRows.filter((item) => item.categoryId === selectedCategory.id) : dashboardRows;
+    return {
+      total: sumExpenses(dashboardRows),
+      today: sumExpenses(todayRows),
+      thisMonth: sumExpenses(monthRows),
+      category: sumExpenses(categoryRows),
+      categoryCount: categoryRows.length
+    };
+  }, [dashboardRows, selectedCategory]);
 
   const openCategoryCard = () => {
     openDrilldown("category");
@@ -201,78 +247,27 @@ export const ExpenseListPage = () => {
     setDrilldownSearch("");
   };
 
-  const save = async () => {
-    try {
-      const selectedInvoice = invoices.find((invoice) => String(invoice.id) === form.invoiceId);
-      const amount = Number(form.amount);
-      if (!form.categoryId) {
-        notificationService.showWarning("Please select an expense category.");
-        return;
-      }
-      if (!form.amount || Number.isNaN(amount) || amount <= 0) {
-        notificationService.showWarning("Please enter a valid expense amount.");
-        return;
-      }
-      if (!form.expenseDate) {
-        notificationService.showWarning("Please select an expense date.");
-        return;
-      }
-      if (form.expenseType === "CUSTOMER_RELATED" && !form.customerId) {
-        notificationService.showWarning("Please select a customer for this expense.");
-        return;
-      }
-      if (form.expenseType === "INVOICE_RELATED" && (!form.invoiceId || !selectedInvoice)) {
-        notificationService.showWarning("Please select an invoice for this expense.");
-        return;
-      }
-      const payload = {
-        expenseType: form.expenseType,
-        categoryId: Number(form.categoryId),
-        customerId: form.expenseType === "CUSTOMER_RELATED" ? Number(form.customerId) : form.expenseType === "INVOICE_RELATED" ? selectedInvoice?.customerId : undefined,
-        invoiceId: form.expenseType === "INVOICE_RELATED" ? Number(form.invoiceId) : undefined,
-        amount,
-        expenseDate: form.expenseDate,
-        description: form.description.trim() || undefined,
-        attachmentUrl: form.attachmentUrl.trim() || undefined
-      };
-      if (editing) {
-        await updateExpense(editing.id, payload);
-        notificationService.showSuccess(CommonSuccessMessageUtil.updated("Expense"));
-      } else {
-        await createExpense(payload);
-        notificationService.showSuccess(CommonSuccessMessageUtil.created("Expense"));
-      }
-      setFormOpen(false);
-      setEditing(null);
-      await Promise.all([load(pageData.page), loadExport(), loadDashboardRows()]);
-    } catch (err: any) {
-      setApiError(err, "Unable to save expense");
-    }
-  };
-
-  const remove = async () => {
-    if (!deleteTarget) return;
-    try {
-      await deleteExpense(deleteTarget.id);
-      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Expense"));
-      setDeleteTarget(null);
-      await Promise.all([load(pageData.page), loadExport(), loadDashboardRows()]);
-    } catch (err: any) {
-      setApiError(err, CommonErrorMessageUtil.deleteFailed);
-    }
-  };
-
-  const selectedInvoice = invoices.find((invoice) => String(invoice.id) === form.invoiceId);
-  const expenseAmount = Number(form.amount);
+  const selectedInvoice = invoices.find((invoice) => String(invoice.id) === form.formValues.invoiceId);
+  const expenseAmount = Number(form.formValues.amount);
   const canSaveExpense = Boolean(
-    form.categoryId &&
-    form.amount &&
+    form.formValues.categoryId &&
+    form.formValues.amount &&
     Number.isFinite(expenseAmount) &&
     expenseAmount > 0 &&
-    form.expenseDate &&
-    (form.expenseType !== "CUSTOMER_RELATED" || form.customerId) &&
-    (form.expenseType !== "INVOICE_RELATED" || (form.invoiceId && selectedInvoice))
+    form.formValues.expenseDate &&
+    (form.formValues.expenseType !== "CUSTOMER_RELATED" || form.formValues.customerId) &&
+    (form.formValues.expenseType !== "INVOICE_RELATED" || (form.formValues.invoiceId && selectedInvoice))
   );
+
+  const submitForm = () => {
+    const warning = getFormWarning(form.formValues, invoices);
+    if (warning) {
+      notificationService.showWarning(warning);
+      return;
+    }
+    void form.saveForm();
+  };
+
   const expenseColumns = useMemo(() => [
     { key: "type", header: "Expense Type", render: (item: Expense) => typeLabel(item.expenseType) },
     { key: "category", header: "Category", render: (item: Expense) => item.categoryName },
@@ -288,9 +283,9 @@ export const ExpenseListPage = () => {
     header: "Actions",
     className: "text-right",
     render: (item: Expense) => <ActionDropdown actions={[
-      { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("EXPENSES", "EDIT"), onClick: () => openForm(item) },
-      { label: "Show Logs", icon: <History size={15} />, hidden: !can("EXPENSES", "LOGS"), onClick: () => setLogTarget(item) },
-      { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("EXPENSES", "DELETE"), onClick: () => setDeleteTarget(item) }
+      { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("EXPENSES", "EDIT"), onClick: () => form.openEditForm(item) },
+      { label: "Show Logs", icon: <History size={15} />, hidden: !can("EXPENSES", "LOGS"), onClick: () => form.openLogs(item) },
+      { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("EXPENSES", "DELETE"), onClick: () => form.askDelete(item) }
     ]} />
   }), [can, invoices]);
   const visibleExpenseColumns = useMemo(() => applyVisibleColumns(expenseColumns, visibleColumns), [expenseColumns, visibleColumns]);
@@ -336,7 +331,7 @@ export const ExpenseListPage = () => {
         ? [`Category: ${selectedCategory.categoryName}`]
         : activeDrilldown === "category"
           ? ["All categories"]
-        : ["All expenses"];
+          : ["All expenses"];
   const activeDrilldownGrandTotal = useMemo(
     () => formatCurrency(drilldownPage.records.reduce((sum, item) => sum + Number(item.amount ?? 0), 0)),
     [drilldownPage.records]
@@ -354,28 +349,27 @@ export const ExpenseListPage = () => {
   }, [activeDrilldown, activeDrilldownParams, drilldownPageNumber, setApiError]);
 
   return (
-    <div className="space-y-4 pb-6">
-      <Header title="Expenses" subtitle="Track general, customer-related, and invoice-related spend for profitability reporting." />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Expenses" value={formatCurrency(dashboardSummary.total)} caption="All expenses" icon={<ReceiptIndianRupee size={18} />} onClick={() => openDrilldown("total")} />
-        <StatCard label="This Month Expenses" value={formatCurrency(dashboardSummary.thisMonth)} caption="Current month expenses" icon={<CalendarDays size={18} />} onClick={() => openDrilldown("thisMonth")} />
-        <StatCard label="Today's Expenses" value={formatCurrency(dashboardSummary.today)} caption="Only today's expenses" icon={<CalendarDays size={18} />} onClick={() => openDrilldown("today")} />
-        <StatCard label="Category Wise Expenses" value={formatCurrency(dashboardSummary.category)} caption={selectedCategory ? `${selectedCategory.categoryName} | ${dashboardSummary.categoryCount} records` : `All categories | ${dashboardSummary.categoryCount} records`} icon={<Layers3 size={18} />} onClick={openCategoryCard} />
-      </div>
-
-      <CommonAdvancedFilterPanel
-        title="Advanced Expense Search"
-        eyebrow="Expense Filters"
-        expanded={filtersOpen}
-        activeFilters={activeFilterSummary}
-        onToggle={() => setFiltersOpen((current) => !current)}
-        onClearAll={resetFilters}
-      >
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Input label="Search" value={draftFilters.search} onChange={(event) => setDraftFilters((current) => ({ ...current, search: event.target.value }))} onClear={() => setDraftFilters((current) => ({ ...current, search: "" }))} />
-          <Select label="Expense Type" value={draftFilters.expenseType} options={[{ label: "All", value: "" }, ...expenseTypeOptions]} onChange={(event) => setDraftFilters((current) => ({ ...current, expenseType: event.target.value }))} />
-          <Select label="Category" value={draftFilters.categoryId} options={[{ label: "All", value: "" }, ...categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, categoryId: event.target.value }))} />
-          <Select label="Expense Date" value={draftFilters.datePreset} options={[
+    <CommonListPage<Expense, ExpenseFilters>
+      pageTitle="Expenses"
+      pageSubtitle="Track general, customer-related, and invoice-related spend for profitability reporting."
+      list={list}
+      searchPlaceholder="Search Expense"
+      activeFilterCount={() => activeFilterSummary.length}
+      filterPanelWidth="max-w-[720px]"
+      filtersClassName="grid gap-3 md:grid-cols-2"
+      statCards={
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Total Expenses" value={formatCurrency(dashboardSummary.total)} caption="All expenses" icon={<ReceiptIndianRupee size={18} />} onClick={() => openDrilldown("total")} />
+          <StatCard label="This Month Expenses" value={formatCurrency(dashboardSummary.thisMonth)} caption="Current month expenses" icon={<CalendarDays size={18} />} onClick={() => openDrilldown("thisMonth")} />
+          <StatCard label="Today's Expenses" value={formatCurrency(dashboardSummary.today)} caption="Only today's expenses" icon={<CalendarDays size={18} />} onClick={() => openDrilldown("today")} />
+          <StatCard label="Category Wise Expenses" value={formatCurrency(dashboardSummary.category)} caption={selectedCategory ? `${selectedCategory.categoryName} | ${dashboardSummary.categoryCount} records` : `All categories | ${dashboardSummary.categoryCount} records`} icon={<Layers3 size={18} />} onClick={openCategoryCard} />
+        </div>
+      }
+      filterFields={
+        <>
+          <Select label="Expense Type" value={list.formFilters.expenseType} options={[{ label: "All", value: "" }, ...expenseTypeOptions]} onChange={(event) => list.updateFormFilters({ expenseType: event.target.value })} />
+          <Select label="Category" value={list.formFilters.categoryId} options={[{ label: "All", value: "" }, ...categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))]} onChange={(event) => list.updateFormFilters({ categoryId: event.target.value })} />
+          <Select label="Expense Date" value={list.formFilters.datePreset} options={[
             { label: "All", value: "" },
             { label: "Today", value: "today" },
             { label: "Yesterday", value: "yesterday" },
@@ -383,86 +377,75 @@ export const ExpenseListPage = () => {
             { label: "This Month", value: "thisMonth" },
             { label: "This Year", value: "thisYear" },
             { label: "Custom Date Range", value: "custom" }
-          ]} onChange={(event) => setDraftFilters((current) => ({ ...current, datePreset: event.target.value as DatePreset, startDate: event.target.value === "custom" ? current.startDate : "", endDate: event.target.value === "custom" ? current.endDate : "" }))} />
-          {draftFilters.datePreset === "custom" ? (
+          ]} onChange={(event) => list.updateFormFilters({ datePreset: event.target.value as DatePreset, startDate: event.target.value === "custom" ? list.formFilters.startDate : "", endDate: event.target.value === "custom" ? list.formFilters.endDate : "" })} />
+          {list.formFilters.datePreset === "custom" ? (
             <>
-              <Input label="Start Date" type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} />
-              <Input label="End Date" type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} />
+              <Input label="Start Date" type="date" value={list.formFilters.startDate} onChange={(event) => list.updateFormFilters({ startDate: event.target.value })} />
+              <Input label="End Date" type="date" value={list.formFilters.endDate} onChange={(event) => list.updateFormFilters({ endDate: event.target.value })} />
             </>
           ) : null}
-          <Select label="Customer" value={draftFilters.customerId} options={[{ label: "All", value: "" }, ...customers.map((item) => ({ label: item.name, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, customerId: event.target.value }))} />
-          <Select label="Invoice" value={draftFilters.invoiceId} options={[{ label: "All", value: "" }, ...invoices.map((item) => ({ label: item.invoiceNo, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, invoiceId: event.target.value }))} />
-          <Select label="Created By" value={draftFilters.createdByRole} options={[{ label: "All", value: "" }, { label: "Owner", value: "OWNER" }, { label: "Admin", value: "ADMIN" }, { label: "User", value: "USER" }]} onChange={(event) => setDraftFilters((current) => ({ ...current, createdByRole: event.target.value }))} />
-          <div className="flex items-end">
-            <Button type="button" className="w-full" onClick={applyFilters}>Apply Filters</Button>
-          </div>
-          <div className="flex items-end">
-            <Button type="button" variant="secondary" className="w-full" onClick={resetFilters}>Reset Filters</Button>
-          </div>
-        </div>
-      </CommonAdvancedFilterPanel>
-
-      <GlassCard className="p-6 md:p-7">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <CommonBreadcrumb items={[{ label: "Expenses" }]} />
-          <div className="flex flex-wrap items-center gap-2">
-            <CommonColumnSelector tableName="EXPENSES" availableColumns={expenseColumns.map(({ key, header }) => ({ key, header }))} visibleColumns={visibleColumns} onApply={setVisibleColumns} />
-            {can("EXPENSES", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportToExcel("expenses.xlsx", exportRows, visibleExpenseExportColumns)}><Download size={16} />Export</Button> : null}
-            {can("EXPENSES", "ADD") ? <Button type="button" onClick={() => openForm()}><Plus size={16} />Add Expense</Button> : null}
-            <Pagination page={pageData.page} size={pageData.size} totalRecords={pageData.totalRecords} totalPages={pageData.totalPages} onPageChange={(page) => void load(page)} layout="inline" />
-          </div>
-        </div>
-        <Table
-          data={pageData.records}
-          columns={[...visibleExpenseColumns, expenseActionColumn]}
-        />
-      </GlassCard>
-
-      <Modal open={formOpen} title={editing ? "Edit Expense" : "Add Expense"} onClose={() => setFormOpen(false)}>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Select label="Expense Type" requiredMark value={form.expenseType} options={expenseTypeOptions} onChange={(event) => setForm((current) => ({ ...current, expenseType: event.target.value as ExpenseType, customerId: "", invoiceId: "" }))} />
-          <Select label="Category" requiredMark value={form.categoryId} options={categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))} onChange={(event) => setForm((current) => ({ ...current, categoryId: event.target.value }))} />
-          {form.expenseType === "CUSTOMER_RELATED" ? <Select label="Customer" requiredMark value={form.customerId} options={customers.map((item) => ({ label: item.name, value: String(item.id) }))} onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))} /> : null}
-          {form.expenseType === "INVOICE_RELATED" ? (
-            <>
-              <Select label="Invoice" requiredMark value={form.invoiceId} options={invoices.map((item) => ({ label: `${item.invoiceNo} - ${item.customerName}`, value: String(item.id) }))} onChange={(event) => setForm((current) => ({ ...current, invoiceId: event.target.value }))} />
-              <Input label="Customer" value={selectedInvoice?.customerName ?? ""} readOnly className="bg-slate-100 text-slate-600" />
-            </>
-          ) : null}
-          <Input label="Amount" requiredMark type="number" step="0.01" value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} />
-          <Input label="Expense Date" requiredMark type="date" value={form.expenseDate} onChange={(event) => setForm((current) => ({ ...current, expenseDate: event.target.value }))} />
-          <Input label="Description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
-          <Input label="Attachment URL" value={form.attachmentUrl} onChange={(event) => setForm((current) => ({ ...current, attachmentUrl: event.target.value }))} />
-          <div className="flex justify-end gap-2 md:col-span-2">
-            <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>Cancel</Button>
-            <Button type="button" disabled={!canSaveExpense} onClick={() => void save()}>Save Expense</Button>
-          </div>
-        </div>
-      </Modal>
-      <AuditLogModal open={Boolean(logTarget)} moduleName="Expense" entityId={logTarget?.id ?? null} title={logTarget ? `${typeLabel(logTarget.expenseType)} Expense Logs` : "Expense Logs"} onClose={() => setLogTarget(null)} />
-      <CommonDeleteModal open={Boolean(deleteTarget)} onCancel={() => setDeleteTarget(null)} onConfirm={() => void remove()} />
-      <CommonDashboardDetailModal
-        open={Boolean(activeDrilldown)}
-        title={activeDrilldownTitle}
-        rows={drilldownPage.records}
-        columns={expenseDrilldownColumns}
-        loading={drilldownLoading}
-        search={drilldownSearch}
-        page={drilldownPage.page}
-        totalRecords={drilldownPage.totalRecords}
-        totalPages={drilldownPage.totalPages}
-        activeFilters={activeDrilldownFilters}
-        grandTotal={activeDrilldownGrandTotal}
-        emptyText="No expenses found for this card."
-        onClose={() => setActiveDrilldown(null)}
-        onSearchChange={(value) => {
-          setDrilldownPageNumber(0);
-          setDrilldownSearch(value);
-        }}
-        onPageChange={setDrilldownPageNumber}
-        onExport={() => exportToExcel(`${activeDrilldown ?? "expenses"}-details.xlsx`, drilldownPage.records, expenseExportColumns)}
-      />
-    </div>
+          <Select label="Customer" value={list.formFilters.customerId} options={[{ label: "All", value: "" }, ...customers.map((item) => ({ label: item.name, value: String(item.id) }))]} onChange={(event) => list.updateFormFilters({ customerId: event.target.value })} />
+          <Select label="Invoice" value={list.formFilters.invoiceId} options={[{ label: "All", value: "" }, ...invoices.map((item) => ({ label: item.invoiceNo, value: String(item.id) }))]} onChange={(event) => list.updateFormFilters({ invoiceId: event.target.value })} />
+          <Select label="Created By" value={list.formFilters.createdByRole} options={[{ label: "All", value: "" }, { label: "Owner", value: "OWNER" }, { label: "Admin", value: "ADMIN" }, { label: "User", value: "USER" }]} onChange={(event) => list.updateFormFilters({ createdByRole: event.target.value })} />
+        </>
+      }
+      toolbarButtons={
+        <>
+          {can("EXPENSES", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportToExcel("expenses.xlsx", exportRows, visibleExpenseExportColumns)}><Download size={16} />Export</Button> : null}
+          {can("EXPENSES", "ADD") ? <Button type="button" onClick={() => form.openAddForm(getEmptyForm())}><Plus size={16} />Add Expense</Button> : null}
+        </>
+      }
+      columnSelector={{ tableName: "EXPENSES", columns: expenseColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["type"] }}
+      tableColumns={[...visibleExpenseColumns, expenseActionColumn]}
+      modals={
+        <>
+          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Expense" : "Add Expense"} onClose={form.closeForm}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select label="Expense Type" requiredMark value={form.formValues.expenseType} options={expenseTypeOptions} onChange={(event) => form.setFormValues((current) => ({ ...current, expenseType: event.target.value as ExpenseType, customerId: "", invoiceId: "" }))} />
+              <Select label="Category" requiredMark value={form.formValues.categoryId} options={categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))} onChange={(event) => form.setFormValues((current) => ({ ...current, categoryId: event.target.value }))} />
+              {form.formValues.expenseType === "CUSTOMER_RELATED" ? <Select label="Customer" requiredMark value={form.formValues.customerId} options={customers.map((item) => ({ label: item.name, value: String(item.id) }))} onChange={(event) => form.setFormValues((current) => ({ ...current, customerId: event.target.value }))} /> : null}
+              {form.formValues.expenseType === "INVOICE_RELATED" ? (
+                <>
+                  <Select label="Invoice" requiredMark value={form.formValues.invoiceId} options={invoices.map((item) => ({ label: `${item.invoiceNo} - ${item.customerName}`, value: String(item.id) }))} onChange={(event) => form.setFormValues((current) => ({ ...current, invoiceId: event.target.value }))} />
+                  <Input label="Customer" value={selectedInvoice?.customerName ?? ""} readOnly className="bg-slate-100 text-slate-600" />
+                </>
+              ) : null}
+              <Input label="Amount" requiredMark type="number" step="0.01" value={form.formValues.amount} onChange={(event) => form.setFormValues((current) => ({ ...current, amount: event.target.value }))} />
+              <Input label="Expense Date" requiredMark type="date" value={form.formValues.expenseDate} onChange={(event) => form.setFormValues((current) => ({ ...current, expenseDate: event.target.value }))} />
+              <Input label="Description" value={form.formValues.description} onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))} />
+              <Input label="Attachment URL" value={form.formValues.attachmentUrl} onChange={(event) => form.setFormValues((current) => ({ ...current, attachmentUrl: event.target.value }))} />
+              <div className="flex justify-end gap-2 md:col-span-2">
+                <Button type="button" variant="secondary" onClick={form.closeForm}>Cancel</Button>
+                <Button type="button" disabled={!canSaveExpense || form.saving} onClick={submitForm}>Save Expense</Button>
+              </div>
+            </div>
+          </Modal>
+          <AuditLogModal open={Boolean(form.logsTarget)} moduleName="Expense" entityId={form.logsTarget?.id ?? null} title={form.logsTarget ? `${typeLabel(form.logsTarget.expenseType)} Expense Logs` : "Expense Logs"} onClose={form.closeLogs} />
+          <CommonDeleteModal open={Boolean(form.deleteTarget)} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
+          <CommonDashboardDetailModal
+            open={Boolean(activeDrilldown)}
+            title={activeDrilldownTitle}
+            rows={drilldownPage.records}
+            columns={expenseDrilldownColumns}
+            loading={drilldownLoading}
+            search={drilldownSearch}
+            page={drilldownPage.page}
+            totalRecords={drilldownPage.totalRecords}
+            totalPages={drilldownPage.totalPages}
+            activeFilters={activeDrilldownFilters}
+            grandTotal={activeDrilldownGrandTotal}
+            emptyText="No expenses found for this card."
+            onClose={() => setActiveDrilldown(null)}
+            onSearchChange={(value) => {
+              setDrilldownPageNumber(0);
+              setDrilldownSearch(value);
+            }}
+            onPageChange={setDrilldownPageNumber}
+            onExport={() => exportToExcel(`${activeDrilldown ?? "expenses"}-details.xlsx`, drilldownPage.records, expenseExportColumns)}
+          />
+        </>
+      }
+    />
   );
 };
 

@@ -334,7 +334,7 @@ const CommunicationHubPage = () => {
                     header: "Provider",
                     render: (record) => (
                       <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#2453d8]/10 text-[#2453d8]">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2453d8]/10 text-[#2453d8]">
                           {tab === "email" ? <Mail size={18} /> : <MessageSquare size={18} />}
                         </span>
                         <div>
@@ -427,7 +427,7 @@ const CommunicationHubPage = () => {
                   <Input label="SMTP Port" type="number" value={form.smtpPort ?? 587} onChange={(event) => setForm((current) => ({ ...current, smtpPort: Number(event.target.value) || 587 }))} />
                   <Input label="SMTP Username" value={form.smtpUsername ?? ""} onChange={(event) => setForm((current) => ({ ...current, smtpUsername: event.target.value }))} />
                   <Input label="SMTP Password" type="password" placeholder={editing ? "Leave blank to keep existing password" : "Gmail app password"} value={form.smtpPassword ?? ""} onChange={(event) => setForm((current) => ({ ...current, smtpPassword: event.target.value }))} />
-                  <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
                     <input type="checkbox" checked={form.smtpTlsEnabled ?? true} onChange={(event) => setForm((current) => ({ ...current, smtpTlsEnabled: event.target.checked }))} />
                     Enable TLS
                   </label>
@@ -446,7 +446,7 @@ const CommunicationHubPage = () => {
             <>
               {selectedSmsProvider?.fields.map((field) => (
                 field.type === "boolean" ? (
-                  <label key={field.key} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
+                  <label key={field.key} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
                     <input
                       type="checkbox"
                       checked={String(form.configValues?.[field.key] ?? field.defaultValue ?? "false") === "true"}
@@ -472,7 +472,7 @@ const CommunicationHubPage = () => {
             <>
               {selectedWhatsAppProvider?.fields.map((field) => (
                 field.type === "boolean" ? (
-                  <label key={field.key} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
+                  <label key={field.key} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
                     <input
                       type="checkbox"
                       checked={String(form.configValues?.[field.key] ?? field.defaultValue ?? "false") === "true"}
@@ -496,7 +496,7 @@ const CommunicationHubPage = () => {
             </>
           )}
 
-          <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 md:col-span-2">
             <input type="checkbox" checked={Boolean(form.active)} onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))} />
             Active provider
           </label>
@@ -534,8 +534,8 @@ const CommunicationHubPage = () => {
 
 const ProviderMetric = ({ label, value }: { label: string; value: string | number }) => (
   <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">
-    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
-    <p className="mt-2 truncate text-lg font-extrabold text-slate-950">{value}</p>
+    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+    <p className="mt-2 truncate fs-16 font-bold text-slate-950">{value}</p>
   </div>
 );
 

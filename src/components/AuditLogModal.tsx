@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, History, PencilLine, X } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { FieldDisplayNameMapper } from "../lib/FieldDisplayNameMapper";
-import { formatDateTime } from "../lib/format";
+import { formatDate, formatDateTime } from "../lib/format";
 import { DEFAULT_THEME_COLOR, getContrastTextColor } from "../lib/theme";
 import type { AuditLog } from "../types/api";
 import { CommonDeleteIcon } from "./CommonDeleteAction";
@@ -98,13 +98,13 @@ export const AuditLogModal = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm">
       <button type="button" aria-label="Close logs modal" className="fixed inset-0 h-full w-full cursor-default" onClick={onClose} />
-      <aside className="absolute right-3 top-1/2 flex h-[75vh] max-h-[75vh] w-[calc(100vw-1.5rem)] -translate-y-1/2 flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-[0_30px_90px_rgba(2,6,23,0.38)] dark:bg-slate-950 md:right-5 md:w-[80vw] lg:w-[76vw] lg:max-w-5xl">
+      <aside className="absolute right-3 top-1/2 flex h-[75vh] max-h-[75vh] w-[calc(100vw-1.5rem)] -translate-y-1/2 flex-col overflow-hidden rounded-lg bg-slate-50 shadow-[0_30px_90px_rgba(2,6,23,0.38)] dark:bg-slate-950 md:right-5 md:w-[80vw] lg:w-[76vw] lg:max-w-5xl">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
               <History size={15} /> Change History
             </p>
-            <h3 className="mt-1.5 text-lg font-extrabold text-slate-950 dark:text-slate-50">{title}</h3>
+            <h3 className="mt-1.5 fs-16 font-bold text-slate-950 dark:text-slate-50">{title}</h3>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{moduleName} #{entityId ?? "--"}</p>
           </div>
           <button type="button" aria-label="Close logs modal" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" onClick={onClose}>
@@ -229,12 +229,24 @@ const parseJson = (value: string | null): Record<string, unknown> | null => {
   }
 };
 
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
+
 const formatValue = (value: unknown) => {
   if (value === null || value === undefined || value === "") {
     return "--";
   }
   if (typeof value === "object") {
     return JSON.stringify(value);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (ISO_DATE_ONLY.test(trimmed)) {
+      return formatDate(trimmed);
+    }
+    if (ISO_DATE_TIME.test(trimmed)) {
+      return formatDateTime(trimmed);
+    }
   }
   return String(value);
 };

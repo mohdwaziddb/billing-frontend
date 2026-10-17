@@ -66,7 +66,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   return (
     <label className="block space-y-2">
       {label ? (
-        <span className="block text-sm font-semibold text-slate-700">
+        <span className="block fs-12 font-semibold text-slate-700">
           {label}
           {requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}
         </span>
@@ -75,7 +75,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={setRefs}
           className={clsx(
-            "w-full rounded-[var(--radius-control)] border bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
+            "w-full rounded-[var(--radius-control)] border bg-white px-3.5 py-2.5 fs-13 font-medium text-slate-900 outline-none transition placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
             canClear ? "pr-11" : "",
             error ? "border-rose-400/70" : "border-slate-200",
             className

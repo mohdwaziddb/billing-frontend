@@ -31,8 +31,8 @@ export const ProductDetailPage = () => {
       <GlassCard className="space-y-4 p-6 md:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CommonBreadcrumb items={[{ label: "Products", to: "/products" }, { label: product?.name ?? "Details" }]} />
-            <h2 className="mt-1 text-2xl font-bold text-white">{product?.name ?? "Loading..."}</h2>
+            <CommonBreadcrumb items={[{ label: "Products", to: "/products" }, { label: "Product Details" }]} />
+            <h2 className="mt-1 fs-18 font-semibold text-white">{product?.name ?? "Loading..."}</h2>
           </div>
           <div className="flex gap-2">
             <Button type="button" variant="secondary" onClick={() => navigate("/products")}>
@@ -84,7 +84,7 @@ export const ProductDetailPage = () => {
 };
 
 const InfoCard = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+  <div className="rounded-lg border border-white/10 bg-white/5 p-4">
     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
     <p className="mt-2 text-base font-semibold text-white">{value}</p>
   </div>

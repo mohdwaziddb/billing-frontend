@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
-import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getProductCategories } from "../api/productCategories";
 import { getProductSubCategories } from "../api/productSubCategories";
 import { createProduct, getProduct, updateProduct } from "../api/products";
 import { getTaxMasters } from "../api/taxMaster";
-import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
-import { GlassCard } from "../components/GlassCard";
+import { FormActionBar } from "../components/FormActionBar";
+import { FormSection } from "../components/FormSection";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
@@ -225,33 +223,24 @@ export const ProductFormPage = () => {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
+    <div className="space-y-4 pb-6 md:space-y-5">
       <Header
-        title={editing ? "Products > Edit Product" : "Products > Add Product"}
+        title={editing ? "Edit Product" : "Add Product"}
         subtitle="Maintain product master data, tax setup, and minimum stock rules. Inventory quantity and rates now come only from purchase batches."
       />
-      <GlassCard className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col p-4 md:p-5">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CommonBreadcrumb items={[{ label: "Products", to: "/products" }, { label: editing ? "Edit Product" : "Add Product" }]} />
-            <h2 className="mt-1 text-xl font-bold text-white">
-              {editing ? "Edit Product" : "Add Product"}
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={() => navigate("/products")}>
-              <ArrowLeft size={16} />
-              Back
-            </Button>
-            <Button disabled={isSubmitting || !canSaveProduct} type="submit" form="product-form">
-              {isSubmitting ? "Saving..." : "Save Product"}
-            </Button>
-          </div>
-        </div>
 
-        <form id="product-form" className="grid flex-1 auto-rows-fr gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
-          <section className="h-full space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500">Product Details</h3>
+      <div className="space-y-4">
+        <FormActionBar
+          items={[{ label: "Products", to: "/products" }, { label: editing ? "Edit Product" : "Add Product" }]}
+          backTo="/products"
+          formId="product-form"
+          saveLabel="Save Product"
+          saving={isSubmitting}
+          saveDisabled={!canSaveProduct}
+        />
+
+        <form id="product-form" className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
+          <FormSection title="Product Details">
             <div className="grid gap-3 md:grid-cols-2">
               <Input
                 label="Product Name"
@@ -363,10 +352,9 @@ export const ProductFormPage = () => {
                 )}
               />
             </div>
-          </section>
+          </FormSection>
 
-          <section className="h-full space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-sm font-bold uppercase text-slate-500">Inventory Policy</h3>
+          <FormSection title="Inventory Policy">
             <div className="grid gap-3 md:grid-cols-2">
               <Input
                 label="Minimum Stock Qty"
@@ -399,14 +387,13 @@ export const ProductFormPage = () => {
                   />
                 )}
               />
-              <div className="md:col-span-2 rounded-2xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+              <div className="md:col-span-2 rounded-lg border border-dashed border-white/10 bg-white/5 p-4 text-sm text-slate-300">
                 Purchase rate, selling rate, and stock quantity are now derived from inventory batches. Use `Purchases` whenever inventory is replenished.
               </div>
             </div>
-          </section>
-
+          </FormSection>
         </form>
-      </GlassCard>
+      </div>
     </div>
   );
 };

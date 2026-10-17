@@ -507,8 +507,8 @@ const RecordsPanel = ({ records, title }: { records: PaymentHierarchyRecord[]; t
   <section className="mt-5 rounded-[var(--radius-card)] border p-4 shadow-[var(--shadow-soft)]" style={{ background: "var(--panel-bg)", borderColor: "var(--panel-border)" }}>
     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: "var(--text-tertiary)" }}>Payment Records</p>
-        <h2 className="mt-1 text-lg font-extrabold" style={{ color: "var(--text-primary)" }}>{title}</h2>
+        <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)" }}>Payment Records</p>
+        <h2 className="mt-1 fs-16 font-bold" style={{ color: "var(--text-primary)" }}>{title}</h2>
       </div>
       <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: "var(--panel-soft)", color: "var(--text-secondary)" }}>{records.length} records</span>
     </div>

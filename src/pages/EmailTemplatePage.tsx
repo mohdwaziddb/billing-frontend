@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, FilePlus2, Italic, Link, List, ListOrdered, Mail, Pencil, Type } from "lucide-react";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
+import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
-import { GlassCard } from "../components/GlassCard";
-import { Header } from "../components/Header";
+import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PreviewSurface } from "../components/PreviewSurface";
 import { StatusBadge } from "../components/StatusBadge";
-import { Table } from "../components/Table";
 import {
   createEmailTemplate,
   deleteEmailTemplate,
@@ -22,21 +19,26 @@ import {
   updateEmailTemplate
 } from "../api/emailTemplates";
 import { useAuth } from "../context/AuthContext";
+import { useAddEditForm } from "../hooks/useAddEditForm";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { useListPage } from "../hooks/useListPage";
 import { formatDate } from "../lib/format";
 import { sanitizeHtml, sanitizeLinkUrl } from "../lib/sanitizeHtml";
 import { notificationService } from "../services/notificationService";
-import type { EmailPreview, EmailTemplate, EmailTemplateRequest, PageResponse } from "../types/api";
+import type { EmailPreview, EmailTemplate, EmailTemplateRequest } from "../types/api";
 
-const emptyPage: PageResponse<EmailTemplate> = {
-  records: [],
-  page: 0,
-  size: DEFAULT_PAGE_SIZE,
-  totalRecords: 0,
-  totalPages: 0
+type EmailFilters = {
+  search: string;
 };
 
-const defaultForm: EmailTemplateRequest = {
+type FormState = {
+  templateName: string;
+  subject: string;
+  emailBody: string;
+  active: boolean;
+};
+
+const emptyForm: FormState = {
   templateName: "",
   subject: "",
   emailBody: "<p>Hello {{Customer_Name}},</p><p>Your outstanding amount is {{Outstanding_Amount}}.</p>",
@@ -44,65 +46,66 @@ const defaultForm: EmailTemplateRequest = {
 };
 
 export const EmailTemplatePage = () => {
-  const [templatePage, setTemplatePage] = useState<PageResponse<EmailTemplate>>(emptyPage);
-  const [variables, setVariables] = useState<Record<string, string>>({});
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
-  const [form, setForm] = useState<EmailTemplateRequest>(defaultForm);
-  const [preview, setPreview] = useState<EmailPreview | null>(null);
-  const [previewTitle, setPreviewTitle] = useState("Email Preview");
-  const [deleteTarget, setDeleteTarget] = useState<EmailTemplate | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const editorRef = useRef<HTMLDivElement | null>(null);
   const { can } = useAuth();
   const { clearMessage, setApiError } = useApiMessage();
-  const canSaveTemplate = Boolean(form.templateName.trim() && form.subject.trim() && form.emailBody.trim());
+  const [variables, setVariables] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<EmailPreview | null>(null);
+  const [previewTitle, setPreviewTitle] = useState("Email Preview");
+  const editorRef = useRef<HTMLDivElement | null>(null);
 
-  const loadTemplates = async (nextPage = 0, searchOverride = search) => {
-    setLoading(true);
-    clearMessage();
-    try {
-      const data = await getEmailTemplatesPage({
-        search: searchOverride.trim() || undefined,
-        page: nextPage,
-        size: DEFAULT_PAGE_SIZE
-      });
-      setTemplatePage(data);
-    } catch (err: any) {
-      setApiError(err, "Unable to load email templates");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const list = useListPage<EmailTemplate, EmailFilters>({
+    initialFilters: { search: "" },
+    errorMessage: "Unable to load email templates",
+    fetchPage: ({ page, size, search }) =>
+      getEmailTemplatesPage({ search: search.trim() || undefined, page, size })
+  });
 
   useEffect(() => {
-    void loadTemplates(0);
     void getEmailTemplateVariables().then(setVariables).catch(() => setVariables({}));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openCreate = () => {
-    setEditingTemplate(null);
-    setForm(defaultForm);
-    setFormOpen(true);
-  };
-
-  const openEdit = (template: EmailTemplate) => {
-    setEditingTemplate(template);
-    setForm({
+  const form = useAddEditForm<EmailTemplate, FormState, EmailTemplateRequest>({
+    emptyForm,
+    entityName: "Email Template",
+    errorMessage: "Unable to save email template",
+    toFormValues: (template) => ({
       templateName: template.templateName,
       subject: template.subject,
       emailBody: template.emailBody,
       active: template.active
-    });
-    setFormOpen(true);
-  };
+    }),
+    buildRequest: (values) => ({
+      ...values,
+      emailBody: sanitizeHtml(editorRef.current?.innerHTML ?? values.emailBody)
+    }),
+    create: createEmailTemplate,
+    update: updateEmailTemplate,
+    remove: deleteEmailTemplate,
+    onSaved: list.refreshTable
+  });
+
+  const canSaveTemplate = Boolean(form.formValues.templateName.trim() && form.formValues.subject.trim() && form.formValues.emailBody.trim());
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const templateColumns = useMemo(() => [
+    {
+      key: "template",
+      header: "Template Name",
+      render: (item: EmailTemplate) => (
+        <div className="min-w-[220px]">
+          <p className="font-semibold text-slate-950">{item.templateName}</p>
+          <p className="mt-1 text-xs text-slate-500">{item.createdBy ?? "system"}</p>
+        </div>
+      )
+    },
+    { key: "subject", header: "Subject", render: (item: EmailTemplate) => <span className="text-slate-700">{item.subject}</span> },
+    { key: "status", header: "Status", render: (item: EmailTemplate) => <StatusBadge label={item.active ? "Active" : "Inactive"} /> },
+    { key: "created", header: "Created On", render: (item: EmailTemplate) => formatDate(item.createdAt) }
+  ], []);
+  const visibleTemplateColumns = useMemo(() => applyVisibleColumns(templateColumns, visibleColumns), [templateColumns, visibleColumns]);
 
   const syncEditor = () => {
     if (editorRef.current) {
-      setForm((current) => ({ ...current, emailBody: editorRef.current?.innerHTML ?? "" }));
+      form.setFormValues((current) => ({ ...current, emailBody: editorRef.current?.innerHTML ?? "" }));
     }
   };
 
@@ -116,47 +119,6 @@ export const EmailTemplatePage = () => {
     runEditorCommand("insertText", `{{${variable}}}`);
   };
 
-  const saveTemplate = async () => {
-    syncEditor();
-    clearMessage();
-    try {
-      const rawBody = editorRef.current?.innerHTML ?? form.emailBody;
-      const payload = {
-        ...form,
-        emailBody: sanitizeHtml(rawBody)
-      };
-      if (editingTemplate) {
-        await updateEmailTemplate(editingTemplate.id, payload);
-        notificationService.showSuccess("Email template updated successfully.");
-      } else {
-        await createEmailTemplate(payload);
-        notificationService.showSuccess("Email template created successfully.");
-      }
-      setFormOpen(false);
-      await loadTemplates(templatePage.page);
-    } catch (err: any) {
-      setApiError(err, "Unable to save email template");
-    }
-  };
-
-  const removeTemplate = async () => {
-    if (!deleteTarget) {
-      return;
-    }
-    clearMessage();
-    setDeleting(true);
-    try {
-      await deleteEmailTemplate(deleteTarget.id);
-      notificationService.showSuccess("Email template deleted successfully.");
-      setDeleteTarget(null);
-      await loadTemplates(templatePage.page);
-    } catch (err: any) {
-      setApiError(err, "Unable to delete email template");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   const openPreview = async (template: EmailTemplate) => {
     clearMessage();
     try {
@@ -165,9 +127,9 @@ export const EmailTemplatePage = () => {
         Customer_Email: "customer@example.com",
         Outstanding_Amount: "7,080.00",
         Invoice_Number: "INV-001",
-        Invoice_Date: "2026-06-10",
+        Invoice_Date: "10-06-2026",
         Invoice_Total: "10,000.00",
-        Due_Date: "2026-06-17"
+        Due_Date: "17-06-2026"
       });
       setPreviewTitle(`${template.templateName} Preview`);
       setPreview(rendered);
@@ -177,187 +139,148 @@ export const EmailTemplatePage = () => {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-2.5rem)] flex-col space-y-4 pb-6">
-      <Header title="Email Templates" subtitle="Manage reusable reminder and invoice email templates with dynamic variables." />
-
-      <GlassCard className="flex min-h-[640px] flex-1 flex-col p-6 md:p-7">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <CommonBreadcrumb items={[{ label: "Email Templates" }]} />
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <Input
-              aria-label="Search email templates"
-              placeholder="Search templates"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onClear={() => {
-                setSearch("");
-                void loadTemplates(0, "");
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  void loadTemplates(0);
-                }
-              }}
+    <CommonListPage<EmailTemplate, EmailFilters>
+      pageTitle="Email Templates"
+      pageSubtitle="Manage reusable reminder and invoice email templates with dynamic variables."
+      list={list}
+      searchPlaceholder="Search Email Template"
+      toolbarButtons={can("EMAIL_TEMPLATES", "ADD") ? <Button onClick={() => form.openAddForm()}><FilePlus2 size={16} /> New Template</Button> : null}
+      columnSelector={{ tableName: "EMAIL_TEMPLATES", columns: templateColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["template"] }}
+      tableColumns={[
+        ...visibleTemplateColumns,
+        {
+          key: "actions",
+          header: "Actions",
+          className: "text-right",
+          render: (item: EmailTemplate) => (
+            <ActionDropdown
+              actions={[
+                { label: "Preview", icon: <Eye size={15} />, onClick: () => void openPreview(item) },
+                { label: "Edit", icon: <Pencil size={15} />, hidden: !can("EMAIL_TEMPLATES", "EDIT"), onClick: () => form.openEditForm(item) },
+                { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("EMAIL_TEMPLATES", "DELETE"), danger: true, onClick: () => form.askDelete(item) }
+              ]}
             />
-            <Button variant="secondary" onClick={() => void loadTemplates(0)}>Search</Button>
-            {can("EMAIL_TEMPLATES", "ADD") ? (
-              <Button onClick={openCreate}><FilePlus2 size={16} /> New Template</Button>
-            ) : null}
-            <Pagination page={templatePage.page} size={templatePage.size} totalRecords={templatePage.totalRecords} totalPages={templatePage.totalPages} disabled={loading} onPageChange={(nextPage) => void loadTemplates(nextPage)} layout="inline" />
-          </div>
-        </div>
-
-        <div className="mt-5 flex min-h-0 flex-1 flex-col">
-          <Table
-            data={templatePage.records}
-            emptyText={loading ? "Loading email templates..." : "No email templates found."}
-            columns={[
-              {
-                key: "template",
-                header: "Template Name",
-                render: (item) => (
-                  <div className="min-w-[220px]">
-                    <p className="font-semibold text-slate-950">{item.templateName}</p>
-                    <p className="mt-1 text-xs text-slate-500">{item.createdBy ?? "system"}</p>
-                  </div>
-                )
-              },
-              { key: "subject", header: "Subject", render: (item) => <span className="text-slate-700">{item.subject}</span> },
-              { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "Active" : "Inactive"} /> },
-              { key: "created", header: "Created On", render: (item) => formatDate(item.createdAt) },
-              {
-                key: "actions",
-                header: "Actions",
-                className: "text-right",
-                render: (item) => (
-                  <ActionDropdown
-                    actions={[
-                      { label: "Preview", icon: <Eye size={15} />, onClick: () => void openPreview(item) },
-                      { label: "Edit", icon: <Pencil size={15} />, hidden: !can("EMAIL_TEMPLATES", "EDIT"), onClick: () => openEdit(item) },
-                      { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("EMAIL_TEMPLATES", "DELETE"), danger: true, onClick: () => setDeleteTarget(item) }
-                    ]}
+          )
+        }
+      ]}
+      emptyMessage={list.loading ? "Loading email templates..." : "No email templates found."}
+      fullHeight
+      modals={
+        <>
+          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Email Template" : "Add Email Template"} onClose={form.closeForm}>
+            <div className="grid gap-5 xl:grid-cols-[1fr_280px]">
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input
+                    label="Template Name"
+                    value={form.formValues.templateName}
+                    onChange={(event) => form.setFormValues((current) => ({ ...current, templateName: event.target.value }))}
+                    requiredMark
                   />
-                )
-              }
-            ]}
-          />
-        </div>
-      </GlassCard>
-
-      <Modal open={formOpen} title={editingTemplate ? "Edit Email Template" : "Add Email Template"} onClose={() => setFormOpen(false)}>
-        <div className="grid gap-5 xl:grid-cols-[1fr_280px]">
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Template Name"
-                value={form.templateName}
-                onChange={(event) => setForm((current) => ({ ...current, templateName: event.target.value }))}
-                requiredMark
-              />
-              <Input
-                label="Subject"
-                value={form.subject}
-                onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))}
-                requiredMark
-              />
-            </div>
-            <label className="block space-y-2">
-              <span className="block text-sm font-semibold text-slate-700">Email Body <span className="ml-1 text-rose-400">*</span></span>
-              <div className="rounded-[var(--radius-control)] border border-slate-200 bg-white">
-                <div className="flex flex-wrap gap-2 border-b border-slate-200 p-2">
-                  <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("bold")}><Type size={15} /> Bold</Button>
-                  <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("italic")}><Italic size={15} /> Italic</Button>
-                  <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("insertUnorderedList")}><List size={15} /> List</Button>
-                  <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("insertOrderedList")}><ListOrdered size={15} /> Numbered</Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="min-h-9 px-3 py-2"
-                    onClick={() => {
-                      const url = window.prompt("Enter link URL (https://...)");
-                      const safeUrl = sanitizeLinkUrl(url);
-                      if (safeUrl) {
-                        runEditorCommand("createLink", safeUrl);
-                      } else if (url) {
-                        notificationService.showError("Only http/https links are allowed.");
-                      }
-                    }}
-                  >
-                    <Link size={15} /> Link
-                  </Button>
+                  <Input
+                    label="Subject"
+                    value={form.formValues.subject}
+                    onChange={(event) => form.setFormValues((current) => ({ ...current, subject: event.target.value }))}
+                    requiredMark
+                  />
                 </div>
-                <div
-                  key={editingTemplate?.id ?? "new-template"}
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  className="min-h-[260px] w-full overflow-y-auto px-4 py-3 text-sm leading-6 text-slate-900 outline-none"
-                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.emailBody) }}
-                  onInput={syncEditor}
-                />
+                <label className="block space-y-2">
+                  <span className="block text-sm font-semibold text-slate-700">Email Body <span className="ml-1 text-rose-400">*</span></span>
+                  <div className="rounded-[var(--radius-control)] border border-slate-200 bg-white">
+                    <div className="flex flex-wrap gap-2 border-b border-slate-200 p-2">
+                      <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("bold")}><Type size={15} /> Bold</Button>
+                      <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("italic")}><Italic size={15} /> Italic</Button>
+                      <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("insertUnorderedList")}><List size={15} /> List</Button>
+                      <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("insertOrderedList")}><ListOrdered size={15} /> Numbered</Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="min-h-9 px-3 py-2"
+                        onClick={() => {
+                          const url = window.prompt("Enter link URL (https://...)");
+                          const safeUrl = sanitizeLinkUrl(url);
+                          if (safeUrl) {
+                            runEditorCommand("createLink", safeUrl);
+                          } else if (url) {
+                            notificationService.showError("Only http/https links are allowed.");
+                          }
+                        }}
+                      >
+                        <Link size={15} /> Link
+                      </Button>
+                    </div>
+                    <div
+                      key={form.editingEntity?.id ?? "new-template"}
+                      ref={editorRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      className="min-h-[260px] w-full overflow-y-auto px-4 py-3 text-sm leading-6 text-slate-900 outline-none"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.formValues.emailBody) }}
+                      onInput={syncEditor}
+                    />
+                  </div>
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-[var(--theme-color)]"
+                    checked={form.formValues.active}
+                    onChange={(event) => form.setFormValues((current) => ({ ...current, active: event.target.checked }))}
+                  />
+                  Active template
+                </label>
+                <div className="flex justify-end gap-3">
+                  <Button type="button" variant="secondary" onClick={form.closeForm}>Cancel</Button>
+                  <Button type="button" disabled={form.saving || !canSaveTemplate} onClick={() => void form.saveForm()}>{form.editingEntity ? "Save Template" : "Create Template"}</Button>
+                </div>
               </div>
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-slate-300 text-[var(--theme-color)]"
-                checked={form.active}
-                onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))}
-              />
-              Active template
-            </label>
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>Cancel</Button>
-              <Button type="button" disabled={!canSaveTemplate} onClick={() => void saveTemplate()}>{editingTemplate ? "Save Template" : "Create Template"}</Button>
-            </div>
-          </div>
 
-          <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <Mail size={17} className="text-[var(--theme-color)]" />
-              <p className="font-semibold text-slate-950">Available Variables</p>
+              <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <Mail size={17} className="text-[var(--theme-color)]" />
+                  <p className="font-semibold text-slate-950">Available Variables</p>
+                </div>
+                <div className="space-y-2">
+                  {Object.entries(variables).map(([variable, description]) => (
+                    <button
+                      key={variable}
+                      type="button"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-[var(--theme-color)] hover:bg-[color-mix(in_srgb,var(--theme-color)_6%,white)]"
+                      onClick={() => insertVariable(variable)}
+                    >
+                      <span className="block font-semibold text-slate-900">{`{{${variable}}}`}</span>
+                      <span className="text-xs text-slate-500">{description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              {Object.entries(variables).map(([variable, description]) => (
-                <button
-                  key={variable}
-                  type="button"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-[var(--theme-color)] hover:bg-[color-mix(in_srgb,var(--theme-color)_6%,white)]"
-                  onClick={() => insertVariable(variable)}
-                >
-                  <span className="block font-semibold text-slate-900">{`{{${variable}}}`}</span>
-                  <span className="text-xs text-slate-500">{description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Modal>
+          </Modal>
 
-      <Modal open={Boolean(preview)} title={previewTitle} onClose={() => setPreview(null)}>
-        {preview ? (
-          <div className="space-y-4">
-            <PreviewSurface>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Subject</p>
-              <p className="mt-2 font-semibold">{preview.subject}</p>
-            </PreviewSurface>
-            <PreviewSurface>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Email Body</p>
-              <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: sanitizeHtml(preview.emailBody) }} />
-            </PreviewSurface>
-          </div>
-        ) : null}
-      </Modal>
-      <CommonDeleteModal
-        open={Boolean(deleteTarget)}
-        loading={deleting}
-        title="Delete Email Template"
-        description={deleteTarget ? `Delete "${deleteTarget.templateName}"? This cannot be undone.` : undefined}
-        onCancel={() => !deleting && setDeleteTarget(null)}
-        onConfirm={() => void removeTemplate()}
-      />
-    </div>
+          <Modal open={Boolean(preview)} title={previewTitle} onClose={() => setPreview(null)}>
+            {preview ? (
+              <div className="space-y-4">
+                <PreviewSurface>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Subject</p>
+                  <p className="mt-2 font-semibold">{preview.subject}</p>
+                </PreviewSurface>
+                <PreviewSurface>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Email Body</p>
+                  <div className="prose max-w-none text-sm" dangerouslySetInnerHTML={{ __html: sanitizeHtml(preview.emailBody) }} />
+                </PreviewSurface>
+              </div>
+            ) : null}
+          </Modal>
+          <CommonDeleteModal
+            open={Boolean(form.deleteTarget)}
+            loading={form.deleting}
+            title="Delete Email Template"
+            description={form.deleteTarget ? `Delete "${form.deleteTarget.templateName}"? This cannot be undone.` : undefined}
+            onCancel={form.cancelDelete}
+            onConfirm={() => void form.confirmDelete()}
+          />
+        </>
+      }
+    />
   );
 };
