@@ -6,6 +6,7 @@ import { authStorage } from "./storage";
 const AUTH_BOOTSTRAP_CACHE_KEY = `billing_frontend_auth_bootstrap${tenantKeySuffix()}`;
 const MAINTENANCE_CODES = new Set(["TENANT_INACTIVE", "TENANT_UNAVAILABLE"]);
 export const MAINTENANCE_EVENT = "bizio:tenant-maintenance";
+export const INVALID_URL_EVENT = "bizio:tenant-invalid-url";
 
 export const isMaintenanceError = (err: unknown) => {
   const status = (err as any)?.response?.status;
@@ -16,12 +17,9 @@ export const isMaintenanceError = (err: unknown) => {
   return code == null || MAINTENANCE_CODES.has(code);
 };
 
-/**
- * Park the tenant on the static maintenance screen WITHOUT changing the
- * URL: clears the session and tells App (via event) to render
- * MaintenancePage in place of whatever route is open.
- */
-export const notifyMaintenance = () => {
+// Dono full-screen states (maintenance / invalid URL) ke liye common reset:
+// stale session, cached bootstrap, per-tab storage aur theme sab saaf.
+const clearTenantState = () => {
   try {
     authStorage.clear();
   } catch {
@@ -42,9 +40,32 @@ export const notifyMaintenance = () => {
   } catch {
     // Ignore theme reset errors.
   }
+};
+
+const emit = (eventName: string) => {
   try {
-    window.dispatchEvent(new Event(MAINTENANCE_EVENT));
+    window.dispatchEvent(new Event(eventName));
   } catch {
     // Ignore dispatch errors (non-browser contexts).
   }
+};
+
+/**
+ * Park the tenant on the static status screen WITHOUT changing the URL:
+ * clears the session and tells App (via event) to render the maintenance
+ * notice in place of whatever route is open.
+ */
+export const notifyMaintenance = () => {
+  clearTenantState();
+  emit(MAINTENANCE_EVENT);
+};
+
+/**
+ * Ghost tenant (unknown subdomain, backend 404): same in-place treatment —
+ * clears stale state and tells App to render the invalid URL notice on the
+ * same URL instead of redirecting anywhere.
+ */
+export const notifyInvalidUrl = () => {
+  clearTenantState();
+  emit(INVALID_URL_EVENT);
 };

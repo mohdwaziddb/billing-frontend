@@ -311,7 +311,7 @@ const FloatingBadges = () => (
 );
 
 export const AnalyticsShowcase = () => (
-  <aside className="relative hidden overflow-hidden bg-[linear-gradient(165deg,#ffffff_0%,#f6f9ff_55%,#edf3ff_100%)] lg:flex lg:justify-center lg:px-6 lg:py-10 xl:px-10">
+  <aside className="relative hidden h-full min-h-[560px] w-full overflow-hidden rounded-[20px] bg-[linear-gradient(165deg,#ffffff_0%,#f6f9ff_55%,#edf3ff_100%)] lg:flex lg:justify-center lg:px-8 lg:py-6 xl:px-10">
     <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-96 w-96 rounded-full bg-[radial-gradient(circle,#dbe7ff_0%,rgba(219,231,255,0.55)_45%,rgba(219,231,255,0)_72%)]" />
     <div aria-hidden className="pointer-events-none absolute -left-20 bottom-6 h-80 w-80 rounded-full bg-[radial-gradient(circle,#e6eeff_0%,rgba(230,238,255,0.6)_45%,rgba(230,238,255,0)_72%)]" />
     <div
@@ -321,7 +321,7 @@ export const AnalyticsShowcase = () => (
 
     <div className="relative z-10 mx-auto flex w-full max-w-[500px] flex-col justify-center">
       <LoginBrand />
-      <div className="mt-5">
+      <div className="mt-4">
         <span className="inline-flex items-center rounded-full border border-[#d7e3ff] bg-white/80 px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em] text-[#2453d8] shadow-[0_6px_16px_rgba(36,83,216,0.08)]">
           Business analytics platform
         </span>
@@ -335,7 +335,7 @@ export const AnalyticsShowcase = () => (
         </p>
       </div>
 
-      <div className="relative mt-5 scale-[0.92] transform-gpu origin-left">
+      <div className="relative mt-4" style={{ zoom: 0.7 }}>
         <MiniDashboard />
         <FloatingBadges />
       </div>

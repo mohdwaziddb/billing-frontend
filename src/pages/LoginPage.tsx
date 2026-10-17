@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../api/apiClient";
-import { AnalyticsShowcase } from "../components/login/AnalyticsShowcase";
+import { PUBLIC_APP_TITLE } from "../config/site";
 import { LoginCard } from "../components/login/LoginCard";
+import { LoginShell } from "../components/login/LoginShell";
 import { MfaChallengeCard } from "../components/login/MfaChallengeCard";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
-import { currentHostname, getSubdomainCompanyCode, isLiveHost, isMainHost, isTenantSubdomainHost, mainSiteHomeUrl } from "../lib/hosts";
-import { isMaintenanceError, notifyMaintenance } from "../lib/tenantMaintenance";
+import { currentHostname, getSubdomainCompanyCode, isLiveHost, isMainHost, isTenantSubdomainHost } from "../lib/hosts";
+import { isMaintenanceError, notifyInvalidUrl, notifyMaintenance } from "../lib/tenantMaintenance";
 import { notificationService } from "../services/notificationService";
 import type { ApiResponse } from "../types/api";
-
-const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
 
 type LoginCompany = {
   name?: string | null;
@@ -82,7 +81,7 @@ export const LoginPage = () => {
     const companyCode = getSubdomainCompanyCode();
     // X-Company-Code header is attached automatically by the apiClient
     // interceptor from the frontend subdomain (same helper logic).
-    // 1) Subdomain validation: unknown subdomain -> main site (existing behavior).
+    // 1) Subdomain validation: unknown subdomain -> branded Invalid URL screen.
     if (companyCode) {
       apiClient
         .get<ApiResponse<CompanyBranding>>("/v1/company/by-domain", {
@@ -94,10 +93,10 @@ export const LoginPage = () => {
             notifyMaintenance();
           } else if (!cancelled && err?.response?.status === 404) {
             setByDomainMissing(true);
-            // Unknown tenant subdomain -> own main site (live main site on
-            // live, local landing on local). Safety net below (workspace
-            // message + disabled sign-in) stays in case navigation is blocked.
-            window.location.href = mainSiteHomeUrl(currentHostname());
+            // Unknown tenant subdomain -> branded Invalid URL screen (App
+            // event par same URL pe swap karta hai, redirect nahi). Safety net
+            // — agar screen na aaye to blocked sign-in + message dikhega.
+            notifyInvalidUrl();
           }
         });
     }
@@ -192,49 +191,41 @@ export const LoginPage = () => {
   };
 
   return (
-    <div
-      className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#f8fafc]"
-      style={{ fontFamily: "Manrope, Inter, system-ui, sans-serif" }}
+    <LoginShell
+      company={company}
+      brandingReady={brandingReady}
+      footerNote={
+        company?.name ? (
+          <span>
+            {company.name} <span className="text-slate-400">• Powered by Bizio Technologies</span>
+          </span>
+        ) : undefined
+      }
     >
-      <div className="grid flex-1 lg:grid-cols-2">
-        <AnalyticsShowcase />
-        <main className="relative flex items-center justify-center px-4 py-10 sm:px-8 lg:py-12">
-          {mfaToken ? (
-            <MfaChallengeCard
-              accountLabel={mfaAccountLabel}
-              loading={mfaLoading}
-              onSubmit={(code) => void submitMfa(code)}
-              onBack={backToPassword}
-            />
-          ) : (
-          <LoginCard
-            username={form.username}
-            password={form.password}
-            loading={loading}
-            canSubmit={effectiveCanSubmit}
-            company={company}
-            brandingReady={brandingReady}
-            // Forgot-password hidden for now (validation later) — 1 line revert to restore.
-            showForgotPassword={false}
-            subtitle={company?.name ? `Sign in to continue to ${company.name}.` : undefined}
-            onUsernameChange={(value) => {
-              setForm((current) => ({ ...current, username: value }));
-            }}
-            onPasswordChange={(value) => {
-              setForm((current) => ({ ...current, password: value }));
-            }}
-            onSubmit={submit}
-          />
-          )}
-        </main>
-      </div>
-      <footer className="border-t border-slate-200 bg-white/70 py-4 text-center text-xs font-medium text-slate-500">
-        {company?.name ? (
-          <span>{company.name} <span className="text-slate-400">• Powered by Bizio Technologies</span></span>
-        ) : (
-          "© 2026 Bizio Technologies. All rights reserved."
-        )}
-      </footer>
-    </div>
+      {mfaToken ? (
+        <MfaChallengeCard
+          accountLabel={mfaAccountLabel}
+          loading={mfaLoading}
+          onSubmit={(code) => void submitMfa(code)}
+          onBack={backToPassword}
+        />
+      ) : (
+        <LoginCard
+          username={form.username}
+          password={form.password}
+          loading={loading}
+          canSubmit={effectiveCanSubmit}
+          // Forgot-password hidden for now (validation later) — 1 line revert to restore.
+          showForgotPassword={false}
+          onUsernameChange={(value) => {
+            setForm((current) => ({ ...current, username: value }));
+          }}
+          onPasswordChange={(value) => {
+            setForm((current) => ({ ...current, password: value }));
+          }}
+          onSubmit={submit}
+        />
+      )}
+    </LoginShell>
   );
 };

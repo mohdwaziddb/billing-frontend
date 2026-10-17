@@ -24,3 +24,7 @@ export const WWW_LOCALHOST = "www.localhost";
 
 // Local dev API fallback (jab VITE_API_BASE_URL set na ho).
 export const LOCAL_API_BASE_URL_FALLBACK = "http://localhost:9009/api";
+
+// Public brand title — platform settings load na ho paane par fallback
+// (LoginPage title, StatusNotice brand block).
+export const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";

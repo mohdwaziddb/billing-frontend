@@ -1,20 +1,9 @@
-import { Building2, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, Phone, User } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { resolveAssetUrl } from "../../config/env";
 import { ForgotPasswordModal } from "../ForgotPasswordModal";
-import { LoginBrand } from "./LoginBrand";
+import { loginInputClass, loginPrimaryButtonClass } from "./loginStyles";
 
 const REMEMBER_ME_KEY = "billing_frontend_remember_me";
-
-const inputBaseClass =
-  "h-[56px] w-full rounded-xl border bg-white text-[15px] font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#2453d8] focus:ring-4 focus:ring-[rgba(36,83,216,0.12)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
-
-export type LoginCompanyInfo = {
-  name?: string | null;
-  logoUrl?: string | null;
-  email?: string | null;
-  phone?: string | null;
-} | null;
 
 type LoginCardProps = {
   username: string;
@@ -24,8 +13,6 @@ type LoginCardProps = {
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: () => void;
-  company?: LoginCompanyInfo;
-  brandingReady?: boolean;
   title?: string;
   subtitle?: string;
   fieldLabel?: string;
@@ -35,6 +22,10 @@ type LoginCardProps = {
   bottomBox?: ReactNode;
 };
 
+/**
+ * Common login form pane (tenant login + platform admin login). Card chrome
+ * nahi — ye LoginShell ke andar render hota hai.
+ */
 export const LoginCard = ({
   username,
   password,
@@ -43,12 +34,10 @@ export const LoginCard = ({
   onUsernameChange,
   onPasswordChange,
   onSubmit,
-  company = null,
-  brandingReady = true,
-  title = "Welcome back",
-  subtitle = "Sign in to continue to your Bizio workspace.",
+  title = "Welcome!",
+  subtitle = "Kindly enter your credentials to access your account.",
   fieldLabel = "Email address",
-  fieldPlaceholder = "Enter your email",
+  fieldPlaceholder,
   inputType = "email",
   showForgotPassword = true,
   bottomBox
@@ -73,49 +62,14 @@ export const LoginCard = ({
     }
   };
 
-  const companyLogoUrl = resolveAssetUrl(company?.logoUrl);
-
   return (
     <>
-      <div className="w-full max-w-[620px] rounded-lg border border-slate-200 bg-white p-8 text-left shadow-[0_28px_70px_rgba(15,23,42,0.12)] sm:p-12">
-        {!brandingReady && !company?.name ? (
-          <div className="flex items-center gap-2.5" aria-label="Loading workspace">
-            <span className="h-9 w-9 animate-pulse rounded-xl bg-slate-200" />
-            <span className="h-5 w-44 animate-pulse rounded-lg bg-slate-200" />
-          </div>
-        ) : company?.name ? (
-          <div>
-            <div className="flex items-center gap-4">
-              {companyLogoUrl ? (
-                <img
-                  src={companyLogoUrl}
-                  alt={`${company.name} logo`}
-                  className="h-16 w-16 shrink-0 rounded-lg border border-slate-200 bg-white object-contain shadow-[0_10px_24px_rgba(36,83,216,0.20)]"
-                />
-              ) : (
-                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#1f4ed8,#2b5dff)] text-white shadow-[0_10px_24px_rgba(36,83,216,0.28)]">
-                  <Building2 size={30} />
-                </span>
-              )}
-              <div className="min-w-0">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#2453d8]">Signing in to</p>
-                <h2 className="truncate text-[26px] font-extrabold tracking-[-0.03em] text-slate-950">{company.name}</h2>
-              </div>
-            </div>
-            <p className="mt-2 text-[15px] leading-7 text-slate-500">{subtitle}</p>
-          </div>
-        ) : (
-          <>
-            <LoginBrand company={company} />
-            <div className="mt-8 text-left">
-              <h2 className="text-[30px] font-extrabold tracking-[-0.03em] text-slate-950">{title}</h2>
-              <p className="mt-2 text-[15px] leading-7 text-slate-500">{subtitle}</p>
-            </div>
-          </>
-        )}
+      <div className="w-full text-left">
+        <h2 className="text-[28px] font-extrabold tracking-[-0.02em] text-slate-950">{title}</h2>
+        <p className="mt-1.5 text-[14px] leading-6 text-slate-500">{subtitle}</p>
 
         <form
-          className="mt-8 space-y-6"
+          className="mt-7 space-y-5"
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
@@ -124,55 +78,39 @@ export const LoginCard = ({
             }
           }}
         >
-          <div className="space-y-1.5">
-            <label htmlFor="login-email" className="block text-[13px] font-bold text-slate-700">
-              {fieldLabel}
-            </label>
-            <div className="relative">
-              {inputType === "email" ? (
-                <Mail size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              ) : (
-                <User size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              )}
-              <input
-                id="login-email"
-                type={inputType}
-                autoComplete={inputType === "email" ? "email" : "username"}
-                placeholder={fieldPlaceholder}
-                value={username}
-                disabled={loading}
-                className={`${inputBaseClass} pl-10 border-slate-200`}
-                onChange={(event) => onUsernameChange(event.target.value)}
-              />
-            </div>
-          </div>
+          <input
+            id="login-email"
+            type={inputType}
+            autoComplete={inputType === "email" ? "email" : "username"}
+            placeholder={fieldPlaceholder ?? fieldLabel}
+            aria-label={fieldLabel}
+            value={username}
+            disabled={loading}
+            className={loginInputClass}
+            onChange={(event) => onUsernameChange(event.target.value)}
+          />
 
-          <div className="space-y-1.5">
-            <label htmlFor="login-password" className="block text-[13px] font-bold text-slate-700">
-              Password
-            </label>
-            <div className="relative">
-              <Lock size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                id="login-password"
-                type={passwordVisible ? "text" : "password"}
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                value={password}
-                disabled={loading}
-                className={`${inputBaseClass} pl-10 pr-12 border-slate-200`}
-                onChange={(event) => onPasswordChange(event.target.value)}
-              />
-              <button
-                type="button"
-                aria-label={passwordVisible ? "Hide password" : "Show password"}
-                disabled={loading}
-                className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed"
-                onClick={() => setPasswordVisible((current) => !current)}
-              >
-                {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
-              </button>
-            </div>
+          <div className="relative">
+            <input
+              id="login-password"
+              type={passwordVisible ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="Password"
+              aria-label="Password"
+              value={password}
+              disabled={loading}
+              className={`${loginInputClass} pr-12`}
+              onChange={(event) => onPasswordChange(event.target.value)}
+            />
+            <button
+              type="button"
+              aria-label={passwordVisible ? "Hide password" : "Show password"}
+              disabled={loading}
+              className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed"
+              onClick={() => setPasswordVisible((current) => !current)}
+            >
+              {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
           </div>
 
           <div className="flex items-center justify-between gap-4">
@@ -181,7 +119,7 @@ export const LoginCard = ({
                 type="checkbox"
                 checked={remember}
                 disabled={loading}
-                className="h-4 w-4 rounded border-slate-300 accent-[#2453d8] focus:ring-2 focus:ring-[rgba(36,83,216,0.30)]"
+                className="h-4 w-4 rounded border-slate-300 accent-[var(--theme-color)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--theme-color)_30%,transparent)]"
                 onChange={toggleRemember}
               />
               Remember me
@@ -190,20 +128,15 @@ export const LoginCard = ({
               <button
                 type="button"
                 disabled={loading}
-                className="rounded text-sm font-bold text-[#2453d8] transition hover:text-[#1d47bd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(36,83,216,0.40)] disabled:cursor-not-allowed"
+                className="rounded text-sm font-bold text-[var(--theme-color)] transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--theme-color)_40%,transparent)] disabled:cursor-not-allowed"
                 onClick={() => setForgotOpen(true)}
               >
-                Forgot password?
+                Forgot Password?
               </button>
             ) : null}
           </div>
 
-          <button
-            type="submit"
-            disabled={loading || !canSubmit}
-            aria-busy={loading}
-            className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#2453d8] text-[15px] font-semibold text-white shadow-[0_14px_28px_rgba(36,83,216,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1d47bd] hover:shadow-[0_18px_36px_rgba(36,83,216,0.30)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(36,83,216,0.30)] disabled:pointer-events-none disabled:opacity-60"
-          >
+          <button type="submit" disabled={loading || !canSubmit} aria-busy={loading} className={loginPrimaryButtonClass}>
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
@@ -214,59 +147,7 @@ export const LoginCard = ({
             )}
           </button>
 
-          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
-            {bottomBox ? (
-              bottomBox
-            ) : company?.name ? (
-              <>
-                <div className="flex items-center gap-3">
-                  {companyLogoUrl ? (
-                    <img src={companyLogoUrl} alt={company.name ?? "Company logo"} className="h-10 w-10 rounded-lg border border-slate-200 bg-white object-contain" />
-                  ) : (
-                    <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2453d8]/10 text-[#2453d8]">
-                      <Building2 size={18} />
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-extrabold uppercase tracking-[0.10em] text-slate-400">Signing in to</p>
-                    <p className="truncate text-[15px] font-extrabold text-slate-900">{company.name}</p>
-                  </div>
-                </div>
-                {company.email || company.phone ? (
-                  <ul className="mt-2.5 space-y-2">
-                    {company.email ? (
-                      <li className="flex items-start gap-2 text-[12px] font-medium leading-5 text-slate-600">
-                        <Mail size={14} className="mt-0.5 shrink-0 text-[#2453d8]" />
-                        {company.email}
-                      </li>
-                    ) : null}
-                    {company.phone ? (
-                      <li className="flex items-start gap-2 text-[12px] font-medium leading-5 text-slate-600">
-                        <Phone size={14} className="mt-0.5 shrink-0 text-[#2453d8]" />
-                        {company.phone}
-                      </li>
-                    ) : null}
-                  </ul>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.10em] text-slate-400">Your Bizio workspace</p>
-                <ul className="mt-2.5 space-y-2">
-                  {[
-                    "Track sales, collections and outstanding from one dashboard",
-                    "Manage customers, invoices and payments in one place",
-                    "Get clear analytics and reports for better decisions"
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-[12px] font-medium leading-5 text-slate-600">
-                      <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[#2453d8]" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+          {bottomBox ? <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">{bottomBox}</div> : null}
         </form>
       </div>
 

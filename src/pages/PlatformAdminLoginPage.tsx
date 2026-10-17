@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AnalyticsShowcase } from "../components/login/AnalyticsShowcase";
 import { LoginCard } from "../components/login/LoginCard";
+import { LoginShell } from "../components/login/LoginShell";
+import { PUBLIC_APP_TITLE } from "../config/site";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
-
-const PUBLIC_APP_TITLE = "Bizio Technologies Pvt. Ltd.";
 
 export const PlatformAdminLoginPage = () => {
   const { loginPlatformAdmin, platform } = useAuth();
@@ -35,45 +34,33 @@ export const PlatformAdminLoginPage = () => {
   };
 
   return (
-    <div
-      className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#f8fafc]"
-      style={{ fontFamily: "Manrope, Inter, system-ui, sans-serif" }}
-    >
-      <div className="grid flex-1 lg:grid-cols-2">
-        <AnalyticsShowcase />
-        <main className="relative flex items-center justify-center px-4 py-10 sm:px-8 lg:py-12">
-          <LoginCard
-            username={form.username}
-            password={form.password}
-            loading={loading}
-            canSubmit={canSubmit}
-            title="Platform Admin Sign in"
-            subtitle="Sign in to manage companies and platform settings from a separate protected session."
-            fieldLabel="Username"
-            fieldPlaceholder="Enter your username"
-            inputType="text"
-            showForgotPassword={false}
-            onUsernameChange={(value) => {
-              setForm((current) => ({ ...current, username: value }));
-            }}
-            onPasswordChange={(value) => {
-              setForm((current) => ({ ...current, password: value }));
-            }}
-            onSubmit={submit}
-            bottomBox={
-              <p className="text-[13px] font-medium leading-5 text-slate-600">
-                Need company access instead?{" "}
-                <Link className="font-semibold text-[#2453d8] transition hover:text-[#1d47bd]" to="/login">
-                  Go to workspace login
-                </Link>
-              </p>
-            }
-          />
-        </main>
-      </div>
-      <footer className="border-t border-slate-200 bg-white/70 py-4 text-center text-xs font-medium text-slate-500">
-        © 2026 Bizio Technologies. All rights reserved.
-      </footer>
-    </div>
+    <LoginShell>
+      <LoginCard
+        username={form.username}
+        password={form.password}
+        loading={loading}
+        canSubmit={canSubmit}
+        title="Platform Admin Sign in"
+        subtitle="Sign in to manage companies and platform settings from a separate protected session."
+        fieldLabel="Username"
+        inputType="text"
+        showForgotPassword={false}
+        onUsernameChange={(value) => {
+          setForm((current) => ({ ...current, username: value }));
+        }}
+        onPasswordChange={(value) => {
+          setForm((current) => ({ ...current, password: value }));
+        }}
+        onSubmit={submit}
+        bottomBox={
+          <p className="text-[13px] font-medium leading-5 text-slate-600">
+            Need company access instead?{" "}
+            <Link className="font-semibold text-[var(--theme-color)] transition hover:opacity-80" to="/login">
+              Go to workspace login
+            </Link>
+          </p>
+        }
+      />
+    </LoginShell>
   );
 };

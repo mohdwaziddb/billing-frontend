@@ -1,5 +1,6 @@
 import { Loader2, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { loginPrimaryButtonClass } from "./loginStyles";
 
 type MfaChallengeCardProps = {
   title?: string;
@@ -12,6 +13,13 @@ type MfaChallengeCardProps = {
 
 const CODE_LENGTH = 6;
 
+const digitInputClass =
+  "h-14 w-full min-w-0 flex-1 rounded-xl border border-[#dbe3f5] bg-[#eef3fc] text-center text-xl font-bold text-slate-950 outline-none transition focus:border-[var(--theme-color)] focus:bg-white focus:ring-4 focus:ring-[color-mix(in_srgb,var(--theme-color)_12%,transparent)] disabled:opacity-70";
+
+/**
+ * MFA step pane — LoginShell ke andar render hota hai (LoginCard jaisa
+ * hi pane, card chrome ke bina).
+ */
 export const MfaChallengeCard = ({
   title = "Additional Verification Required",
   subtitle = "Your account is protected with Multi-Factor Authentication (MFA). To continue, please enter the verification code from your MFA device below.",
@@ -64,9 +72,9 @@ export const MfaChallengeCard = ({
   };
 
   return (
-    <div className="w-full max-w-[620px] rounded-lg border border-slate-200 bg-white p-6 text-left shadow-[0_24px_64px_-24px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="w-full text-left">
       <div className="flex flex-col items-center text-center">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-slate-950 text-white">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
           <ShieldCheck size={22} />
         </span>
         <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Step 2 of 2 — Verification</p>
@@ -91,7 +99,7 @@ export const MfaChallengeCard = ({
               onChange={(event) => setDigit(index, event.target.value)}
               onKeyDown={(event) => handleKeyDown(index, event)}
               aria-label={`Digit ${index + 1}`}
-              className="h-14 w-full min-w-0 flex-1 rounded-xl border border-slate-300 bg-white text-center text-xl font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#2453d8] focus:ring-4 focus:ring-[rgba(36,83,216,0.12)] disabled:bg-slate-50"
+              className={digitInputClass}
             />
           ))}
         </div>
@@ -102,7 +110,7 @@ export const MfaChallengeCard = ({
         type="button"
         disabled={!canSubmit}
         onClick={() => onSubmit(digits.join(""))}
-        className="mt-5 flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-[#2453d8] text-[15px] font-semibold text-white transition hover:bg-[#1d44b4] disabled:cursor-not-allowed disabled:opacity-60"
+        className={`mt-5 ${loginPrimaryButtonClass}`}
       >
         {loading ? (
           <>

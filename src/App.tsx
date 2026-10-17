@@ -6,12 +6,13 @@ import {
   currentHostname,
   isLiveHost,
   isMainHost,
-  isTenantSubdomainHost,
-  mainSiteHomeUrl
+  isTenantSubdomainHost
 } from "./lib/hosts";
 import {
+  INVALID_URL_EVENT,
   isMaintenanceError,
   MAINTENANCE_EVENT,
+  notifyInvalidUrl,
   notifyMaintenance
 } from "./lib/tenantMaintenance";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
@@ -63,6 +64,7 @@ import { PurchaseListPage } from "./pages/PurchaseListPage";
 import { StockLedgerPage } from "./pages/StockLedgerPage";
 import { InvoiceTemplatesPage } from "./pages/InvoiceTemplatesPage";
 import { MaintenancePage } from "./pages/MaintenancePage";
+import { InvalidUrlPage } from "./pages/InvalidUrlPage";
 
 // All host decisions come from the single shared helper in lib/hosts.
 // isAppHost: main hosts show LandingPage, everything else is tenant app space.
@@ -89,8 +91,9 @@ const clearTenantSession = () => {
   notifyMaintenance();
 };
 
-function useTenantMaintenance(): { maintenance: boolean; checking: boolean } {
+function useTenantMaintenance(): { maintenance: boolean; invalidUrl: boolean; checking: boolean } {
   const [maintenance, setMaintenance] = useState(false);
+  const [invalidUrl, setInvalidUrl] = useState(false);
   // While the status probe is in flight, render a blank screen so the
   // login page never flashes on an INACTIVE tenant. URL stays untouched.
   const [checking, setChecking] = useState(() => isTenantSubdomainHost());
@@ -100,7 +103,9 @@ function useTenantMaintenance(): { maintenance: boolean; checking: boolean } {
       return;
     }
     const onMaintenance = () => setMaintenance(true);
+    const onInvalidUrl = () => setInvalidUrl(true);
     window.addEventListener(MAINTENANCE_EVENT, onMaintenance);
+    window.addEventListener(INVALID_URL_EVENT, onInvalidUrl);
     let cancelled = false;
     // Single status probe: the backend interceptor answers 503 for an
     // INACTIVE tenant or a missing database before any controller runs.
@@ -115,28 +120,28 @@ function useTenantMaintenance(): { maintenance: boolean; checking: boolean } {
         }
       })
       .catch((err) => {
-        if (!cancelled) {
-          if (isMaintenanceError(err)) {
-            clearTenantSession();
-          } else {
-            setChecking(false);
-            // Unknown tenant subdomain -> own main site. This probe only runs on
-            // tenant hosts, so any 404 here means ghost tenant. Live goes to
-            // the live main site, local goes to the local main (landing).
-            // Main hosts never reach here (no probe there) so no loop possible.
-            if ((err as any)?.response?.status === 404) {
-              window.location.href = mainSiteHomeUrl();
-            }
-          }
+        if (cancelled) {
+          return;
+        }
+        if (isMaintenanceError(err)) {
+          clearTenantSession();
+        } else if ((err as any)?.response?.status === 404) {
+          // Ghost tenant subdomain: branded Invalid URL screen on the SAME
+          // URL, koi redirect nahi. Ye probe sirf tenant hosts par chalta
+          // hai — main hosts par (no probe) loop possible hi nahi.
+          notifyInvalidUrl();
+        } else {
+          setChecking(false);
         }
       });
     return () => {
       cancelled = true;
       window.removeEventListener(MAINTENANCE_EVENT, onMaintenance);
+      window.removeEventListener(INVALID_URL_EVENT, onInvalidUrl);
     };
   }, []);
 
-  return { maintenance, checking };
+  return { maintenance, invalidUrl, checking };
 }
 
 function App() {
@@ -145,12 +150,21 @@ function App() {
   // (biziotechnologies.com) /login must not render — redirect to landing.
   // Local main hosts (localhost) keep working for single-DB dev.
   const isLiveMain = typeof window !== "undefined" && isLiveHost() && isMainHost();
-  const { maintenance, checking } = useTenantMaintenance();
+  const { maintenance, invalidUrl, checking } = useTenantMaintenance();
   if (maintenance) {
     // Same URL, no navigation: the workspace is unavailable, nothing else renders.
     return (
       <Routes>
         <Route path="*" element={<MaintenancePage />} />
+      </Routes>
+    );
+  }
+  if (invalidUrl) {
+    // Same URL, no navigation: unknown tenant subdomain gets the branded
+    // Invalid URL screen.
+    return (
+      <Routes>
+        <Route path="*" element={<InvalidUrlPage />} />
       </Routes>
     );
   }
