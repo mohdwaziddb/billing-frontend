@@ -21,7 +21,7 @@ export const Button = ({ children, className, variant = "primary", size = "defau
         variant === "ghost" &&
           "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950",
         variant === "danger" &&
-          "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
+          "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-400/30 dark:bg-rose-500/15 dark:text-rose-300 dark:hover:bg-rose-500/25",
         className
       )}
       {...props}
