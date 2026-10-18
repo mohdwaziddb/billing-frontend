@@ -28,7 +28,7 @@ import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import { notificationService } from "../services/notificationService";
-import type { PageResponse, Payment, PaymentModeMaster } from "../types/api";
+import type { NotificationLog, PageResponse, Payment, PaymentModeMaster } from "../types/api";
 
 type DatePreset = "" | "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 type SummaryKey = "total" | "collection" | "outstanding" | `mode:${string}`;
@@ -239,11 +239,12 @@ export const PaymentListPage = () => {
     }
     try {
       setSendingReminder(true);
+      let sentLogs: NotificationLog[] = [];
       if (reminderForm.channel === "EMAIL") {
         if (!reminderTarget.customerEmail) {
           throw new Error("Customer email is not available");
         }
-        await sendEmailNotification({
+        sentLogs = await sendEmailNotification({
           toEmails: [reminderTarget.customerEmail],
           subject: reminderForm.subject,
           message: reminderForm.message
@@ -252,7 +253,7 @@ export const PaymentListPage = () => {
         if (!reminderTarget.customerMobile) {
           throw new Error("Customer mobile number is not available");
         }
-        await sendSmsNotification({
+        sentLogs = await sendSmsNotification({
           mobileNumbers: [reminderTarget.customerMobile],
           message: reminderForm.message
         });
@@ -260,10 +261,15 @@ export const PaymentListPage = () => {
         if (!reminderTarget.customerMobile) {
           throw new Error("Customer mobile number is not available");
         }
-        await sendWhatsAppNotification({
+        sentLogs = await sendWhatsAppNotification({
           mobileNumbers: [reminderTarget.customerMobile],
           message: reminderForm.message
         });
+      }
+      // PENDING/FAILED (e.g. provider not configured) must not show as
+      // success — surface the backend provider message instead.
+      if (!sentLogs.length || sentLogs.every((log) => log.status !== "SENT")) {
+        throw new Error(sentLogs[0]?.providerResponse ?? "Reminder could not be sent.");
       }
       notificationService.showSuccess("Reminder sent successfully.");
       setReminderTarget(null);

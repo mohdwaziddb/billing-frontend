@@ -12,6 +12,7 @@ type ForgotPasswordModalProps = {
   initialUsername?: string;
   onClose: () => void;
   tone?: "theme" | "brand";
+  identifierLocked?: boolean;
 };
 
 const brandFieldBaseClass =
@@ -102,7 +103,13 @@ const BrandPasswordField = ({
   );
 };
 
-export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone = "theme" }: ForgotPasswordModalProps) => {
+export const ForgotPasswordModal = ({
+  open,
+  initialUsername = "",
+  onClose,
+  tone = "theme",
+  identifierLocked = false
+}: ForgotPasswordModalProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [identifier, setIdentifier] = useState(initialUsername);
   const [challengeId, setChallengeId] = useState<number | null>(null);
@@ -152,7 +159,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
       return;
     }
     const value = identifier.trim();
-    if (!value) {
+    if (!value && !identifierLocked) {
       notificationService.showError("Enter your email, mobile number or username first.");
       return;
     }
@@ -253,7 +260,7 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
               value={identifier}
               placeholder="Enter your email, mobile or username"
               onChange={(event) => setIdentifier(event.target.value)}
-              disabled={saving}
+              disabled={saving || identifierLocked}
               icon={<User size={16} />}
             />
           ) : (
@@ -269,13 +276,19 @@ export const ForgotPasswordModal = ({ open, initialUsername = "", onClose, tone 
                   autoComplete="username"
                   placeholder="Enter your email, mobile or username"
                   value={identifier}
-                  disabled={saving}
-                  className="h-[50px] w-full rounded-xl border border-slate-200 bg-white pl-10 text-[15px] font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] disabled:bg-slate-50"
+                  disabled={saving || identifierLocked}
+                  className="h-[50px] w-full rounded-xl border border-slate-200 bg-white pl-10 text-[15px] font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[var(--theme-color)] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
                   onChange={(event) => setIdentifier(event.target.value)}
                 />
               </div>
             </div>
           )}
+
+          {identifierLocked ? (
+            <p className="text-xs font-medium text-slate-400">
+              OTP will be sent to this registered email only.
+            </p>
+          ) : null}
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             {isBrand ? (

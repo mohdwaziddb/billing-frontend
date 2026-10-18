@@ -215,8 +215,6 @@ export const LoginPage = () => {
           password={form.password}
           loading={loading}
           canSubmit={effectiveCanSubmit}
-          // Forgot-password hidden for now (validation later) — 1 line revert to restore.
-          showForgotPassword={false}
           onUsernameChange={(value) => {
             setForm((current) => ({ ...current, username: value }));
           }}

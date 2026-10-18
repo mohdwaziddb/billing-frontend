@@ -90,7 +90,9 @@ const isAuthBypassRoute = (url?: string) => {
   return [
     "/v1/auth/login",
     "/v1/auth/mfa/verify",
-    "/v1/auth/forgot-password",
+    // NOTE: /v1/auth/forgot-password is intentionally NOT bypassed — when a
+    // session exists the request must carry the Bearer token so the backend
+    // can force the OTP destination to the logged-in user's email.
     "/v1/auth/logout",
     "/v1/auth/refresh",
     "/v1/platform-admin/login",

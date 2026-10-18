@@ -300,6 +300,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
       <ForgotPasswordModal
         open={forgotPasswordOpen}
         initialUsername={user?.email ?? user?.mobileNumber ?? ""}
+        identifierLocked={sessionType === "user" && Boolean(user?.email)}
         onClose={() => setForgotPasswordOpen(false)}
       />
       <Modal

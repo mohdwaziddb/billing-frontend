@@ -22,7 +22,7 @@ import { formatCurrency } from "../lib/currency";
 import { formatDate, formatDateTime } from "../lib/format";
 import { sanitizeHtml } from "../lib/sanitizeHtml";
 import { notificationService } from "../services/notificationService";
-import type { AuditLog, Invoice, Payment, Profitability } from "../types/api";
+import type { AuditLog, Invoice, NotificationLog, Payment, Profitability } from "../types/api";
 
 export const InvoiceDetailPage = () => {
   const { invoiceId } = useParams();
@@ -112,11 +112,16 @@ export const InvoiceDetailPage = () => {
           base64Content: await blobToBase64(await downloadInvoicePdfFile(invoice.id, selectedTemplateId))
         }]
         : [];
-      await sendWhatsAppNotification({
+      const sentLogs: NotificationLog[] = await sendWhatsAppNotification({
         mobileNumbers: [invoice.customerMobile],
         message,
         attachments
       });
+      // PENDING/FAILED (e.g. WhatsApp provider not configured) must not show
+      // as success — surface the backend provider message instead.
+      if (!sentLogs.length || sentLogs.every((log) => log.status !== "SENT")) {
+        throw new Error(sentLogs[0]?.providerResponse ?? "Invoice could not be sent on WhatsApp.");
+      }
       notificationService.showSuccess("Invoice sent on WhatsApp successfully.");
       setWhatsAppOpen(false);
     } catch (error) {
@@ -140,12 +145,17 @@ export const InvoiceDetailPage = () => {
         }]
         : [];
       const html = renderedHtml || await resolveRenderedInvoiceHtml();
-      await sendEmailNotification({
+      const sentLogs: NotificationLog[] = await sendEmailNotification({
         toEmails: [emailForm.to.trim()],
         subject: emailForm.subject.trim() || `Invoice ${invoice.invoiceNo}`,
         message: html || `<p>Please find invoice ${invoice.invoiceNo} attached.</p>`,
         attachments
       });
+      // PENDING/FAILED (e.g. email provider not configured) must not show as
+      // success — surface the backend provider message instead.
+      if (!sentLogs.length || sentLogs.every((log) => log.status !== "SENT")) {
+        throw new Error(sentLogs[0]?.providerResponse ?? "Invoice email could not be sent.");
+      }
       notificationService.showSuccess("Invoice email sent successfully.");
       setEmailOpen(false);
     } catch (error) {
