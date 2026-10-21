@@ -17,6 +17,7 @@ declare module "axios" {
   interface AxiosRequestConfig {
     skipAuthRefresh?: boolean;
     skipPageLoader?: boolean;
+    pageLoaderBlocking?: boolean;
   }
 }
 

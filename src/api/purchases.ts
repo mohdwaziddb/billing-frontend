@@ -7,7 +7,9 @@ export const getPurchasesPage = async (params?: { active?: boolean; search?: str
 };
 
 export const getPurchase = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<Purchase>>(`/v1/purchases/${id}`);
+  const response = await apiClient.get<ApiResponse<Purchase>>(`/v1/purchases/${id}`, {
+    pageLoaderBlocking: true
+  });
   return response.data.data;
 };
 

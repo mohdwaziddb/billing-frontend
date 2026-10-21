@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AiAssistantWidget } from "../components/AiAssistantWidget";
 import { Sidebar } from "../components/Sidebar";
@@ -17,6 +17,14 @@ const readCollapsed = () => {
 export const DashboardLayout = () => {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.sidebarCollapsed = String(collapsed);
+    return () => {
+      delete root.dataset.sidebarCollapsed;
+    };
+  }, [collapsed]);
 
   useEffect(() => {
     try {

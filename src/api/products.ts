@@ -43,7 +43,9 @@ export const getProducts = async (params?: { search?: string; active?: boolean; 
 };
 
 export const getProduct = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<Product>>(`/v1/products/${id}`);
+  const response = await apiClient.get<ApiResponse<Product>>(`/v1/products/${id}`, {
+    pageLoaderBlocking: true
+  });
   return response.data.data;
 };
 

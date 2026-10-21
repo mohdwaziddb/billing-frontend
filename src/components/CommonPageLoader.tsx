@@ -51,9 +51,10 @@ export const CommonPageLoader = () => {
 
   return createPortal(
     <div
-      className={`fixed inset-0 z-[10000] flex items-center justify-center ${
+      className={`fixed inset-y-0 right-0 z-[10000] flex items-center justify-center bg-slate-950/10 backdrop-blur-[2px] dark:bg-slate-950/25 ${
         blocking ? "pointer-events-auto cursor-wait" : "pointer-events-none"
       }`}
+      style={{ left: "var(--app-content-left, 0px)" }}
       role="status"
       aria-live="polite"
       aria-label="Please wait"

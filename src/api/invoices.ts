@@ -31,7 +31,9 @@ export const getInvoices = async (params?: InvoiceFilterParams) => {
 };
 
 export const getInvoice = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<Invoice>>(`/v1/invoices/${id}`);
+  const response = await apiClient.get<ApiResponse<Invoice>>(`/v1/invoices/${id}`, {
+    pageLoaderBlocking: true
+  });
   return response.data.data;
 };
 

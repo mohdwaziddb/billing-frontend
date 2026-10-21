@@ -21,7 +21,9 @@ export const getCustomers = async (params?: { search?: string; active?: boolean;
 };
 
 export const getCustomer = async (id: number) => {
-  const response = await apiClient.get<ApiResponse<Customer>>(`/v1/customers/${id}`);
+  const response = await apiClient.get<ApiResponse<Customer>>(`/v1/customers/${id}`, {
+    pageLoaderBlocking: true
+  });
   return response.data.data;
 };
 

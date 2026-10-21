@@ -35,6 +35,17 @@
   --theme-contrast: #ffffff;
   --theme-light-contrast: #111827;
   --theme-dark-contrast: #ffffff;
+  --app-content-left: 0px;
+}
+
+@media (min-width: 1024px) {
+  :root[data-sidebar-collapsed="false"] {
+    --app-content-left: 240px;
+  }
+
+  :root[data-sidebar-collapsed="true"] {
+    --app-content-left: 70px;
+  }
 }
 
 :root.dark {

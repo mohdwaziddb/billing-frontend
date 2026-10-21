@@ -64,7 +64,9 @@ export const resetSuperAdminPassword = async (companyCode: string, password: str
 };
 
 export const getPlatformAdminCompanyDetails = async (companyCode: string) => {
-  const response = await apiClient.get<ApiResponse<PlatformAdminCompanyDetails>>(`/v1/platform-admin/companies/${companyCode}`);
+  const response = await apiClient.get<ApiResponse<PlatformAdminCompanyDetails>>(`/v1/platform-admin/companies/${companyCode}`, {
+    pageLoaderBlocking: true
+  });
   return response.data.data;
 };
 

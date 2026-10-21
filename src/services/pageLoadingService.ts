@@ -4,6 +4,7 @@ export type PageLoadingState = "idle" | "loading" | "blocking";
 
 export type PageLoaderRequestConfig = AxiosRequestConfig & {
   skipPageLoader?: boolean;
+  pageLoaderBlocking?: boolean;
   _pageLoaderId?: number;
 };
 
@@ -80,7 +81,7 @@ const start = (config: PageLoaderRequestConfig) => {
 
   const requestId = ++nextRequestId;
   const entry: TrackedRequest = {
-    blocking: isBlockingMethod(config.method)
+    blocking: config.pageLoaderBlocking ?? isBlockingMethod(config.method)
   };
 
   config._pageLoaderId = requestId;
