@@ -37,7 +37,7 @@ export const sendAiMessage = async (
   const response = await apiClient.post<ApiResponse<AiChatReply>>(
     "/v1/ai/chat",
     { message, history },
-    { signal }
+    { signal, skipPageLoader: true }
   );
   return response.data.data;
 };

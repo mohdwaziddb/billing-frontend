@@ -4,6 +4,7 @@ import { getApiErrorMessage } from "../lib/errors";
 import { authStorage } from "../lib/storage";
 import { getSubdomainCompanyCode } from "../lib/hosts";
 import { notificationService } from "../services/notificationService";
+import { pageLoadingService } from "../services/pageLoadingService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
 import {
   isMaintenanceError,
@@ -15,6 +16,7 @@ import type { ApiResponse, AuthPayload, StoredAuthSession } from "../types/api";
 declare module "axios" {
   interface AxiosRequestConfig {
     skipAuthRefresh?: boolean;
+    skipPageLoader?: boolean;
   }
 }
 
@@ -63,6 +65,7 @@ const getLoginPath = (session?: StoredAuthSession | null) => {
 const clearSessionAndRedirect = (message?: string) => {
   const session = authStorage.get();
   const loginPath = getLoginPath(session);
+  pageLoadingService.reset();
   authStorage.clear();
   try {
     sessionStorage.clear();
@@ -101,112 +104,129 @@ const isAuthBypassRoute = (url?: string) => {
 };
 
 apiClient.interceptors.request.use((config) => {
-  // DATABASE-per-tenant: backend Host is always localhost:9009 in dev, so send
-  // X-Company-Code from frontend subdomain (TSM-like routing).
-  const companyCode = getSubdomainCompanyCode();
-  if (companyCode && !config.headers["X-Company-Code"]) {
-    config.headers["X-Company-Code"] = companyCode;
-  }
-  if (isAuthBypassRoute(config.url)) {
-    delete config.headers.Authorization;
-    return config;
-  }
-
-  const session = authStorage.get();
-  if (session?.auth.accessToken) {
-    config.headers.Authorization = `Bearer ${session.auth.accessToken}`;
-  }
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    // Maintenance stop: INACTIVE tenant or missing database. Park on the
-    // static screen WITHOUT changing the URL (App listens for the event);
-    // the screen itself makes no API calls, so this cannot loop.
-    if (isMaintenanceError(error) && isTenantSubdomainHost()) {
-      const onPlatformPath =
-        typeof window !== "undefined" && window.location.pathname.startsWith("/platform-admin");
-      if (!onPlatformPath) {
-        notifyMaintenance();
-      }
-      return Promise.reject(error);
+  pageLoadingService.start(config);
+  try {
+    // DATABASE-per-tenant: backend Host is always localhost:9009 in dev, so send
+    // X-Company-Code from frontend subdomain (TSM-like routing).
+    const companyCode = getSubdomainCompanyCode();
+    if (companyCode && !config.headers["X-Company-Code"]) {
+      config.headers["X-Company-Code"] = companyCode;
     }
-
-    const originalRequest = error.config as RetryableRequestConfig | undefined;
-    const status = error.response?.status;
-
-    if (isCompanyInactiveResponse(error)) {
-      const message = "Company is inactive. Please contact administrator.";
-      notificationService.showError(message, error);
-      clearSessionAndRedirect(message);
-      return Promise.reject(error);
-    }
-
-    if (status === 403) {
-      notificationService.showError(getApiErrorMessage(error, "You do not have permission to access this resource"), error);
-    } else if (error.message === "Network Error") {
-      notificationService.showError("Unable to connect to the server. Please check your network connection.", error);
-    }
-
-    if (!originalRequest || status !== 401 || originalRequest.skipAuthRefresh || isAuthBypassRoute(originalRequest.url)) {
-      if (status === 401 && (originalRequest?.skipAuthRefresh || originalRequest?.url?.includes("/v1/auth/refresh"))) {
-        clearSessionAndRedirect();
-      }
-      return Promise.reject(error);
-    }
-
-    if (originalRequest._retry) {
-      clearSessionAndRedirect();
-      return Promise.reject(error);
+    if (isAuthBypassRoute(config.url)) {
+      delete config.headers.Authorization;
+      return config;
     }
 
     const session = authStorage.get();
-    if (!session || session.type !== "user" || !session.auth.refreshToken) {
-      clearSessionAndRedirect();
-      return Promise.reject(error);
+    if (session?.auth.accessToken) {
+      config.headers.Authorization = `Bearer ${session.auth.accessToken}`;
     }
+    return config;
+  } catch (error) {
+    pageLoadingService.finish(config);
+    throw error;
+  }
+});
 
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingRequests.push({
-          resolve: (accessToken) => {
-            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-            resolve(apiClient(originalRequest));
-          },
-          reject
-        });
+const handleResponseError = async (error: any) => {
+  // Maintenance stop: INACTIVE tenant or missing database. Park on the
+  // static screen WITHOUT changing the URL (App listens for the event);
+  // the screen itself makes no API calls, so this cannot loop.
+  if (isMaintenanceError(error) && isTenantSubdomainHost()) {
+    const onPlatformPath =
+      typeof window !== "undefined" && window.location.pathname.startsWith("/platform-admin");
+    if (!onPlatformPath) {
+      notifyMaintenance();
+    }
+    return Promise.reject(error);
+  }
+
+  const originalRequest = error.config as RetryableRequestConfig | undefined;
+  const status = error.response?.status;
+
+  if (isCompanyInactiveResponse(error)) {
+    const message = "Company is inactive. Please contact administrator.";
+    notificationService.showError(message, error);
+    clearSessionAndRedirect(message);
+    return Promise.reject(error);
+  }
+
+  if (status === 403) {
+    notificationService.showError(getApiErrorMessage(error, "You do not have permission to access this resource"), error);
+  } else if (error.message === "Network Error") {
+    notificationService.showError("Unable to connect to the server. Please check your network connection.", error);
+  }
+
+  if (!originalRequest || status !== 401 || originalRequest.skipAuthRefresh || isAuthBypassRoute(originalRequest.url)) {
+    if (status === 401 && (originalRequest?.skipAuthRefresh || originalRequest?.url?.includes("/v1/auth/refresh"))) {
+      clearSessionAndRedirect();
+    }
+    return Promise.reject(error);
+  }
+
+  if (originalRequest._retry) {
+    clearSessionAndRedirect();
+    return Promise.reject(error);
+  }
+
+  const session = authStorage.get();
+  if (!session || session.type !== "user" || !session.auth.refreshToken) {
+    clearSessionAndRedirect();
+    return Promise.reject(error);
+  }
+
+  if (isRefreshing) {
+    return new Promise((resolve, reject) => {
+      pendingRequests.push({
+        resolve: (accessToken) => {
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          resolve(apiClient(originalRequest));
+        },
+        reject
       });
+    });
+  }
+
+  originalRequest._retry = true;
+  isRefreshing = true;
+
+  try {
+    // Tenant routing is header-based: the refresh call must carry the same
+    // X-Company-Code or multi-DB routing lands in the wrong database.
+    const refreshHeaders: Record<string, string> = {};
+    const refreshCompanyCode = getSubdomainCompanyCode();
+    if (refreshCompanyCode) {
+      refreshHeaders["X-Company-Code"] = refreshCompanyCode;
     }
+    const refreshResponse = await refreshClient.post<ApiResponse<AuthPayload>>(
+      "/v1/auth/refresh",
+      { refreshToken: session.auth.refreshToken },
+      { headers: refreshHeaders }
+    );
+    const nextAuth = refreshResponse.data.data;
+    authStorage.set({ type: "user", auth: nextAuth });
+    flushPendingRequests(null, nextAuth.accessToken);
+    originalRequest.headers.Authorization = `Bearer ${nextAuth.accessToken}`;
+    return apiClient(originalRequest);
+  } catch (refreshError) {
+    flushPendingRequests(refreshError);
+    clearSessionAndRedirect();
+    return Promise.reject(refreshError);
+  } finally {
+    isRefreshing = false;
+  }
+};
 
-    originalRequest._retry = true;
-    isRefreshing = true;
-
+apiClient.interceptors.response.use(
+  (response) => {
+    pageLoadingService.finish(response.config);
+    return response;
+  },
+  async (error) => {
     try {
-      // Tenant routing is header-based: the refresh call must carry the same
-      // X-Company-Code or multi-DB routing lands in the wrong database.
-      const refreshHeaders: Record<string, string> = {};
-      const refreshCompanyCode = getSubdomainCompanyCode();
-      if (refreshCompanyCode) {
-        refreshHeaders["X-Company-Code"] = refreshCompanyCode;
-      }
-      const refreshResponse = await refreshClient.post<ApiResponse<AuthPayload>>(
-        "/v1/auth/refresh",
-        { refreshToken: session.auth.refreshToken },
-        { headers: refreshHeaders }
-      );
-      const nextAuth = refreshResponse.data.data;
-      authStorage.set({ type: "user", auth: nextAuth });
-      flushPendingRequests(null, nextAuth.accessToken);
-      originalRequest.headers.Authorization = `Bearer ${nextAuth.accessToken}`;
-      return apiClient(originalRequest);
-    } catch (refreshError) {
-      flushPendingRequests(refreshError);
-      clearSessionAndRedirect();
-      return Promise.reject(refreshError);
+      return await handleResponseError(error);
     } finally {
-      isRefreshing = false;
+      pageLoadingService.finish(error?.config);
     }
   }
 );

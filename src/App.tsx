@@ -15,6 +15,7 @@ import {
   notifyInvalidUrl,
   notifyMaintenance
 } from "./lib/tenantMaintenance";
+import { CommonPageLoader } from "./components/CommonPageLoader";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
 import { PermissionRoute } from "./components/PermissionRoute";
@@ -169,7 +170,11 @@ function App() {
     );
   }
   if (checking) {
-    return <main className="min-h-screen bg-white" />;
+    return (
+      <main className="min-h-screen bg-white">
+        <CommonPageLoader />
+      </main>
+    );
   }
   return (
     <Routes>

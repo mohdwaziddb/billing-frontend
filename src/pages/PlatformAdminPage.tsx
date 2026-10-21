@@ -332,7 +332,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       return;
     }
     const timer = window.setInterval(() => {
-      void loadDumpHistory().catch(() => undefined);
+      void loadDumpHistory(undefined, undefined, true).catch(() => undefined);
     }, 5000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -446,10 +446,13 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     }));
   };
 
-  const loadDumpHistory = async (page = dumpPage, size = dumpPageSize) => {
+  const loadDumpHistory = async (page = dumpPage, size = dumpPageSize, skipPageLoader = false) => {
     const [history, stats] = await Promise.all([
-      getDumpHistory({ date: dumpDateFilter || undefined, status: dumpStatusFilter || undefined, page, size }),
-      getDumpStats()
+      getDumpHistory(
+        { date: dumpDateFilter || undefined, status: dumpStatusFilter || undefined, page, size },
+        { skipPageLoader }
+      ),
+      getDumpStats({ skipPageLoader })
     ]);
     setDumpHistory(history.records);
     setDumpHistoryTotal(history.total);

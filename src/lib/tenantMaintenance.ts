@@ -1,3 +1,4 @@
+import { pageLoadingService } from "../services/pageLoadingService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
 import { sessionCache } from "./sessionCache";
 import { tenantKeySuffix } from "./hosts";
@@ -20,6 +21,7 @@ export const isMaintenanceError = (err: unknown) => {
 // Dono full-screen states (maintenance / invalid URL) ke liye common reset:
 // stale session, cached bootstrap, per-tab storage aur theme sab saaf.
 const clearTenantState = () => {
+  pageLoadingService.reset();
   try {
     authStorage.clear();
   } catch {

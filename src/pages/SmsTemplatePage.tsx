@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Eye, FilePlus2, Pencil } from "lucide-react";
 import { createSmsTemplate, deleteSmsTemplate, getSmsTemplateVariables, getSmsTemplatesPage, previewSmsTemplate, updateSmsTemplate } from "../api/smsTemplates";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AvailableVariablesPanel } from "../components/AvailableVariablesPanel";
 import { Button } from "../components/Button";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
@@ -15,7 +16,9 @@ import { useAuth } from "../context/AuthContext";
 import { useAddEditForm } from "../hooks/useAddEditForm";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { useListPage } from "../hooks/useListPage";
+import { useTextInputVariableInsertion } from "../hooks/useTextInputVariableInsertion";
 import { formatDate } from "../lib/format";
+import { TEMPLATE_PREVIEW_VARIABLES } from "../lib/templatePreviewVariables";
 import type { EmailPreview, SmsTemplate, SmsTemplateRequest } from "../types/api";
 
 type SmsFilters = {
@@ -71,6 +74,15 @@ export const SmsTemplatePage = () => {
     onSaved: list.refreshTable
   });
 
+  const bodyInsertion = useTextInputVariableInsertion<HTMLTextAreaElement>(
+    form.formValues.templateBody,
+    (templateBody) => form.setFormValues((current) => ({ ...current, templateBody }))
+  );
+
+  const insertVariable = (variable: string) => {
+    bodyInsertion.insert(`{{${variable}}}`);
+  };
+
   const canSaveTemplate = Boolean(form.formValues.templateName.trim() && form.formValues.templateBody.trim());
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const templateColumns = useMemo(() => [
@@ -83,7 +95,7 @@ export const SmsTemplatePage = () => {
 
   const openPreview = async (template: SmsTemplate) => {
     try {
-      setPreview(await previewSmsTemplate(template.id, sampleVariables));
+      setPreview(await previewSmsTemplate(template.id, TEMPLATE_PREVIEW_VARIABLES));
     } catch (err: any) {
       setApiError(err, "Unable to preview SMS template");
     }
@@ -122,7 +134,7 @@ export const SmsTemplatePage = () => {
                 <Input label="Template Name" value={form.formValues.templateName} onChange={(event) => form.setFormValues((current) => ({ ...current, templateName: event.target.value }))} requiredMark />
                 <label className="block space-y-2">
                   <span className="block text-sm font-semibold text-slate-700">Template Body <span className="ml-1 text-rose-400">*</span></span>
-                  <textarea className="min-h-[220px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-[var(--theme-color)]" value={form.formValues.templateBody} onChange={(event) => form.setFormValues((current) => ({ ...current, templateBody: event.target.value }))} />
+                  <textarea ref={bodyInsertion.inputRef} className="min-h-[220px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-[var(--theme-color)]" value={form.formValues.templateBody} onChange={(event) => form.setFormValues((current) => ({ ...current, templateBody: event.target.value }))} />
                 </label>
                 <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
                   <input type="checkbox" checked={form.formValues.active} onChange={(event) => form.setFormValues((current) => ({ ...current, active: event.target.checked }))} />
@@ -133,17 +145,7 @@ export const SmsTemplatePage = () => {
                   <Button type="button" disabled={form.saving || !canSaveTemplate} onClick={() => void form.saveForm()}>{form.editingEntity ? "Save Template" : "Create Template"}</Button>
                 </div>
               </div>
-              <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">
-                <p className="mb-4 font-semibold text-slate-950">Available Variables</p>
-                <div className="space-y-2">
-                  {Object.entries(variables).map(([variable, description]) => (
-                    <button key={variable} type="button" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm" onClick={() => form.setFormValues((current) => ({ ...current, templateBody: `${current.templateBody} {{${variable}}}` }))}>
-                      <span className="block font-semibold text-slate-900">{`{{${variable}}}`}</span>
-                      <span className="text-xs text-slate-500">{description}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <AvailableVariablesPanel variables={variables} onInsert={insertVariable} />
             </div>
           </Modal>
 
@@ -162,15 +164,4 @@ export const SmsTemplatePage = () => {
       }
     />
   );
-};
-
-const sampleVariables = {
-  Customer_Name: "Mohd Wazid",
-  Customer_Email: "customer@example.com",
-  Customer_Mobile: "9876543210",
-  Outstanding_Amount: "7,080.00",
-  Invoice_Number: "INV-001",
-  Invoice_Date: "10-06-2026",
-  Invoice_Total: "10,000.00",
-  Due_Date: "17-06-2026"
 };

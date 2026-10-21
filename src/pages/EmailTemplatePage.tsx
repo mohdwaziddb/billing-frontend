@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, FilePlus2, Italic, Link, List, ListOrdered, Mail, Pencil, Type } from "lucide-react";
 import { ActionDropdown } from "../components/ActionDropdown";
+import { AvailableVariablesPanel } from "../components/AvailableVariablesPanel";
 import { Button } from "../components/Button";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
@@ -22,8 +23,10 @@ import { useAuth } from "../context/AuthContext";
 import { useAddEditForm } from "../hooks/useAddEditForm";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { useListPage } from "../hooks/useListPage";
+import { useTextInputVariableInsertion } from "../hooks/useTextInputVariableInsertion";
 import { formatDate } from "../lib/format";
 import { sanitizeHtml, sanitizeLinkUrl } from "../lib/sanitizeHtml";
+import { TEMPLATE_PREVIEW_VARIABLES } from "../lib/templatePreviewVariables";
 import { notificationService } from "../services/notificationService";
 import type { EmailPreview, EmailTemplate, EmailTemplateRequest } from "../types/api";
 
@@ -37,6 +40,8 @@ type FormState = {
   emailBody: string;
   active: boolean;
 };
+
+type VariableTarget = "subject" | "emailBody";
 
 const emptyForm: FormState = {
   templateName: "",
@@ -84,6 +89,24 @@ export const EmailTemplatePage = () => {
     onSaved: list.refreshTable
   });
 
+  const [activeVariableTarget, setActiveVariableTarget] = useState<VariableTarget>("emailBody");
+  const activeVariableTargetRef = useRef<VariableTarget>("emailBody");
+  const subjectInsertion = useTextInputVariableInsertion<HTMLInputElement>(
+    form.formValues.subject,
+    (subject) => form.setFormValues((current) => ({ ...current, subject }))
+  );
+
+  const selectVariableTarget = (target: VariableTarget) => {
+    activeVariableTargetRef.current = target;
+    setActiveVariableTarget(target);
+  };
+
+  useEffect(() => {
+    if (form.formOpen) {
+      selectVariableTarget("emailBody");
+    }
+  }, [form.formOpen]);
+
   const canSaveTemplate = Boolean(form.formValues.templateName.trim() && form.formValues.subject.trim() && form.formValues.emailBody.trim());
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const templateColumns = useMemo(() => [
@@ -110,27 +133,37 @@ export const EmailTemplatePage = () => {
   };
 
   const runEditorCommand = (command: string, value?: string) => {
-    editorRef.current?.focus();
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+    const selection = window.getSelection();
+    const hasSelectionInside = Boolean(selection && selection.rangeCount > 0 && editor.contains(selection.anchorNode));
+    editor.focus();
+    if (command === "insertText" && !hasSelectionInside && selection) {
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
     document.execCommand(command, false, value);
     syncEditor();
   };
 
   const insertVariable = (variable: string) => {
-    runEditorCommand("insertText", `{{${variable}}}`);
+    const token = `{{${variable}}}`;
+    if (activeVariableTargetRef.current === "subject") {
+      subjectInsertion.insert(token);
+      return;
+    }
+    runEditorCommand("insertText", token);
   };
 
   const openPreview = async (template: EmailTemplate) => {
     clearMessage();
     try {
-      const rendered = await previewEmailTemplate(template.id, {
-        Customer_Name: "Mohd Wazid",
-        Customer_Email: "customer@example.com",
-        Outstanding_Amount: "7,080.00",
-        Invoice_Number: "INV-001",
-        Invoice_Date: "10-06-2026",
-        Invoice_Total: "10,000.00",
-        Due_Date: "17-06-2026"
-      });
+      const rendered = await previewEmailTemplate(template.id, TEMPLATE_PREVIEW_VARIABLES);
       setPreviewTitle(`${template.templateName} Preview`);
       setPreview(rendered);
     } catch (err: any) {
@@ -178,9 +211,11 @@ export const EmailTemplatePage = () => {
                     requiredMark
                   />
                   <Input
+                    ref={subjectInsertion.inputRef}
                     label="Subject"
                     value={form.formValues.subject}
                     onChange={(event) => form.setFormValues((current) => ({ ...current, subject: event.target.value }))}
+                    onFocus={() => selectVariableTarget("subject")}
                     requiredMark
                   />
                 </div>
@@ -216,6 +251,7 @@ export const EmailTemplatePage = () => {
                       suppressContentEditableWarning
                       className="min-h-[260px] w-full overflow-y-auto px-4 py-3 text-sm leading-6 text-slate-900 outline-none"
                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.formValues.emailBody) }}
+                      onFocus={() => selectVariableTarget("emailBody")}
                       onInput={syncEditor}
                     />
                   </div>
@@ -235,25 +271,12 @@ export const EmailTemplatePage = () => {
                 </div>
               </div>
 
-              <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Mail size={17} className="text-[var(--theme-color)]" />
-                  <p className="font-semibold text-slate-950">Available Variables</p>
-                </div>
-                <div className="space-y-2">
-                  {Object.entries(variables).map(([variable, description]) => (
-                    <button
-                      key={variable}
-                      type="button"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm transition hover:border-[var(--theme-color)] hover:bg-[color-mix(in_srgb,var(--theme-color)_6%,white)]"
-                      onClick={() => insertVariable(variable)}
-                    >
-                      <span className="block font-semibold text-slate-900">{`{{${variable}}}`}</span>
-                      <span className="text-xs text-slate-500">{description}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <AvailableVariablesPanel
+                variables={variables}
+                onInsert={insertVariable}
+                targetLabel={activeVariableTarget === "subject" ? "Subject" : "Email Body"}
+                icon={<Mail size={17} className="text-[var(--theme-color)]" />}
+              />
             </div>
           </Modal>
 

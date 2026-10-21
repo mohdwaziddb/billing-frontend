@@ -11,6 +11,7 @@ import { authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
 import { tenantKeySuffix } from "../lib/hosts";
 import { sessionCache } from "../lib/sessionCache";
 import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
+import { pageLoadingService } from "../services/pageLoadingService";
 import { ThemeBootstrapService } from "../services/ThemeBootstrapService";
 import type {
   AuthPayload,
@@ -33,7 +34,7 @@ type AuthContextValue = {
   theme: CompanyTheme;
   platform: PlatformSettings;
   preferences: UserPreference;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (options?: { skipPageLoader?: boolean }) => Promise<void>;
   refreshTheme: () => Promise<void>;
   setDarkMode: (enabled: boolean) => Promise<void>;
   refreshPermissions: () => Promise<void>;
@@ -223,12 +224,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       theme,
       platform,
       preferences,
-      async refreshProfile() {
+      async refreshProfile(options) {
         if (!session?.auth.accessToken || session.type !== "user") {
           setUser(null);
           return;
         }
-        const profile = await meRequest();
+        const profile = await meRequest(options);
         setUser(profile);
         const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
         if (cached && cached.accessToken === session.auth.accessToken) {
@@ -357,6 +358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Ignore logout failures and clear local session anyway.
           }
         }
+        pageLoadingService.reset();
         clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
       }
     }),

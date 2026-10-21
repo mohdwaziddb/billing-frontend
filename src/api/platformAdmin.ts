@@ -98,8 +98,14 @@ export const queueDumpRequest = async (payload: { database: string; mode: Platfo
   return response.data.data;
 };
 
-export const getDumpHistory = async (params?: { date?: string; status?: string; page?: number; size?: number }) => {
-  const response = await apiClient.get<ApiResponse<PlatformAdminDumpHistoryPage>>("/v1/platform-admin/dumps", { params });
+export const getDumpHistory = async (
+  params?: { date?: string; status?: string; page?: number; size?: number },
+  options?: { skipPageLoader?: boolean }
+) => {
+  const response = await apiClient.get<ApiResponse<PlatformAdminDumpHistoryPage>>("/v1/platform-admin/dumps", {
+    params,
+    skipPageLoader: options?.skipPageLoader
+  });
   return response.data.data;
 };
 
@@ -118,8 +124,10 @@ export const deleteDumpRequest = async (id: number) => {
   return response.data.data;
 };
 
-export const getDumpStats = async () => {
-  const response = await apiClient.get<ApiResponse<PlatformAdminDumpStats>>("/v1/platform-admin/dumps/stats");
+export const getDumpStats = async (options?: { skipPageLoader?: boolean }) => {
+  const response = await apiClient.get<ApiResponse<PlatformAdminDumpStats>>("/v1/platform-admin/dumps/stats", {
+    skipPageLoader: options?.skipPageLoader
+  });
   return response.data.data;
 };
 

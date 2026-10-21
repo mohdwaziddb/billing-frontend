@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { currentHostname, isLiveHost, isMainHost } from "../lib/hosts";
+import { CommonPageLoader } from "./CommonPageLoader";
 
 export const ProtectedRoute = () => {
   const { auth, sessionType } = useAuth();
@@ -13,5 +14,10 @@ export const ProtectedRoute = () => {
     return <Navigate to={liveMain ? "/" : "/login"} replace state={{ from: location }} />;
   }
 
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <CommonPageLoader />
+    </>
+  );
 };

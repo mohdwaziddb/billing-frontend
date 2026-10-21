@@ -106,11 +106,7 @@ export const InvoiceDetailPage = () => {
         ? `${whatsAppForm.message.trim()}\nInvoice Link: ${window.location.origin}/invoices/${invoice.id}`
         : whatsAppForm.message.trim();
       const attachments = whatsAppForm.includePdf
-        ? [{
-          fileName: `${invoice.invoiceNo}.pdf`,
-          contentType: "application/pdf",
-          base64Content: await blobToBase64(await downloadInvoicePdfFile(invoice.id, selectedTemplateId))
-        }]
+        ? [await buildInvoiceAttachment(invoice, selectedTemplateId)]
         : [];
       const sentLogs: NotificationLog[] = await sendWhatsAppNotification({
         mobileNumbers: [invoice.customerMobile],
@@ -138,17 +134,15 @@ export const InvoiceDetailPage = () => {
     try {
       setSendingEmail(true);
       const attachments = emailForm.includePdf
-        ? [{
-          fileName: `${invoice.invoiceNo}.pdf`,
-          contentType: "application/pdf",
-          base64Content: await blobToBase64(await downloadInvoicePdfFile(invoice.id, selectedTemplateId))
-        }]
+        ? [await buildInvoiceAttachment(invoice, selectedTemplateId)]
         : [];
-      const html = renderedHtml || await resolveRenderedInvoiceHtml();
+      const message = emailForm.includePdf
+        ? `<p>Please find invoice ${invoice.invoiceNo} attached.</p>`
+        : renderedHtml || await resolveRenderedInvoiceHtml();
       const sentLogs: NotificationLog[] = await sendEmailNotification({
         toEmails: [emailForm.to.trim()],
         subject: emailForm.subject.trim() || `Invoice ${invoice.invoiceNo}`,
-        message: html || `<p>Please find invoice ${invoice.invoiceNo} attached.</p>`,
+        message,
         attachments
       });
       // PENDING/FAILED (e.g. email provider not configured) must not show as
@@ -402,6 +396,12 @@ export const InvoiceDetailPage = () => {
 
 const defaultInvoiceWhatsAppMessage = (invoice: Invoice) =>
   `Hello ${invoice.customerName}, your invoice ${invoice.invoiceNo} for Rs. ${Number(invoice.totalAmount).toFixed(2)} is ready. Outstanding amount: Rs. ${Number(invoice.balanceAmount).toFixed(2)}.`;
+
+const buildInvoiceAttachment = async (invoice: Invoice, templateId?: string) => ({
+  fileName: `${invoice.invoiceNo}.pdf`,
+  contentType: "application/pdf",
+  base64Content: await blobToBase64(await downloadInvoicePdfFile(invoice.id, templateId))
+});
 
 const blobToBase64 = async (blob: Blob) =>
   await new Promise<string>((resolve, reject) => {

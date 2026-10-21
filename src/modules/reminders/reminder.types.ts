@@ -9,6 +9,8 @@ export type OverdueCustomer = {
   currentBalance: number;
   overdueDays: number;
   oldestOutstandingInvoiceDate: string | null;
+  oldestOutstandingInvoiceNo: string | null;
+  oldestOutstandingInvoiceTotal: number | null;
   lastReminderAt: string | null;
   lastReminderStatus: ReminderStatus | null;
 };

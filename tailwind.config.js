@@ -15,7 +15,8 @@ export default {
       },
       animation: {
         float: "float 6s ease-in-out infinite",
-        shine: "shine 1.4s ease-in-out infinite"
+        shine: "shine 1.4s ease-in-out infinite",
+        "loader-dot": "loader-dot 1s ease-in-out infinite"
       },
       keyframes: {
         float: {
@@ -26,6 +27,10 @@ export default {
           "0%": { opacity: "0.5", transform: "translateX(-4px)" },
           "50%": { opacity: "1", transform: "translateX(4px)" },
           "100%": { opacity: "0.5", transform: "translateX(-4px)" }
+        },
+        "loader-dot": {
+          "0%, 80%, 100%": { opacity: "0.3", transform: "translateY(0) scale(0.75)" },
+          "40%": { opacity: "1", transform: "translateY(-3px) scale(1)" }
         }
       }
     }

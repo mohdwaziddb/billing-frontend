@@ -57,7 +57,7 @@ export const AiAssistantWidget = () => {
     const token = auth?.accessToken;
     if (sessionType === "user" && token && refreshedTokenRef.current !== token) {
       refreshedTokenRef.current = token;
-      void refreshProfile().catch(() => undefined);
+      void refreshProfile({ skipPageLoader: true }).catch(() => undefined);
     }
   }, [auth?.accessToken, sessionType, refreshProfile]);
 
@@ -68,7 +68,9 @@ export const AiAssistantWidget = () => {
   const [serverChatbotDisabled, setServerChatbotDisabled] = useState(false);
   const refreshServerFlag = useCallback(async () => {
     try {
-      const response = await apiClient.get<ApiResponse<{ chatbotEnabled?: boolean }>>("/v1/company/current");
+      const response = await apiClient.get<ApiResponse<{ chatbotEnabled?: boolean }>>("/v1/company/current", {
+        skipPageLoader: true
+      });
       if (response.data?.data?.chatbotEnabled === false) {
         setServerChatbotDisabled(true);
       }
@@ -98,7 +100,7 @@ export const AiAssistantWidget = () => {
   const openChat = () => {
     // Re-check the flag when the user opens the chat: covers disable
     // happening mid-session (mount refresh only runs once per load).
-    void refreshProfile().catch(() => undefined);
+    void refreshProfile({ skipPageLoader: true }).catch(() => undefined);
     void refreshServerFlag().catch(() => undefined);
     setOpen(true);
   };

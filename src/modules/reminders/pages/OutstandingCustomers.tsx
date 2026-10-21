@@ -352,7 +352,11 @@ export const OutstandingCustomersReminderPage = () => {
 const reminderVariables = (customer: OverdueCustomer) => ({
   Customer_Name: customer.customerName,
   Customer_Email: customer.email ?? "",
+  Customer_Mobile: customer.mobile ?? "",
   Outstanding_Amount: customer.currentBalance.toFixed(2),
+  Invoice_Number: customer.oldestOutstandingInvoiceNo ?? "",
+  Invoice_Date: customer.oldestOutstandingInvoiceDate ? formatDate(customer.oldestOutstandingInvoiceDate) : "",
+  Invoice_Total: customer.oldestOutstandingInvoiceTotal != null ? customer.oldestOutstandingInvoiceTotal.toFixed(2) : "",
   Due_Date: customer.oldestOutstandingInvoiceDate ? formatDate(customer.oldestOutstandingInvoiceDate) : "",
   Current_Date: formatDate(new Date().toISOString().slice(0, 10))
 });

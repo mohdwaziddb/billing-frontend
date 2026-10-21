@@ -16,8 +16,10 @@ export const platformAdminLoginRequest = async (payload: { username: string; pas
   return response.data.data;
 };
 
-export const meRequest = async () => {
-  const response = await apiClient.get<ApiResponse<UserProfile>>("/v1/users/me");
+export const meRequest = async (options?: { skipPageLoader?: boolean }) => {
+  const response = await apiClient.get<ApiResponse<UserProfile>>("/v1/users/me", {
+    skipPageLoader: options?.skipPageLoader
+  });
   return response.data.data;
 };
 

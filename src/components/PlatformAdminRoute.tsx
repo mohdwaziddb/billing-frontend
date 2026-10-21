@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { CommonPageLoader } from "./CommonPageLoader";
 
 export const PlatformAdminRoute = () => {
   const { auth, sessionType, isPlatformAdmin } = useAuth();
@@ -13,5 +14,10 @@ export const PlatformAdminRoute = () => {
     return <Navigate to="/platform-admin/login" replace state={{ from: location }} />;
   }
 
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <CommonPageLoader />
+    </>
+  );
 };
