@@ -23,7 +23,7 @@ export const CommonDeleteModal = ({
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-rose-500/15 bg-rose-500/10 text-rose-600 dark:border-rose-400/25 dark:bg-rose-500/15 dark:text-rose-300">
           <CommonDeleteIcon size={19} />
         </div>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{description}</p>
+        <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">{description}</p>
       </div>
       <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button type="button" variant="ghost" disabled={loading} onClick={onCancel}>
