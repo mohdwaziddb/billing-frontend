@@ -1,6 +1,7 @@
+import { Banknote, Smartphone } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCustomers } from "../api/customers";
 import { getInvoices } from "../api/invoices";
 import { getPaymentModes } from "../api/paymentModes";
@@ -10,12 +11,14 @@ import { FormSection } from "../components/FormSection";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
+import { StatusBadge } from "../components/StatusBadge";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
+import { formatDate } from "../lib/format";
 import { firstFormErrorMessage } from "../lib/formValidation";
 import { CollectOnlineModal } from "../modules/payments/components/CollectOnlineModal";
 import { usePaymentGatewayConfig } from "../modules/payments/hooks/usePaymentGatewayConfig";
-import { findPaymentMode, isOnlineModeMaster, paymentModeOptions, referenceLabelForMode } from "../modules/payments/paymentModeOptions";
+import { findPaymentMode, isOnlineModeMaster, paymentModeLabel, referenceLabelForMode, visiblePaymentModes } from "../modules/payments/paymentModeOptions";
 import { notificationService } from "../services/notificationService";
 import type { Customer, Invoice, PaymentMode, PaymentModeMaster, PaymentRequest } from "../types/api";
 
@@ -40,6 +43,9 @@ const todayIso = () => {
 
 export const PaymentEntryPage = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  // Invoice page se aaye (?invoiceId=): save ke baad wahi invoice dikhao (updated history ke saath).
+  const returnInvoiceId = searchParams.get("invoiceId");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
@@ -97,7 +103,8 @@ export const PaymentEntryPage = () => {
   const invoiceOptions = useMemo(() => {
     const customerInvoices = invoices.filter((invoice) => String(invoice.customerId) === selectedCustomerId && Number(invoice.balanceAmount) > 0);
     return customerInvoices.map((invoice) => ({
-      label: `${invoice.invoiceNo} | ${invoice.paymentStatus} | Due ${formatCurrency(invoice.balanceAmount)}`,
+      // Status right side summary me dikhta hai; label chhota taaki kate nahi.
+      label: `${invoice.invoiceNo} · Due ${formatCurrency(invoice.balanceAmount)}`,
       value: invoice.id
     }));
   }, [invoices, selectedCustomerId]);
@@ -185,6 +192,21 @@ export const PaymentEntryPage = () => {
     prefilledInvoiceId.current = null;
   };
 
+  // Balance badal gaya: invoice se aaye to wapas invoice par, warna form saaf + dues taaze.
+  const afterPaymentSaved = () => {
+    if (returnInvoiceId) {
+      navigate(`/invoices/${returnInvoiceId}`);
+      return;
+    }
+    resetForm();
+    void Promise.all([getCustomers({ active: true, size: 1000 }), getInvoices({ size: 1000 })])
+      .then(([customerData, invoiceData]) => {
+        setCustomers(customerData.filter((customer) => customer.active));
+        setInvoices(invoiceData);
+      })
+      .catch(() => undefined);
+  };
+
   const onSubmit = async (values: FormValues) => {
     clearMessage();
 
@@ -222,11 +244,26 @@ export const PaymentEntryPage = () => {
     try {
       await createPayment(payload);
       notificationService.showSuccess("Payment Recorded Successfully");
-      resetForm();
+      afterPaymentSaved();
     } catch (err: any) {
       setApiError(err, "Unable to record payment");
     }
   };
+
+  // Right side summary: locked / selected invoice ke numbers live (amount type karte hi update).
+  const summaryInvoice = lockedInvoice ?? selectedInvoice ?? null;
+  const selectedCustomer = customers.find((customer) => String(customer.id) === (lockedInvoice ? String(lockedInvoice.customerId) : selectedCustomerId));
+  const customerDue = invoices
+    .filter((invoice) => String(invoice.customerId) === selectedCustomerId)
+    .reduce((sum, invoice) => sum + Math.max(0, Number(invoice.balanceAmount)), 0);
+  const invoiceTotal = Number(summaryInvoice?.totalAmount ?? 0);
+  const invoiceBalance = Number(summaryInvoice?.balanceAmount ?? 0);
+  const validAmount = Number.isFinite(paymentAmount) && paymentAmount > 0 ? Math.min(paymentAmount, invoiceBalance || paymentAmount) : 0;
+  const remainingAfter = Math.max(0, Math.round((invoiceBalance - validAmount) * 100) / 100);
+  const paidPercent = invoiceTotal > 0 ? Math.min(100, (Number(summaryInvoice?.paidAmount ?? 0) / invoiceTotal) * 100) : 0;
+  const thisPaymentPercent = invoiceTotal > 0 ? Math.min(100 - paidPercent, (validAmount / invoiceTotal) * 100) : 0;
+  // Mode pills: active modes (Online sirf gateway on ho to).
+  const modeChoices = visiblePaymentModes(paymentModes, onlineEnabled);
 
   const onInvalid = (validationErrors: FieldErrors<FormValues>) => {
     notificationService.showError(firstFormErrorMessage(validationErrors, "Please fill all required payment fields before saving."));
@@ -236,7 +273,7 @@ export const PaymentEntryPage = () => {
     <div className="space-y-4 pb-6 md:space-y-5">
       <Header
         title="Add Payment"
-        subtitle={lockedInvoice ? `Recording payment for ${lockedInvoice.invoiceNo} | Outstanding ${formatCurrency(lockedInvoice.balanceAmount)}` : "Record customer collections and map them to invoices with consistent validation and clean form layout."}
+        subtitle={lockedInvoice ? `Recording payment for ${lockedInvoice.invoiceNo}` : "Record a customer payment against an invoice or as an advance."}
       />
 
       <div className="space-y-4">
@@ -249,78 +286,101 @@ export const PaymentEntryPage = () => {
           saveDisabled={!canSavePayment}
         />
 
-        <form id="payment-form" className="grid gap-4 lg:grid-cols-3" onSubmit={handleSubmit(onSubmit, onInvalid)}>
-          <FormSection title="Customer Information">
-            {/* Controlled: shown option always equals submitted value (async
-                options + setValue autofill used to desync the display). */}
-            <Controller
-              name="customerId"
-              control={control}
-              rules={{ required: "Customer is required" }}
-              render={({ field }) => (
-                <Select
-                  label="Customer"
-                  requiredMark
-                  placeholder="Select Customer"
-                  error={errors.customerId?.message}
-                  options={customers.map((customer) => ({ label: customer.name, value: customer.id }))}
-                  disabled={Boolean(lockedInvoice)}
-                  name={field.name}
-                  value={field.value}
-                  onChange={(event) => field.onChange(event.target.value)}
-                  onBlur={field.onBlur}
-                  ref={field.ref}
-                />
-              )}
-            />
-          </FormSection>
-
-          <FormSection title="Invoice Information">
-            <Controller
-              name="invoiceId"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label="Invoice"
-                  placeholder="Select Invoice"
-                  hint="Optional if you are recording an unapplied customer payment."
-                  options={invoiceOptions}
-                  disabled={Boolean(lockedInvoice)}
-                  name={field.name}
-                  value={field.value}
-                  onChange={(event) => field.onChange(event.target.value)}
-                  onBlur={field.onBlur}
-                  ref={field.ref}
-                />
-              )}
-            />
-          </FormSection>
-
-          <FormSection title="Payment Information">
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <Input
-                label="Amount"
-                requiredMark
-                type="number"
-                step="0.01"
-                error={errors.amount?.message}
-                {...register("amount", {
-                  required: "Amount is required",
-                  validate: (value) => {
-                    const amount = Number(value);
-                    if (amount <= 0) return "Payment amount must be greater than 0";
-                    const invoice = invoices.find((item) => String(item.id) === selectedInvoiceId);
-                    return !invoice || amount <= Number(invoice.balanceAmount) || "Payment amount cannot exceed outstanding amount";
-                  }
-                })}
+        <form id="payment-form" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start" onSubmit={handleSubmit(onSubmit, onInvalid)}>
+          <FormSection title="Payment Details" contentClassName="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Controlled: shown option always equals submitted value (async
+                  options + setValue autofill used to desync the display). */}
+              <Controller
+                name="customerId"
+                control={control}
+                rules={{ required: "Customer is required" }}
+                render={({ field }) => (
+                  <Select
+                    label="Customer"
+                    requiredMark
+                    searchable
+                    placeholder="Select Customer"
+                    error={errors.customerId?.message}
+                    options={customers.map((customer) => ({ label: customer.mobile ? `${customer.name} · ${customer.mobile}` : customer.name, value: customer.id }))}
+                    disabled={Boolean(lockedInvoice)}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
+              <Controller
+                name="invoiceId"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Invoice"
+                    placeholder={selectedCustomerId ? (invoiceOptions.length ? "Select Invoice" : "No unpaid invoices") : "Select a customer first"}
+                    hint={lockedInvoice ? undefined : "Optional — leave empty to apply to the oldest unpaid invoices."}
+                    options={invoiceOptions}
+                    disabled={Boolean(lockedInvoice) || !selectedCustomerId}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Input
+                  label="Amount"
+                  requiredMark
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  inputMode="decimal"
+                  error={errors.amount?.message}
+                  {...register("amount", {
+                    required: "Amount is required",
+                    validate: (value) => {
+                      const amount = Number(value);
+                      if (!Number.isFinite(amount) || amount <= 0) return "Payment amount must be greater than 0";
+                      const invoice = invoices.find((item) => String(item.id) === selectedInvoiceId);
+                      return !invoice || amount <= Number(invoice.balanceAmount) || "Payment amount cannot exceed outstanding amount";
+                    }
+                  })}
+                />
+                {summaryInvoice && Number(summaryInvoice.balanceAmount) > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[
+                      { label: "Full due", value: Number(summaryInvoice.balanceAmount) },
+                      { label: "Half", value: Math.round(Number(summaryInvoice.balanceAmount) * 50) / 100 }
+                    ].map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1 fs-12 font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                        onClick={() => {
+                          const next = chip.value.toFixed(2);
+                          setValue("amount", next, { shouldValidate: true, shouldDirty: true });
+                          lastAutoAmount.current = null;
+                        }}
+                      >
+                        {chip.label} · {formatCurrency(chip.value)}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <Controller
                 name="paymentDate"
                 control={control}
                 rules={{ required: "Payment date is required" }}
                 render={({ field }) => (
                   <Input
-                    label="Payment date"
+                    label="Payment Date"
                     requiredMark
                     type="date"
                     error={errors.paymentDate?.message}
@@ -332,38 +392,114 @@ export const PaymentEntryPage = () => {
                   />
                 )}
               />
-              <Controller
-                name="mode"
-                control={control}
-                rules={{ required: "Payment mode is required" }}
-                render={({ field }) => (
-                  <Select
-                    label="Mode"
-                    requiredMark
-                    placeholder="Select Mode"
-                    error={errors.mode?.message}
-                    options={paymentModeOptions(paymentModes, onlineEnabled, gatewayConfig?.gatewayName)}
-                    name={field.name}
-                    value={field.value}
-                    onChange={(event) => field.onChange(event.target.value)}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
-                )}
-              />
-              {selectedMode?.requiresReference ? (
-                <Input label={referenceLabelForMode(watchedMode)} placeholder="Optional" maxLength={120} {...register("referenceNo")} />
-              ) : null}
-              <Input label="Notes" {...register("remarks")} />
             </div>
+
+            <Controller
+              name="mode"
+              control={control}
+              rules={{ required: "Payment mode is required" }}
+              render={({ field }) => (
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-700">
+                    Payment Mode <span className="text-rose-500">*</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Payment mode">
+                    {modeChoices.map((mode) => {
+                      const selected = field.value === mode.modeCode;
+                      return (
+                        <button
+                          key={mode.modeCode}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          className={`inline-flex min-w-[120px] items-center justify-center gap-2 rounded-[var(--radius-control)] border px-4 py-2.5 text-sm font-semibold transition ${
+                            selected
+                              ? "border-[var(--theme-color)] bg-[color-mix(in_srgb,var(--theme-color)_10%,white)] text-slate-950 ring-2 ring-[color:color-mix(in_srgb,var(--theme-color)_22%,transparent)]"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                          onClick={() => field.onChange(mode.modeCode)}
+                        >
+                          {isOnlineModeMaster(mode) ? <Smartphone size={16} /> : <Banknote size={16} />}
+                          {paymentModeLabel(mode, gatewayConfig?.gatewayName)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {errors.mode?.message ? <p className="mt-1.5 fs-12 font-medium text-rose-600">{errors.mode.message}</p> : null}
+                </div>
+              )}
+            />
+
             {onlineSelected ? (
-              <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 fs-12 text-emerald-800">
+              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 fs-12 text-emerald-800">
                 {lockedInvoice || selectedInvoice
-                  ? `Collect Online opens ${gatewayConfig?.gatewayName ?? "the payment gateway"} (Pay Now or payment link). The payment is recorded automatically once it succeeds.`
+                  ? `Collect Online opens ${gatewayConfig?.gatewayName ?? "the payment gateway"} — Pay Now (UPI, card, netbanking) or send a payment link. The payment is recorded automatically once it succeeds.`
                   : "Select an invoice to collect an online payment."}
               </p>
             ) : null}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              {selectedMode?.requiresReference ? (
+                <Input label={referenceLabelForMode(watchedMode)} placeholder="Optional" maxLength={120} {...register("referenceNo")} />
+              ) : null}
+              <div className={selectedMode?.requiresReference ? "" : "md:col-span-2"}>
+                <Input label="Notes" placeholder="Optional" maxLength={255} disabled={onlineSelected} {...register("remarks")} />
+              </div>
+            </div>
           </FormSection>
+
+          <aside className="lg:sticky lg:top-24">
+            <FormSection title={summaryInvoice ? "Invoice Summary" : "Customer Summary"} contentClassName="space-y-4">
+              {summaryInvoice ? (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate fs-16 font-bold text-slate-950">{summaryInvoice.invoiceNo}</p>
+                      <p className="mt-0.5 fs-12 text-slate-500">{summaryInvoice.customerName} · {formatDate(summaryInvoice.invoiceDate)}</p>
+                    </div>
+                    <StatusBadge label={summaryInvoice.paymentStatus} />
+                  </div>
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Invoice total</dt><dd className="font-semibold tabular-nums text-slate-900">{formatCurrency(summaryInvoice.totalAmount)}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Already paid</dt><dd className="font-semibold tabular-nums text-slate-900">{formatCurrency(summaryInvoice.paidAmount)}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Balance due</dt><dd className="font-bold tabular-nums text-rose-600">{formatCurrency(summaryInvoice.balanceAmount)}</dd></div>
+                  </dl>
+                  <div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
+                      <div className="flex h-full">
+                        <div className="h-full bg-emerald-500" style={{ width: `${paidPercent}%` }} />
+                        <div className="h-full bg-emerald-300" style={{ width: `${thisPaymentPercent}%` }} />
+                      </div>
+                    </div>
+                    <p className="mt-1.5 fs-11 text-slate-500">{(paidPercent + thisPaymentPercent).toFixed(0)}% paid after this payment</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex justify-between gap-3 text-sm"><span className="text-slate-500">This payment</span><span className="font-semibold tabular-nums text-slate-900">{formatCurrency(validAmount)}</span></div>
+                    <div className="mt-1.5 flex justify-between gap-3 text-sm">
+                      <span className="font-semibold text-slate-700">Remaining after</span>
+                      <span className={`font-bold tabular-nums ${remainingAfter === 0 ? "text-emerald-600" : "text-slate-950"}`}>{remainingAfter === 0 ? "Fully paid" : formatCurrency(remainingAfter)}</span>
+                    </div>
+                  </div>
+                </>
+              ) : selectedCustomer ? (
+                <>
+                  <div>
+                    <p className="truncate fs-16 font-bold text-slate-950">{selectedCustomer.name}</p>
+                    <p className="mt-0.5 fs-12 text-slate-500">{selectedCustomer.mobile}</p>
+                  </div>
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Unpaid invoices</dt><dd className="font-semibold tabular-nums text-slate-900">{invoiceOptions.length}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-slate-500">Total due</dt><dd className="font-bold tabular-nums text-rose-600">{formatCurrency(customerDue)}</dd></div>
+                  </dl>
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 fs-12 text-slate-600">
+                    No invoice selected: the amount is applied to this customer's oldest unpaid invoices first; anything extra stays as advance.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-500">Select a customer to see their dues.</p>
+              )}
+            </FormSection>
+          </aside>
         </form>
       </div>
 
@@ -382,9 +518,7 @@ export const PaymentEntryPage = () => {
           onClose={() => {
             setOnlineCollectInvoice(null);
             if (onlinePaidRef.current) {
-              resetForm();
-              // Balance badal gaya: dropdown ke dues taaze karo.
-              void getInvoices({ size: 1000 }).then(setInvoices).catch(() => undefined);
+              afterPaymentSaved();
             }
           }}
         />

@@ -1,25 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, Banknote, Gauge, HeartPulse, ReceiptText, TrendingUp, UsersRound } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
-import { getAnalyticsSummary, getCustomerDueList, getLowStockProducts, getOwnerAnalytics } from "../api/analytics";
+import { Activity, Gauge, PieChart as PieChartIcon, ReceiptText, UsersRound } from "lucide-react";
+import { getCustomerDueList, getLowStockProducts, getOwnerAnalytics } from "../api/analytics";
 import { getCustomersPage } from "../api/customers";
 import { getExpensesPage } from "../api/expenses";
 import { getInvoicesPage } from "../api/invoices";
 import { getPaymentsPage } from "../api/payments";
+import { ANALYTICS_COLORS, CashFlowChart, MoneyFlow, MonthlyRevenueChart, ReceivablesChart } from "../components/analytics/AnalyticsCharts";
 import { Button } from "../components/Button";
 import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
 import { GlassCard } from "../components/GlassCard";
@@ -27,14 +13,14 @@ import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { StatCard } from "../components/StatCard";
+import { RankedBarList } from "../components/dashboard/RankedBarList";
 import { Table } from "../components/Table";
-import { TrendBadge } from "../components/TrendBadge";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
-import { CHART_PALETTE, getChartTheme } from "../lib/chartTheme";
+import { buildChartPeriods } from "../lib/chartPeriods";
 import { useIsDarkMode } from "../hooks/useIsDarkMode";
-import type { AnalyticsSummary, Customer, CustomerDue, Expense, Invoice, LowStockProduct, OwnerAnalytics, PageResponse, Payment } from "../types/api";
+import type { Customer, CustomerDue, Expense, Invoice, LowStockProduct, OwnerAnalytics, PageResponse, Payment } from "../types/api";
 
 type DatePreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 type AnalyticsDrilldownKey = "revenue" | "collections" | "outstanding" | "expenses" | "customers";
@@ -80,11 +66,9 @@ const buildRange = (preset: DatePreset) => {
   return { startDate: toIso(start), endDate: toIso(today) };
 };
 
-const chartColors = CHART_PALETTE;
-
 export const SalesAnalyticsPage = () => {
-  const chart = getChartTheme(useIsDarkMode());
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const dark = useIsDarkMode();
+  const colors = dark ? ANALYTICS_COLORS.dark : ANALYTICS_COLORS.light;
   const [overview, setOverview] = useState<OwnerAnalytics | null>(null);
   const [lowStockPage, setLowStockPage] = useState<PageResponse<LowStockProduct>>({
     records: [],
@@ -112,12 +96,10 @@ export const SalesAnalyticsPage = () => {
 
   useEffect(() => {
     void Promise.all([
-      getAnalyticsSummary(activeRange),
       getOwnerAnalytics(activeRange),
       getLowStockProducts({ page: 0, size: DEFAULT_PAGE_SIZE }),
       getCustomerDueList({ page: 0, size: DEFAULT_PAGE_SIZE })
-    ]).then(([summaryData, ownerData, lowStockData, dueData]) => {
-      setSummary(summaryData);
+    ]).then(([ownerData, lowStockData, dueData]) => {
       setOverview(ownerData);
       setLowStockPage(lowStockData);
       setDueCustomersPage(dueData);
@@ -138,47 +120,62 @@ export const SalesAnalyticsPage = () => {
     setDrilldownSearch("");
   };
 
-  const salesVsPayments = useMemo(() => {
-    const collectionsByLabel = new Map((overview?.collectionTrend ?? []).map((point) => [point.label, point.value]));
-    const expensesByLabel = new Map((overview?.expenseTrend ?? []).map((point) => [point.label, point.value]));
-    const profitByLabel = new Map((overview?.netProfitTrend ?? []).map((point) => [point.label, point.value]));
-    return (overview?.salesTrend ?? []).map((point) => ({
-      label: point.label,
-      sales: point.value,
-      payments: collectionsByLabel.get(point.label) ?? 0,
-      expense: expensesByLabel.get(point.label) ?? 0,
-      netProfit: profitByLabel.get(point.label) ?? 0
-    }));
-  }, [overview]);
+  // Trend buckets ki asli dates (backend label "15" / "Oct" par nirbhar nahi). Series index se jodo.
+  const periods = useMemo(
+    () => buildChartPeriods(overview?.startDate ?? activeRange.startDate, overview?.endDate ?? activeRange.endDate, overview?.salesTrend.length ?? 0),
+    [overview, activeRange]
+  );
+  const periodAt = (position: number, fallback: string) => ({
+    axisLabel: periods?.[position]?.axisLabel ?? fallback,
+    fullLabel: periods?.[position]?.fullLabel ?? fallback
+  });
+  const cashFlow = useMemo(
+    () => (overview?.collectionTrend ?? []).map((point, position) => ({
+      ...periodAt(position, point.label),
+      collected: Number(point.value ?? 0),
+      expense: Number(overview?.expenseTrend[position]?.value ?? 0)
+    })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [overview, periods]
+  );
+  const receivables = useMemo(
+    () => (overview?.outstandingTrend ?? []).map((point, position) => ({ ...periodAt(position, point.label), value: Number(point.value ?? 0) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [overview, periods]
+  );
+  // monthlyRevenue: end date tak ke 12 mahine, label "Oct 2026".
+  const monthlyRevenue = useMemo(
+    () => (overview?.monthlyRevenue ?? []).map((point) => {
+      const [monthName, year] = String(point.label).split(" ");
+      // Axis par sirf mahina; saal sirf January par (12 labels "Nov 25Dec 25…" chipak jaate the).
+      const axisLabel = monthName === "Jan" && year ? `Jan '${year.slice(-2)}` : monthName;
+      return { axisLabel, fullLabel: point.label, value: Number(point.value ?? 0) };
+    }),
+    [overview]
+  );
 
-  const revenueMix = useMemo(() => {
-    const sales = overview?.totalSales ?? 0;
-    const collections = overview?.totalCollection ?? 0;
-    const expense = overview?.totalExpense ?? 0;
-    const outstanding = overview?.outstandingAmount ?? 0;
-    return [
-      { name: "Revenue", value: sales },
-      { name: "Collection", value: collections },
-      { name: "Expense", value: expense },
-      { name: "Outstanding", value: outstanding }
-    ].filter((item) => item.value > 0);
-  }, [overview]);
   const executiveKpis = useMemo(() => {
-    const sales = overview?.totalSales ?? 0;
-    const collections = overview?.totalCollection ?? 0;
-    const outstanding = overview?.outstandingAmount ?? 0;
-    const invoices = overview?.totalInvoices ?? 0;
-    const customers = overview?.newCustomers ?? 0;
-    const efficiency = sales > 0 ? collections / sales * 100 : 0;
-    const recovery = collections + outstanding > 0 ? collections / (collections + outstanding) * 100 : 0;
+    const sales = Number(overview?.totalSales ?? 0);
+    const collections = Number(overview?.totalCollection ?? 0);
+    const expense = Number(overview?.totalExpense ?? 0);
+    const outstanding = Number(overview?.outstandingAmount ?? 0);
+    const invoices = Number(overview?.totalInvoices ?? 0);
+    const start = new Date(`${activeRange.startDate}T00:00:00`);
+    const end = new Date(`${activeRange.endDate}T00:00:00`);
+    const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1);
+    // DSO = outstanding ÷ (period ki billing ÷ din). Pehle "outstanding ÷ (collections ÷ 30)"
+    // tha — har range ko 30 din maanta tha aur data na ho to bhi "1 days" dikhata.
+    const dso = sales > 0 ? outstanding / (sales / days) : null;
     return {
-      collectionEfficiency: `${efficiency.toFixed(1)}%`,
-      averageInvoiceValue: formatCurrency(invoices > 0 ? sales / invoices : 0),
-      averageCollectionDays: `${Math.max(1, Math.round(outstanding > 0 && collections > 0 ? outstanding / Math.max(collections / 30, 1) : 0))} days`,
-      customerGrowth: `${customers}`,
-      recoveryRate: `${recovery.toFixed(1)}%`
+      collectionEfficiency: sales > 0 ? `${((collections / sales) * 100).toFixed(1)}%` : "—",
+      averageInvoiceValue: invoices > 0 ? formatCurrency(sales / invoices) : "—",
+      invoiceCount: invoices,
+      dso: dso === null ? "—" : `${dso < 10 ? dso.toFixed(1) : Math.round(dso)} days`,
+      customerGrowth: `${overview?.newCustomers ?? 0}`,
+      // Pehle "Recovery rate" = collections ÷ (collections + all-time outstanding): do alag scope mix.
+      expenseRatio: collections > 0 ? `${((expense / collections) * 100).toFixed(1)}%` : expense > 0 ? "—" : "0%"
     };
-  }, [overview]);
+  }, [overview, activeRange]);
 
   const drilldownColumns = useMemo<DashboardDetailModalColumn<AnalyticsDrilldownRow>[]>(() => {
     if (activeDrilldown === "collections") {
@@ -281,7 +278,7 @@ export const SalesAnalyticsPage = () => {
     <div className="space-y-4 pb-6">
       <Header
         title="Analytics"
-        subtitle="Executive view of revenue, collection, recovery, outstanding exposure, customer performance, and business health."
+        subtitle="Cash flow, receivables, 12-month revenue and stock alerts for the selected period."
       />
 
       <GlassCard className="p-6 md:p-7">
@@ -314,157 +311,59 @@ export const SalesAnalyticsPage = () => {
       </GlassCard>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Collection Efficiency" value={executiveKpis.collectionEfficiency} caption="Collections against billed revenue." icon={<Gauge size={18} />} onClick={() => openDrilldown("collections")} />
-        <StatCard label="Avg Invoice Value" value={executiveKpis.averageInvoiceValue} caption="Revenue per invoice." icon={<ReceiptText size={18} />} onClick={() => openDrilldown("revenue")} />
-        <StatCard label="Avg Collection Days" value={executiveKpis.averageCollectionDays} caption="Receivable pressure estimate." icon={<Activity size={18} />} onClick={() => openDrilldown("outstanding")} />
-        <StatCard label="Customer Growth" value={executiveKpis.customerGrowth} caption="New customers in range." icon={<UsersRound size={18} />} onClick={() => openDrilldown("customers")} />
-        <StatCard label="Recovery Rate" value={executiveKpis.recoveryRate} caption="Cash recovered from receivables." icon={<HeartPulse size={18} />} onClick={() => openDrilldown("collections")} />
+        <StatCard label="Collection Efficiency" value={executiveKpis.collectionEfficiency} caption="Collected ÷ billed" icon={<Gauge size={18} />} onClick={() => openDrilldown("collections")} />
+        <StatCard label="Avg Invoice Value" value={executiveKpis.averageInvoiceValue} caption={`Across ${executiveKpis.invoiceCount} invoice${executiveKpis.invoiceCount === 1 ? "" : "s"}`} icon={<ReceiptText size={18} />} onClick={() => openDrilldown("revenue")} />
+        <StatCard label="Days Sales Outstanding" value={executiveKpis.dso} caption="Outstanding ÷ daily billing" icon={<Activity size={18} />} onClick={() => openDrilldown("outstanding")} />
+        <StatCard label="New Customers" value={executiveKpis.customerGrowth} caption="Added in this period" icon={<UsersRound size={18} />} onClick={() => openDrilldown("customers")} />
+        <StatCard label="Expense Ratio" value={executiveKpis.expenseRatio} caption="Expenses ÷ collected" icon={<PieChartIcon size={18} />} onClick={() => openDrilldown("expenses")} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.9fr]">
         <GlassCard className="p-6 md:p-7">
-          <div className="mb-5">
-            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Business Health</p>
-            <h2 className="mt-2 fs-18 font-semibold text-white">Revenue, collection, and risk mix</h2>
+          <div className="mb-4">
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Cash flow</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Cash in vs cash out</h2>
           </div>
-          <div className="h-80 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={revenueMix} dataKey="value" nameKey="name" innerRadius={68} outerRadius={110} paddingAngle={4}>
-                  {revenueMix.map((entry, index) => (
-                    <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
-                <Legend iconType="circle" wrapperStyle={{ color: chart.legend, fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <CashFlowChart data={cashFlow} dark={dark} />
         </GlassCard>
 
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Revenue vs Expense</p>
-            <h2 className="mt-2 fs-18 font-semibold text-white">Net profit movement</h2>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Money flow</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Where this period's money went</h2>
           </div>
-          <div className="h-80 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salesVsPayments}>
-                <CartesianGrid stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
-                <Legend wrapperStyle={{ color: chart.legend, fontSize: 12 }} />
-                <Bar dataKey="sales" name="Revenue" fill="#38bdf8" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="payments" name="Collection" fill="#10b981" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="expense" name="Expense" fill="#f97316" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="netProfit" name="Net Profit" fill="#a78bfa" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <MoneyFlow billed={Number(overview?.totalSales ?? 0)} collected={Number(overview?.totalCollection ?? 0)} expense={Number(overview?.totalExpense ?? 0)} dark={dark} />
         </GlassCard>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+      <div className="grid gap-4 xl:grid-cols-2">
         <GlassCard className="p-6 md:p-7">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Revenue Trend</p>
-              <h2 className="mt-2 fs-18 font-semibold text-white">Revenue momentum</h2>
-            </div>
-            {summary ? <TrendBadge status={summary.trendStatus} percentage={summary.salesTrendPercentage} /> : null}
+          <div className="mb-4">
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Revenue trend</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Last 12 months billing</h2>
           </div>
-          <div className="h-80 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={overview?.salesTrend ?? []}>
-                <CartesianGrid stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
-                <Area type="monotone" dataKey="value" name="Sales" stroke="#38bdf8" strokeWidth={3} fill="#38bdf8" fillOpacity={0.18} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <MonthlyRevenueChart data={monthlyRevenue} dark={dark} />
         </GlassCard>
 
         <GlassCard className="p-6 md:p-7">
-          <div className="mb-5">
-            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Outstanding Trend</p>
-            <h2 className="mt-2 fs-18 font-semibold text-white">Receivable exposure</h2>
+          <div className="mb-4">
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Receivables</p>
+            <h2 className="mt-2 fs-18 font-semibold text-white">Outstanding balance over the period</h2>
           </div>
-          <div className="h-80 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={overview?.outstandingTrend ?? []}>
-                <CartesianGrid stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
-                <Bar dataKey="value" fill="#f97316" radius={[10, 10, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ReceivablesChart data={receivables} dark={dark} />
         </GlassCard>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+      <div className="grid gap-4 xl:grid-cols-2">
         <GlassCard className="p-6 md:p-7">
           <div className="mb-5">
-            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Net Profit Trend</p>
-            <h2 className="mt-2 fs-18 font-semibold text-white">Profit after expenses</h2>
-          </div>
-          <div className="h-80 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={overview?.netProfitTrend ?? []}>
-                <CartesianGrid stroke={chart.grid} vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <YAxis tick={{ fill: chart.text, fontSize: 11 }} stroke={chart.grid} tickLine={false} />
-                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
-                <Area type="monotone" dataKey="value" name="Net Profit" stroke="#a78bfa" strokeWidth={3} fill="#a78bfa" fillOpacity={0.2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-6 md:p-7">
-          <div className="mb-5">
-            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Expense Signals</p>
-            <h2 className="mt-2 fs-18 font-semibold text-white">Cost and profitability signals</h2>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("revenue")}>
-              <p className="text-sm text-slate-400"><TrendingUp className="mr-2 inline" size={16} />Net Revenue</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{formatCurrency(overview?.netRevenue)}</p>
-            </button>
-            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
-              <p className="text-sm text-slate-400"><Banknote className="mr-2 inline" size={16} />Total Expense</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{formatCurrency(overview?.totalExpense)}</p>
-            </button>
-            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("expenses")}>
-              <p className="text-sm text-slate-400">Expense Categories</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{overview?.expenseByCategory?.length ?? 0}</p>
-            </button>
-            <button type="button" className="rounded-lg border border-white/10 bg-white/5 p-5 text-left transition hover:border-white/25 hover:bg-white/10" onClick={() => openDrilldown("customers")}>
-              <p className="text-sm text-slate-400">Due Customers</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{summary?.dueCustomers ?? 0}</p>
-              <p className="mt-2 text-xs text-slate-400">Recovery focus count.</p>
-            </button>
-          </div>
-        </GlassCard>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <GlassCard className="p-6 md:p-7">
-          <div className="mb-5">
-            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Expense By Category</p>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Expense by category</p>
             <h2 className="mt-2 fs-18 font-semibold text-white">Where spend is going</h2>
           </div>
-          <Table
-            data={overview?.expenseByCategory ?? []}
-            emptyText="No expenses in this range."
-            columns={[
-              { key: "category", header: "Category", render: (item) => <span className="font-semibold text-white">{item.label}</span> },
-              { key: "expense", header: "Expense", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.value)}</span> }
-            ]}
+          <RankedBarList
+            color={colors.expense}
+            emptyText="No expenses recorded in this period."
+            items={(overview?.expenseByCategory ?? []).map((item) => ({ id: item.label, label: item.label, value: Number(item.value ?? 0) }))}
           />
         </GlassCard>
 
@@ -482,15 +381,29 @@ export const SalesAnalyticsPage = () => {
               onPageChange={(nextPage) => void loadLowStockProducts(nextPage)}
             layout="inline" />
           </div>
-          <Table
-            data={lowStockPage.records}
-            emptyText="No low stock products."
-            columns={[
-              { key: "product", header: "Product", render: (item) => <div><p className="font-semibold text-white">{item.productName}</p><p className="text-xs text-slate-400">{item.sku}</p></div> },
-              { key: "stock", header: "Stock", className: "text-right", render: (item) => <span className="block text-right font-semibold text-amber-200">{item.stockQty}</span> },
-              { key: "min", header: "Min", className: "text-right", render: (item) => <span className="block text-right">{item.minStockQty}</span> }
-            ]}
-          />
+          {lowStockPage.records.length ? (
+            <ul className="space-y-3">
+              {lowStockPage.records.map((item) => {
+                const stock = Number(item.stockQty ?? 0);
+                const min = Math.max(1, Number(item.minStockQty ?? 0));
+                const level = Math.min(100, (stock / min) * 100);
+                return (
+                  <li key={item.productId ?? item.sku} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 truncate fs-13 font-semibold text-slate-800">{item.productName} <span className="ml-1 fs-11 font-normal text-slate-400">{item.sku}</span></p>
+                      <p className="shrink-0 fs-12 text-slate-500"><span className={`font-bold ${stock <= 0 ? "text-rose-600" : "text-amber-700 dark:text-amber-300"}`}>{stock}</span> / min {item.minStockQty}</p>
+                    </div>
+                    {/* Meter: track same ramp ka halka step; stock min ke kitna kareeb hai. */}
+                    <div className="mt-2 h-2 rounded-full" style={{ background: "color-mix(in srgb, #eda100 18%, transparent)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(2, level)}%`, background: stock <= 0 ? colors.due : "#eda100" }} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">All products are above their minimum stock.</div>
+          )}
         </GlassCard>
       </div>
 
@@ -510,11 +423,12 @@ export const SalesAnalyticsPage = () => {
         </div>
         <Table
           data={dueCustomersPage.records}
+          minHeightClass="min-h-0"
           emptyText="No outstanding customer balances."
           columns={[
             { key: "customer", header: "Customer", render: (item) => <div><p className="font-semibold text-white">{item.customerName}</p><p className="text-xs text-slate-400">{item.mobile}</p></div> },
             { key: "email", header: "Email", render: (item) => item.email ?? "--" },
-            { key: "due", header: "Current Due", className: "text-right", render: (item) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.currentBalance)}</span> }
+            { key: "due", header: "Current Due", className: "text-right", render: (item) => <span className="block whitespace-nowrap text-right font-semibold text-rose-600">{formatCurrency(item.currentBalance)}</span> }
           ]}
         />
       </GlassCard>

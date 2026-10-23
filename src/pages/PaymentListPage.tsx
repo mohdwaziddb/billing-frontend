@@ -28,7 +28,8 @@ import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
 import { fetchAllPages } from "../lib/fetchAllPages";
 import { formatDate } from "../lib/format";
-import { paymentModeDisplay } from "../modules/payments/paymentModeOptions";
+import { usePaymentGatewayConfig } from "../modules/payments/hooks/usePaymentGatewayConfig";
+import { paymentModeDisplay, paymentModeLabel } from "../modules/payments/paymentModeOptions";
 import { notificationService } from "../services/notificationService";
 import type { NotificationLog, PageResponse, Payment, PaymentModeMaster } from "../types/api";
 
@@ -130,6 +131,7 @@ export const PaymentListPage = () => {
   });
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
+  const { config: gatewayConfig } = usePaymentGatewayConfig();
 
   const list = useListPage<Payment, PaymentFilters>({
     initialFilters: emptyFilters,
@@ -166,8 +168,17 @@ export const PaymentListPage = () => {
       totals[item.mode] = (totals[item.mode] ?? 0) + Number(item.amount ?? 0);
       return totals;
     }, {}),
-    outstandingCollection: exportRows.filter((item) => item.invoiceNo).reduce((sum, item) => sum + Number(item.amount ?? 0), 0)
   }), [exportRows]);
+  // Active modes ke cards + baaki sab (purane / band modes jaise UPI, Card) ek "Other modes" card me —
+  // taaki cards ka jod hamesha Total Collection ke barabar rahe (pehle UPI ki payment kahin nahi dikhti thi).
+  const modeCards = useMemo(() => paymentModes.slice(0, 2), [paymentModes]);
+  const otherModes = useMemo(() => {
+    const shown = new Set(modeCards.map((mode) => mode.modeCode));
+    return Object.entries(summary.byMode)
+      .filter(([code, amount]) => !shown.has(code) && amount > 0)
+      .sort((a, b) => b[1] - a[1]);
+  }, [modeCards, summary.byMode]);
+  const otherModesTotal = otherModes.reduce((sum, [, amount]) => sum + amount, 0);
   const modalGrandTotal = useMemo(() => modalPayments.reduce((sum, item) => sum + Number(item.amount ?? 0), 0), [modalPayments]);
   const paymentColumns = useMemo(() => basePaymentColumns(), []);
   const visiblePaymentColumns = useMemo(() => applyVisibleColumns(paymentColumns, visibleColumns), [paymentColumns, visibleColumns]);
@@ -328,10 +339,19 @@ export const PaymentListPage = () => {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <StatCard label="Total Payments" value={String(summary.total)} caption="Current filtered payments" icon={<CreditCard size={18} />} onClick={() => openSummary("total")} />
           <StatCard label="Total Collection" value={formatCurrency(summary.collection)} caption="All payment modes" icon={<Wallet size={18} />} onClick={() => openSummary("collection")} />
-          {paymentModes.slice(0, 2).map((mode) => (
-            <StatCard key={mode.modeCode} label={`${mode.modeName} Collection`} value={formatCurrency(summary.byMode[mode.modeCode] ?? 0)} caption={`${mode.modeName} payments`} icon={<CreditCard size={18} />} onClick={() => openSummary(`mode:${mode.modeCode}`)} />
-          ))}
-          <StatCard label="Outstanding Collection" value={formatCurrency(summary.outstandingCollection)} caption="Invoice-linked payments" icon={<AlertCircle size={18} />} onClick={() => openSummary("outstanding")} />
+          {modeCards.map((mode) => {
+            const label = paymentModeLabel(mode, gatewayConfig?.gatewayName);
+            return (
+              <StatCard key={mode.modeCode} label={`${label} Collection`} value={formatCurrency(summary.byMode[mode.modeCode] ?? 0)} caption={`${label} payments`} icon={<CreditCard size={18} />} onClick={() => openSummary(`mode:${mode.modeCode}`)} />
+            );
+          })}
+          <StatCard
+            label="Other Modes"
+            value={formatCurrency(otherModesTotal)}
+            caption={otherModes.length ? otherModes.map(([code, amount]) => `${code.replace(/_/g, " ")} ${formatCurrency(amount)}`).join(" · ") : "Older modes (UPI, Card…)"}
+            icon={<AlertCircle size={18} />}
+            onClick={otherModes.length === 1 ? () => openSummary(`mode:${otherModes[0][0]}`) : undefined}
+          />
         </div>
       }
       filterFields={
@@ -513,14 +533,14 @@ const basePaymentColumns = () => [
     key: "customer",
     header: "Customer",
     render: (item: Payment) => (
-      <div>
+      <div className="whitespace-nowrap">
         <p className="font-semibold text-white">{item.customerName}</p>
         <p className="text-xs text-slate-400">{item.customerMobile ?? "--"}</p>
       </div>
     )
   },
   { key: "invoice", header: "Invoice Number", render: (item: Payment) => item.invoiceNo ?? "Unapplied" },
-  { key: "date", header: "Payment Date", render: (item: Payment) => formatDate(item.paymentDate) },
+  { key: "date", header: "Payment Date", render: (item: Payment) => <span className="whitespace-nowrap">{formatDate(item.paymentDate)}</span> },
   { key: "mode", header: "Method", render: (item: Payment) => (
     item.source === "GATEWAY"
       ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 fs-11 font-semibold text-emerald-700">{paymentModeDisplay(item)}</span>

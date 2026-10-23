@@ -25,9 +25,16 @@ export const CommonColumnSelector = ({
   onApply: (columns: string[]) => void;
   localOnly?: boolean;
 }) => {
-  const defaultColumns = useMemo(() => availableColumns.map((column) => column.key), [availableColumns]);
-  const lockedColumns = useMemo(() => availableColumns.filter((column) => column.locked).map((column) => column.key), [availableColumns]);
-  const selectableColumns = useMemo(() => availableColumns.filter((column) => !column.locked).map((column) => column.key), [availableColumns]);
+  // Parent har render par naya availableColumns array deta hai (CommonListPage .map). Memo ko
+  // keys ke string par tikao — warna defaultColumns har render naya, neeche ka setDraft effect
+  // har render chalta aur preference load hone tak "Maximum update depth exceeded" loop.
+  const columnsSignature = availableColumns.map((column) => `${column.key}:${column.locked ? 1 : 0}`).join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const defaultColumns = useMemo(() => availableColumns.map((column) => column.key), [columnsSignature]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lockedColumns = useMemo(() => availableColumns.filter((column) => column.locked).map((column) => column.key), [columnsSignature]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const selectableColumns = useMemo(() => availableColumns.filter((column) => !column.locked).map((column) => column.key), [columnsSignature]);
   const [draft, setDraft] = useState<string[]>(visibleColumns.length ? visibleColumns : defaultColumns);
   const saveSequence = useRef(0);
   const { open, toggle: togglePanel, buttonRef, panelRef, panelStyle } = useAnchoredPanel({
@@ -95,7 +102,11 @@ export const CommonColumnSelector = ({
         if (cancelled) {
           return;
         }
-        const valid = normalizeColumns(preference.visibleColumns);
+        // Saved preference me ek bhi (non-locked) column na ho = kabhi save hi nahi hua
+        // (naya user). Pehle yahan sirf locked column bachta tha aur naye user ko table me
+        // akela "Payment Ref" dikhta tha — ab saare default columns.
+        const savedKeys = (preference.visibleColumns ?? []).filter((key) => selectableColumns.includes(key));
+        const valid = savedKeys.length ? normalizeColumns(preference.visibleColumns) : defaultColumns;
         if (valid.length) {
           setDraft(valid);
           onApply(valid);

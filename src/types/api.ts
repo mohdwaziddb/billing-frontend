@@ -292,10 +292,11 @@ export type DashboardSummary = {
   cgstCollected: number;
   sgstCollected: number;
   igstCollected: number;
-  totalSalesTrendPercentage: number;
-  collectionTrendPercentage: number;
-  outstandingTrendPercentage: number;
-  totalCustomersTrendPercentage: number;
+  /** null = pichhle period me 0 tha (koi baseline nahi) — UI "New" dikhata hai. */
+  totalSalesTrendPercentage: number | null;
+  collectionTrendPercentage: number | null;
+  outstandingTrendPercentage: number | null;
+  totalCustomersTrendPercentage: number | null;
   topCustomers: DashboardTopCustomer[];
 };
 
@@ -984,7 +985,8 @@ export type SalesReferralInvoice = {
 export type SalesReferralUserSummary = {
   userId: number;
   userName: string;
-  username: string;
+  username?: string;
+  loginName?: string;
   totalInvoices: number;
   totalRevenue: number;
   paidRevenue: number;
@@ -1104,7 +1106,11 @@ export type ProfitLossPoint = {
   label: string;
   revenue?: number;
   expense?: number;
+  /** Cash view: collections − expense. */
   netRevenue?: number;
+  costOfGoodsSold?: number;
+  /** Profit view (cards jaisa): revenue − COGS − expense. */
+  netProfit?: number;
   value?: number;
 };
 

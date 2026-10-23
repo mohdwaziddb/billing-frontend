@@ -2,29 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import { getPaymentGatewayConfig } from "../paymentGateway.api";
 import type { PaymentGatewayPublicConfig } from "../payment.types";
 
-let cachedConfig: PaymentGatewayPublicConfig | null = null;
+// Koi cache nahi: har screen par live config (gateway on/off turant dikhe).
+// Sirf ek hi waqt ki duplicate calls ek request share karti hain.
 let inflight: Promise<PaymentGatewayPublicConfig> | null = null;
 
-const loadConfig = (force = false) => {
-  if (cachedConfig && !force) {
-    return Promise.resolve(cachedConfig);
-  }
-  if (!inflight || force) {
-    inflight = getPaymentGatewayConfig()
-      .then((config) => {
-        cachedConfig = config;
-        return config;
-      })
-      .finally(() => {
-        inflight = null;
-      });
+const loadConfig = () => {
+  if (!inflight) {
+    inflight = getPaymentGatewayConfig().finally(() => {
+      inflight = null;
+    });
   }
   return inflight;
-};
-
-/** Settings save hone par purana "online on/off" cache hatao. */
-export const clearPaymentGatewayConfigCache = () => {
-  cachedConfig = null;
 };
 
 /**
@@ -32,13 +20,13 @@ export const clearPaymentGatewayConfigCache = () => {
  * nahi / network) to online band maan lo — offline flow kabhi block na ho.
  */
 export const usePaymentGatewayConfig = (enabled = true) => {
-  const [config, setConfig] = useState<PaymentGatewayPublicConfig | null>(cachedConfig);
-  const [loading, setLoading] = useState(enabled && !cachedConfig);
+  const [config, setConfig] = useState<PaymentGatewayPublicConfig | null>(null);
+  const [loading, setLoading] = useState(enabled);
 
-  const reload = useCallback(async (force = true) => {
+  const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setConfig(await loadConfig(force));
+      setConfig(await loadConfig());
     } catch {
       setConfig(null);
     } finally {
@@ -52,6 +40,7 @@ export const usePaymentGatewayConfig = (enabled = true) => {
       return;
     }
     let cancelled = false;
+    setLoading(true);
     loadConfig()
       .then((next) => {
         if (!cancelled) {

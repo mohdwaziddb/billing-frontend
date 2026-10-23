@@ -1,8 +1,8 @@
 import { apiClient } from "./apiClient";
-import { sessionCache } from "../lib/sessionCache";
 import type { ApiResponse, PageResponse, ProductCategory, ProductCategoryRequest } from "../types/api";
 
-const ACTIVE_PRODUCT_CATEGORIES_CACHE_KEY = "billing_frontend_active_product_categories";
+// Koi cache nahi: list hamesha server se live (price / stock / naam turant sahi dikhein).
+// Pehle sessionStorage cache tab band hone tak purana data dikhata tha.
 let activeProductCategoriesPromise: Promise<ProductCategory[]> | null = null;
 
 const isActiveLookupRequest = (params?: { search?: string; active?: boolean; page?: number; size?: number }) =>
@@ -17,16 +17,9 @@ export const getProductCategoriesPage = async (params?: { search?: string; activ
 
 export const getProductCategories = async (params?: { search?: string; active?: boolean; page?: number; size?: number }) => {
   if (isActiveLookupRequest(params)) {
-    const cached = sessionCache.get<ProductCategory[]>(ACTIVE_PRODUCT_CATEGORIES_CACHE_KEY);
-    if (cached) {
-      return cached;
-    }
     if (!activeProductCategoriesPromise) {
       activeProductCategoriesPromise = getProductCategoriesPage(params)
-        .then((response) => {
-          sessionCache.set(ACTIVE_PRODUCT_CATEGORIES_CACHE_KEY, response.records);
-          return response.records;
-        })
+        .then((response) => response.records)
         .finally(() => {
           activeProductCategoriesPromise = null;
         });
@@ -39,17 +32,14 @@ export const getProductCategories = async (params?: { search?: string; active?: 
 
 export const createProductCategory = async (payload: ProductCategoryRequest) => {
   const response = await apiClient.post<ApiResponse<ProductCategory>>("/v1/product-categories", payload);
-  sessionCache.clear(ACTIVE_PRODUCT_CATEGORIES_CACHE_KEY);
   return response.data.data;
 };
 
 export const updateProductCategory = async (id: number, payload: ProductCategoryRequest) => {
   const response = await apiClient.put<ApiResponse<ProductCategory>>(`/v1/product-categories/${id}`, payload);
-  sessionCache.clear(ACTIVE_PRODUCT_CATEGORIES_CACHE_KEY);
   return response.data.data;
 };
 
 export const deleteProductCategory = async (id: number) => {
   await apiClient.delete(`/v1/product-categories/${id}`);
-  sessionCache.clear(ACTIVE_PRODUCT_CATEGORIES_CACHE_KEY);
 };

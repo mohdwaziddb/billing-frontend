@@ -1,34 +1,25 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Banknote, Boxes, ChevronDown, ChevronUp, CreditCard, Download, FileText, Search, TrendingUp, Users, Wallet } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { getCustomerDueList, getOwnerAnalytics, getSalesByCategoryDetails, getTopProducts } from "../api/analytics";
 import { getDashboardDetails, getDashboardSummary } from "../api/dashboard";
 import { getInvoicesPage } from "../api/invoices";
 import { Button } from "../components/Button";
 import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
+import { RankedBarList } from "../components/dashboard/RankedBarList";
+import { SALES_COLLECTION_COLORS, SalesCollectionsChart, type SalesCollectionsPoint } from "../components/dashboard/SalesCollectionsChart";
 import { Header } from "../components/Header";
 import { MfaEnrollBanner } from "../components/MfaEnrollBanner";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
-import { Select } from "../components/Select";
-import { StatCard } from "../components/StatCard";
+import { StatCard, type StatGrowthTone } from "../components/StatCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
-import { formatAmount, formatCompactCurrency, formatCurrency } from "../lib/currency";
+import { formatAmount, formatCompactCurrency, formatCurrency, formatShortCurrency } from "../lib/currency";
 import { getChartTheme } from "../lib/chartTheme";
+import { buildChartPeriods } from "../lib/chartPeriods";
 import { exportToExcel } from "../lib/excelExport";
 import { formatDate } from "../lib/format";
 import type { CustomerDue, DashboardCardKey, DashboardDetail, DashboardDetailRow, DashboardSummary, Invoice, MetricPoint, OwnerAnalytics, PageResponse, SalesByCategory, TopSellingProduct } from "../types/api";
@@ -55,15 +46,16 @@ const DATE_PRESET_OPTIONS: Array<{ value: DatePreset; label: string }> = [
   { value: "custom", label: "Custom Range" }
 ];
 
-const GRAPH_PRESET_OPTIONS = DATE_PRESET_OPTIONS.filter((option) => option.value !== "custom");
 
+// Validated categorical order (dataviz reference palette, fixed order — kabhi cycle nahi).
+// Sales / collections cards aur main chart ek hi rang use karte hain taaki identity sab jagah same rahe.
 const CHART_COLORS = {
-  sales: "#2563eb",
-  collection: "#16a34a",
-  outstanding: "#ef4444",
-  customers: "#8b5cf6",
-  products: "#f97316",
-  palette: ["#2563eb", "#16a34a", "#f97316", "#8b5cf6", "#0d9488", "#f43f5e", "#64748b"]
+  sales: SALES_COLLECTION_COLORS.light.sales,
+  collection: SALES_COLLECTION_COLORS.light.collections,
+  outstanding: "#e34948",
+  customers: "#6250d6",
+  products: "#eb6834",
+  palette: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6"]
 };
 
 const OUTSTANDING_WIDGET_COLORS = {
@@ -72,15 +64,8 @@ const OUTSTANDING_WIDGET_COLORS = {
   remaining: "#f97316"
 };
 
-const categoryColorFor = (categoryName: string, index: number) => {
-  const name = categoryName.toLowerCase();
-  if (name.includes("electronic")) return "#2563eb";
-  if (name.includes("cloth") || name.includes("apparel") || name.includes("fashion")) return "#16a34a";
-  if (name.includes("print")) return "#f97316";
-  if (name.includes("service")) return "#8b5cf6";
-  if (name.includes("other") || name.includes("misc")) return "#0d9488";
-  return CHART_COLORS.palette[index % CHART_COLORS.palette.length];
-};
+// List top 7 tak hi hai (DASHBOARD_ROW_LIMIT) = 7 validated slots; index ke bahar kabhi naya rang nahi banta.
+const categoryColorFor = (_categoryName: string, index: number) => CHART_COLORS.palette[Math.min(index, CHART_COLORS.palette.length - 1)];
 
 const detailConfig: Record<DashboardCardKey, { title: string; columns: DetailColumn[]; defaultSort: string }> = {
   totalSales: {
@@ -290,25 +275,45 @@ const buildRange = (preset: DatePreset) => {
   return { startDate: toIso(start), endDate: toIso(today) };
 };
 
-const formatTrend = (value?: number | null) => {
-  const safeValue = Number(value ?? 0);
+/**
+ * vs previous period. null = pichhle period me kuch nahi tha (backend % nahi deta):
+ * current > 0 ho to "New", warna kuch nahi.
+ */
+const formatTrend = (value: number | null | undefined, current?: number | null) => {
+  if (value === null || value === undefined) {
+    return Number(current ?? 0) > 0 ? "New" : undefined;
+  }
+  const safeValue = Number(value);
   if (safeValue === 0) {
     return "0%";
   }
-  return `${safeValue > 0 ? "+" : ""}${safeValue.toFixed(2)}%`;
+  const rounded = Math.abs(safeValue) >= 100 ? safeValue.toFixed(0) : safeValue.toFixed(1);
+  return `${safeValue > 0 ? "+" : ""}${rounded}%`;
 };
 
-const computeTrendPercentage = (trend?: MetricPoint[]) => {
-  if (!trend || trend.length < 2) {
-    return 0;
+/** Up hamesha accha nahi: Outstanding badhna = bad. */
+const trendTone = (value: number | null | undefined, upIsGood: boolean): StatGrowthTone => {
+  if (value === null || value === undefined || Number(value) === 0) {
+    return "neutral";
   }
-  const latest = Number(trend[trend.length - 1]?.value ?? 0);
-  const previous = Number(trend[trend.length - 2]?.value ?? 0);
-  if (previous === 0) {
-    return latest === 0 ? 0 : latest > 0 ? 100 : -100;
-  }
-  return ((latest - previous) / Math.abs(previous)) * 100;
+  return (Number(value) > 0) === upIsGood ? "good" : "bad";
 };
+
+/** Card sparkline: period ka running total (ek din ki spike ke bajaye "ab tak kitna"). */
+const cumulative = (points?: MetricPoint[]) => {
+  let running = 0;
+  return (points ?? []).map((point) => {
+    running += Number(point.value ?? 0);
+    return running;
+  });
+};
+
+const shiftIsoDate = (iso: string, days: number) => {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(year, month - 1, day + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
 
 type DashboardListRow = Invoice | DashboardDetailRow | TopSellingProduct | SalesByCategory | CustomerDue;
 
@@ -480,7 +485,9 @@ export const DashboardPage = () => {
   const { preferences } = useAuth();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [recentInvoicesPage, setRecentInvoicesPage] = useState<PageResponse<Invoice>>(emptyPage<Invoice>());
-  const [salesTrendData, setSalesTrendData] = useState<MetricPoint[]>([]);
+  const [chartPoints, setChartPoints] = useState<SalesCollectionsPoint[]>([]);
+  const [chartUnit, setChartUnit] = useState<"day" | "month">("day");
+  const [chartLoading, setChartLoading] = useState(false);
   const [ownerAnalytics, setOwnerAnalytics] = useState<OwnerAnalytics | null>(null);
   const [topProducts, setTopProducts] = useState<TopSellingProduct[]>([]);
   const [topProductsPage, setTopProductsPage] = useState<PageResponse<TopSellingProduct>>(emptyPage<TopSellingProduct>());
@@ -490,7 +497,6 @@ export const DashboardPage = () => {
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [preset, setPreset] = useState<DatePreset>("thisMonth");
   const [customRange, setCustomRange] = useState(() => buildRange("thisMonth"));
-  const [salesTrendPreset, setSalesTrendPreset] = useState<DatePreset>("thisMonth");
   const [activeCard, setActiveCard] = useState<DashboardCardKey | null>(null);
   const [details, setDetails] = useState<DashboardDetail | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -507,22 +513,23 @@ export const DashboardPage = () => {
   const [listData, setListData] = useState<PageResponse<Invoice | DashboardDetailRow | TopSellingProduct | SalesByCategory | CustomerDue>>(emptyPage<Invoice | DashboardDetailRow | TopSellingProduct | SalesByCategory | CustomerDue>());
 
   const activeRange = useMemo(() => (preset === "custom" ? customRange : buildRange(preset)), [customRange, preset]);
-  const salesTrendRange = useMemo(() => buildRange(salesTrendPreset), [salesTrendPreset]);
+  // Chart dashboard filter ke saath chalta hai. Ek din ki range = ek bar (bekaar), isliye us din tak ke 7 din.
+  const singleDayRange = Boolean(activeRange.startDate && activeRange.startDate === activeRange.endDate);
+  const chartRange = useMemo(
+    () => (singleDayRange && activeRange.endDate ? { startDate: shiftIsoDate(activeRange.endDate, -6), endDate: activeRange.endDate } : activeRange),
+    [activeRange, singleDayRange]
+  );
   const selectedConfig = activeCard ? detailConfig[activeCard] : null;
   const customerDetailOpen = activeCard === "customers" || activeCard === "newCustomers" || activeCard === "existingCustomers";
   const categoryTotal = useMemo(() => salesByCategory.reduce((sum, item) => sum + Number(item.totalAmount ?? 0), 0), [salesByCategory]);
+  // Scope saaf rakho: billed / collected = chuna hua period; outstanding = end date tak ka
+  // poora baaki (saare unpaid invoices). Pehle dono ko jod kar "Total Outstanding" aur
+  // ek mixed "collection rate" dikhta tha jo Today jaisi range par bekaar number deta tha.
+  const billedAmount = Number(summary?.totalSales ?? 0);
   const collectedAmount = Number(summary?.totalCollection ?? 0);
-  const remainingAmount = Number(summary?.outstandingAmount ?? 0);
-  const totalOutstandingBase = collectedAmount + remainingAmount;
-  const collectionRate = totalOutstandingBase > 0 ? (collectedAmount / totalOutstandingBase) * 100 : 0;
-  const outstandingRate = totalOutstandingBase > 0 ? (remainingAmount / totalOutstandingBase) * 100 : 0;
-  const hasOutstandingOverviewData = totalOutstandingBase > 0;
-  const outstandingOverviewData = useMemo(() => [
-    { name: "Collected", value: collectedAmount, color: OUTSTANDING_WIDGET_COLORS.collected },
-    { name: "Outstanding", value: remainingAmount, color: OUTSTANDING_WIDGET_COLORS.outstanding }
-  ].filter((item) => item.value > 0), [collectedAmount, remainingAmount]);
-  const chartTextColor = preferences.darkModeEnabled ? "#CBD5E1" : "#64748B";
-  const chartGridColor = preferences.darkModeEnabled ? "#334155" : "#e8edf5";
+  const collectionRate = billedAmount > 0 ? (collectedAmount / billedAmount) * 100 : null;
+  const darkMode = Boolean(preferences.darkModeEnabled);
+  const seriesColors = darkMode ? SALES_COLLECTION_COLORS.dark : SALES_COLLECTION_COLORS.light;
   const chartTooltipTheme = getChartTheme(preferences.darkModeEnabled);
   const grandTotalRow = useMemo(
     () => (selectedConfig && details ? buildGrandTotalRow(details.rows, selectedConfig.columns) : null),
@@ -538,9 +545,10 @@ export const DashboardPage = () => {
           fullValue: formatCurrency(summary?.totalSales),
           caption: "In selected period",
           icon: <TrendingUp size={18} />,
-          growth: formatTrend(summary?.totalSalesTrendPercentage),
-          analyticsColor: CHART_COLORS.sales,
-          trend: ownerAnalytics?.salesTrend.map((point) => point.value)
+          growth: formatTrend(summary?.totalSalesTrendPercentage, summary?.totalSales),
+          growthTone: trendTone(summary?.totalSalesTrendPercentage, true),
+          analyticsColor: seriesColors.sales,
+          trend: cumulative(ownerAnalytics?.salesTrend)
         },
         {
           key: "collections" as const,
@@ -549,9 +557,10 @@ export const DashboardPage = () => {
           fullValue: formatCurrency(summary?.totalCollection),
           caption: "Recorded payments",
           icon: <CreditCard size={18} />,
-          growth: formatTrend(summary?.collectionTrendPercentage),
-          analyticsColor: CHART_COLORS.collection,
-          trend: ownerAnalytics?.collectionTrend.map((point) => point.value)
+          growth: formatTrend(summary?.collectionTrendPercentage, summary?.totalCollection),
+          growthTone: trendTone(summary?.collectionTrendPercentage, true),
+          analyticsColor: seriesColors.collections,
+          trend: cumulative(ownerAnalytics?.collectionTrend)
         },
         {
           key: "outstanding" as const,
@@ -560,12 +569,14 @@ export const DashboardPage = () => {
           fullValue: formatCurrency(summary?.outstandingAmount),
           caption: "Pending balance",
           icon: <Wallet size={18} />,
-          growth: formatTrend(summary?.outstandingTrendPercentage),
+          growth: formatTrend(summary?.outstandingTrendPercentage, summary?.outstandingAmount),
+          // Outstanding badhna buri khabar: up = laal.
+          growthTone: trendTone(summary?.outstandingTrendPercentage, false),
           analyticsColor: CHART_COLORS.outstanding,
-          trend: ownerAnalytics?.outstandingTrend?.length ? ownerAnalytics.outstandingTrend.map((point) => point.value) : [0, 0, 0, 0, 0, 0, 0, 0]
+          trend: ownerAnalytics?.outstandingTrend?.map((point) => point.value)
         },
       ],
-    [summary, ownerAnalytics]
+    [summary, ownerAnalytics, seriesColors]
   );
   const compactMetrics = useMemo(
     () => [
@@ -608,10 +619,32 @@ export const DashboardPage = () => {
   }, [activeRange]);
 
   useEffect(() => {
-    void getOwnerAnalytics(salesTrendRange)
-      .then((data) => setSalesTrendData(data.salesTrend))
-      .catch(() => setSalesTrendData([]));
-  }, [salesTrendRange]);
+    let cancelled = false;
+    setChartLoading(true);
+    void getOwnerAnalytics(chartRange)
+      .then((data) => {
+        if (cancelled) return;
+        // Dono series same buckets me same order me aati hain: index se jodo (label se nahi —
+        // "Jan" jaisa label saal paar karti range me do baar aa kar mix ho jata tha).
+        const periods = buildChartPeriods(data.startDate ?? chartRange.startDate, data.endDate ?? chartRange.endDate, data.salesTrend.length);
+        setChartUnit(periods?.[0]?.daily === false ? "month" : "day");
+        setChartPoints(data.salesTrend.map((point, position) => ({
+          axisLabel: periods?.[position]?.axisLabel ?? point.label,
+          fullLabel: periods?.[position]?.fullLabel ?? point.label,
+          sales: Number(point.value ?? 0),
+          collections: Number(data.collectionTrend[position]?.value ?? 0)
+        })));
+      })
+      .catch(() => {
+        if (!cancelled) setChartPoints([]);
+      })
+      .finally(() => {
+        if (!cancelled) setChartLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chartRange]);
 
   useEffect(() => {
     if (!activeCard) {
@@ -798,6 +831,8 @@ export const DashboardPage = () => {
             caption={card.caption}
             icon={card.icon}
             growth={card.growth}
+            growthTone={card.growthTone}
+            growthTitle="vs previous period of the same length"
             analyticsColor={card.analyticsColor}
             trend={card.trend}
             onClick={card.key ? () => openDetails(card.key) : undefined}
@@ -810,9 +845,8 @@ export const DashboardPage = () => {
           valueTitle={formatCurrency(summary?.totalExpense)}
           caption="Recorded business spend"
           icon={<Banknote size={18} />}
-          analyticsColor="#f97316"
-          growth={formatTrend(computeTrendPercentage(ownerAnalytics?.expenseTrend))}
-          trend={ownerAnalytics?.expenseTrend?.length ? ownerAnalytics.expenseTrend.map((point) => point.value) : [0, 0, 0, 0, 0, 0, 0, 0]}
+          analyticsColor={CHART_COLORS.products}
+          trend={cumulative(ownerAnalytics?.expenseTrend)}
           onClick={() => openDetails("totalExpense")}
         />
         <StatCard
@@ -822,9 +856,8 @@ export const DashboardPage = () => {
           valueTitle={formatCurrency(summary?.netRevenue)}
           caption="Collection minus expense"
           icon={<TrendingUp size={18} />}
-          analyticsColor="#0d9488"
-          growth={formatTrend(computeTrendPercentage(ownerAnalytics?.netProfitTrend))}
-          trend={ownerAnalytics?.netProfitTrend?.length ? ownerAnalytics.netProfitTrend.map((point) => point.value) : [0, 0, 0, 0, 0, 0, 0, 0]}
+          analyticsColor={CHART_COLORS.customers}
+          trend={cumulative(ownerAnalytics?.netProfitTrend)}
           onClick={() => openDetails("netRevenue")}
         />
       </div>
@@ -861,37 +894,17 @@ export const DashboardPage = () => {
 
       <div className="grid gap-4 xl:grid-cols-[1.55fr_0.85fr]">
         <Panel className="p-4 md:p-5">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Analytics</p>
-              <h2 className="mt-2 fs-18 font-bold text-slate-950">Sales Trend</h2>
-            </div>
-            <Select
-              density="sm"
-              options={GRAPH_PRESET_OPTIONS}
-              value={salesTrendPreset}
-              onChange={(event) => setSalesTrendPreset(event.target.value as DatePreset)}
-              aria-label="Sales trend range"
-              wrapperClassName="w-auto min-w-[150px]"
-            />
+          <div className="mb-4">
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Analytics</p>
+            <h2 className="mt-2 fs-18 font-bold text-slate-950">Sales vs Collections</h2>
           </div>
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesTrendData}>
-                <defs>
-                  <linearGradient id="salesArea" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor={CHART_COLORS.sales} stopOpacity={0.25} />
-                    <stop offset="100%" stopColor={CHART_COLORS.sales} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke={chartGridColor} strokeDasharray="4 4" vertical={false} />
-                <XAxis dataKey="label" minTickGap={24} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis width={64} tickFormatter={(tickValue: number) => formatCompactCurrency(tickValue)} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
-                <Area type="monotone" dataKey="value" stroke={CHART_COLORS.sales} strokeWidth={3} fill="url(#salesArea)" dot={{ r: 3, fill: CHART_COLORS.sales }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <SalesCollectionsChart
+            data={chartPoints}
+            dark={darkMode}
+            periodUnit={chartUnit}
+            loading={chartLoading}
+            rangeNote={singleDayRange && chartRange.startDate ? `Showing last 7 days (${formatDate(chartRange.startDate)} – ${formatDate(chartRange.endDate)}) for context` : undefined}
+          />
         </Panel>
 
         <Panel className="p-4 md:p-5">
@@ -902,28 +915,17 @@ export const DashboardPage = () => {
             </div>
             <p className="fs-11 shrink-0 rounded-full bg-slate-100 px-3 py-0.5 font-semibold text-slate-500">Top 7</p>
           </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_1fr] xl:grid-cols-1">
-            <div className="h-[210px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={topProducts} dataKey="totalSalesAmount" nameKey="productName" innerRadius={52} outerRadius={82} paddingAngle={3}>
-                    {topProducts.map((_, index) => <Cell key={index} fill={CHART_COLORS.palette[index % CHART_COLORS.palette.length]} />)}
-                  </Pie>
-                  <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-3">
-              {topProducts.map((product, index) => (
-                <div key={product.productId} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: CHART_COLORS.palette[index % CHART_COLORS.palette.length] }} />
-                    <p className="truncate fs-13 font-semibold text-slate-700">{product.productName}</p>
-                  </div>
-                  <Money value={product.totalSalesAmount} align="right" className="shrink-0 text-sm font-bold text-slate-950" />
-                </div>
-              ))}
-            </div>
+          <div className="mt-5">
+            <RankedBarList
+              color={seriesColors.sales}
+              emptyText="No product sales in the selected range."
+              items={topProducts.map((product) => ({
+                id: product.productId,
+                label: product.productName,
+                value: Number(product.totalSalesAmount ?? 0),
+                meta: product.totalQtySold ? `${product.totalQtySold} sold` : undefined
+              }))}
+            />
           </div>
           {topProductsPage.totalRecords > DASHBOARD_ROW_LIMIT ? (
             <div className="mt-4 border-t border-slate-200 pt-4">
@@ -944,26 +946,27 @@ export const DashboardPage = () => {
           </div>
           <Table
             data={recentInvoicesPage.records}
+            minHeightClass="min-h-0"
             emptyText="No invoices fall within the selected range."
             columns={[
-              { key: "invoice", header: "Invoice", render: (item) => <span className="font-semibold text-slate-950">{item.invoiceNo}</span> },
+              { key: "invoice", header: "Invoice", render: (item) => <span className="break-all font-semibold text-slate-950">{item.invoiceNo}</span> },
               {
                 key: "customer",
                 header: "Customer",
                 render: (item) => (
-                  <div>
+                  <div className="whitespace-nowrap">
                     <p className="font-semibold text-slate-950">{item.customerName}</p>
                     <p className="text-xs text-slate-400">{item.customerMobile}</p>
                   </div>
                 )
               },
-              { key: "date", header: "Date", render: (item) => formatDate(item.invoiceDate) },
+              { key: "date", header: "Date", render: (item) => <span className="whitespace-nowrap">{formatDate(item.invoiceDate)}</span> },
               { key: "status", header: "Status", render: (item) => <StatusBadge label={item.paymentStatus} /> },
               {
                 key: "balance",
                 header: "Balance",
                 className: "text-right",
-                render: (item) => <span className="block text-right font-semibold text-slate-950">{formatCurrency(item.balanceAmount)}</span>
+                render: (item) => <span className="block whitespace-nowrap text-right font-semibold text-slate-950">{formatCurrency(item.balanceAmount)}</span>
               }
             ]}
           />
@@ -986,16 +989,34 @@ export const DashboardPage = () => {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-slate-950">{customer.customerName}</p>
-                      <p className="mt-1 fs-12 text-slate-400">{customer.mobile}</p>
-                      <p className="mt-2 text-xs text-slate-500">Last purchase: {formatDate(customer.lastPurchaseDate)}</p>
+                      <p className="mt-0.5 fs-12 text-slate-400">{customer.mobile}</p>
+                      <p className="mt-0.5 whitespace-nowrap fs-11 text-slate-500">Last purchase {formatDate(customer.lastPurchaseDate)}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="fs-11 uppercase tracking-[0.18em] text-slate-500">Sales</p>
-                      <Money value={customer.totalPurchaseAmount} align="right" className="mt-1 font-semibold text-slate-950" />
-                      <p className="mt-2 text-xs text-slate-400">Paid: <Money value={customer.totalPaidAmount} /></p>
-                      <p className="text-xs font-semibold text-rose-600">Outstanding: <Money value={customer.outstandingBalance} /></p>
+                    <div className="shrink-0 text-right">
+                      <p className="fs-11 uppercase tracking-[0.14em] text-slate-500">Sales</p>
+                      <Money value={customer.totalPurchaseAmount} align="right" className="mt-0.5 font-bold text-slate-950" />
                     </div>
                   </div>
+                  {(() => {
+                    const paid = Math.max(0, Number(customer.totalPaidAmount ?? 0));
+                    const due = Math.max(0, Number(customer.outstandingBalance ?? 0));
+                    const base = paid + due;
+                    const paidShare = base > 0 ? (paid / base) * 100 : 0;
+                    return (
+                      <div className="mt-3">
+                        <div className="flex h-2 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                          <div className="h-full" style={{ width: `${paidShare}%`, background: seriesColors.collections }} />
+                          {/* 2px surface gap between the two fills */}
+                          {paidShare > 0 && paidShare < 100 ? <div className="h-full w-0.5 bg-white" /> : null}
+                          <div className="h-full flex-1" style={{ background: base > 0 && due > 0 ? CHART_COLORS.outstanding : "transparent" }} />
+                        </div>
+                        <div className="mt-1.5 flex justify-between gap-3 fs-12">
+                          <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-sm" style={{ background: seriesColors.collections }} />Paid <Money value={paid} className="font-semibold text-slate-900" /></span>
+                          <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-sm" style={{ background: CHART_COLORS.outstanding }} />Due <Money value={due} className="font-semibold text-slate-900" /></span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))
             ) : (
@@ -1021,22 +1042,41 @@ export const DashboardPage = () => {
             </div>
             <p className="fs-11 shrink-0 rounded-full bg-slate-100 px-3 py-0.5 font-semibold text-slate-500">Top 7</p>
           </div>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={salesByCategory} dataKey="totalAmount" nameKey="categoryName" innerRadius={62} outerRadius={96} paddingAngle={3}>
-                  {salesByCategory.map((category, index) => (
-                    <Cell
-                      key={category.categoryId}
-                      fill={categoryColorFor(category.categoryName, index)}
-                      opacity={!activeCategoryId || activeCategoryId === category.categoryId ? 1 : 0.28}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {salesByCategory.length ? (
+            <div className="relative h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  {/* Slices ke beech 2px surface stroke (paddingAngle akeli category par ajeeb gap deta tha). */}
+                  <Pie
+                    data={salesByCategory}
+                    dataKey="totalAmount"
+                    nameKey="categoryName"
+                    innerRadius={70}
+                    outerRadius={100}
+                    paddingAngle={0}
+                    stroke={darkMode ? "#0f172a" : "#ffffff"}
+                    strokeWidth={salesByCategory.length > 1 ? 2 : 0}
+                    startAngle={90}
+                    endAngle={-270}
+                  >
+                    {salesByCategory.map((category, index) => (
+                      <Cell
+                        key={category.categoryId}
+                        fill={categoryColorFor(category.categoryName, index)}
+                        opacity={!activeCategoryId || activeCategoryId === category.categoryId ? 1 : 0.28}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="fs-11 font-semibold uppercase tracking-[0.14em] text-slate-400">Total sales</span>
+                <span className="mt-1 fs-18 font-bold text-slate-950">{formatShortCurrency(categoryTotal)}</span>
+                <span className="fs-11 text-slate-400">{salesByCategory.length} {salesByCategory.length === 1 ? "category" : "categories"}</span>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-4 space-y-2">
             {salesByCategory.length ? salesByCategory.map((category, index) => (
               <button
@@ -1075,65 +1115,27 @@ export const DashboardPage = () => {
               <h2 className="mt-1 fs-18 font-bold text-slate-950">Outstanding Overview</h2>
             </div>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-rose-200/70 bg-[rgba(220,38,38,0.12)] p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Total Outstanding</p>
-              <Money value={totalOutstandingBase} className="mt-2 fs-16 font-bold text-slate-950" />
-            </div>
-            <div className="rounded-lg border border-emerald-200/70 bg-[rgba(22,163,74,0.12)] p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Collected Amount</p>
-              <Money value={collectedAmount} className="mt-2 fs-16 font-bold text-slate-950" />
-            </div>
-            <div className="rounded-lg border border-orange-200/70 bg-[rgba(249,115,22,0.12)] p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Remaining Amount</p>
-              <Money value={remainingAmount} className="mt-2 fs-16 font-bold text-slate-950" />
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Collection Rate</p>
-              <p className="mt-2 truncate fs-16 font-bold text-slate-950">{collectionRate.toFixed(1)}%</p>
-            </div>
-          </div>
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-            {hasOutstandingOverviewData ? (
-              <div className="grid gap-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-                <div className="relative h-[180px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={outstandingOverviewData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={82} paddingAngle={4}>
-                        {outstandingOverviewData.map((item) => <Cell key={item.name} fill={item.color} />)}
-                      </Pie>
-                      <Tooltip contentStyle={chartTooltipTheme.tooltipContentStyle} itemStyle={chartTooltipTheme.tooltipItemStyle} labelStyle={chartTooltipTheme.tooltipLabelStyle} cursor={chartTooltipTheme.tooltipCursor} formatter={(value) => formatCurrency(Number(value))} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="fs-18 font-bold text-slate-950">{collectionRate.toFixed(0)}%</span>
-                    <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Collected</span>
-                  </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            {collectionRate !== null ? (
+              <div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-bold text-slate-700">Collected vs billed (this period)</span>
+                  <span className="fs-18 font-bold text-slate-950">{collectionRate.toFixed(0)}%</span>
                 </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex min-w-0 items-center gap-2 text-sm font-bold text-slate-700">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: OUTSTANDING_WIDGET_COLORS.collected }} />
-                      Collected
-                    </span>
-                    <span className="shrink-0 text-sm font-extrabold text-slate-950">{collectionRate.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                    <div className="h-full rounded-full" style={{ width: `${Math.min(100, collectionRate)}%`, backgroundColor: OUTSTANDING_WIDGET_COLORS.collected }} />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="flex min-w-0 items-center gap-2 text-sm font-bold text-slate-700">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: OUTSTANDING_WIDGET_COLORS.outstanding }} />
-                      Outstanding Percentage
-                    </span>
-                    <span className="shrink-0 text-sm font-extrabold text-slate-950">{outstandingRate.toFixed(1)}%</span>
-                  </div>
-                  <p className="text-xs font-semibold text-slate-500">Collected and remaining balances are calculated from the selected dashboard range.</p>
+                {/* Meter: track same ramp ka halka step, fill = collected share (100% par cap). */}
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full" style={{ background: `color-mix(in srgb, ${OUTSTANDING_WIDGET_COLORS.collected} 18%, transparent)` }}>
+                  <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.min(100, collectionRate)}%`, backgroundColor: OUTSTANDING_WIDGET_COLORS.collected }} />
                 </div>
+                <p className="mt-2 text-xs font-medium text-slate-500">
+                  {collectionRate >= 100
+                    ? "Collections cover everything billed in this period (includes payments for older invoices)."
+                    : `${formatCurrency(Math.max(0, billedAmount - collectedAmount))} of this period's billing is not collected yet.`}
+                </p>
+
               </div>
             ) : (
-              <div className="flex min-h-[180px] items-center justify-center text-center text-sm font-semibold text-slate-500">
-                No Outstanding Data Available
+              <div className="flex min-h-[72px] items-center justify-center text-center text-sm font-semibold text-slate-500">
+                No billing in the selected period
               </div>
             )}
           </div>

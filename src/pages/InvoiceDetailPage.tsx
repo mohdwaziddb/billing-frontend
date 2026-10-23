@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Building2, CreditCard, Printer, ReceiptText, Send, Smartphone, UserRound, Wallet } from "lucide-react";
+import { Building2, CalendarDays, CreditCard, Mail, MessageCircle, Printer, ReceiptText, Smartphone, UserCheck, UserRound, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { getInvoiceProfitability } from "../api/expenses";
 import { getInvoice } from "../api/invoices";
@@ -253,59 +253,81 @@ export const InvoiceDetailPage = () => {
       <Header title="Invoice Details" subtitle="Professional invoice view with payment history, status timeline, and outstanding tracking." />
 
       <GlassCard className="p-5 md:p-7">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Invoice Details" }]} />
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <h2 className="fs-24 font-bold text-slate-950">{invoice?.invoiceNo ?? "--"}</h2>
-              {invoice ? <StatusBadge label={invoice.paymentStatus} /> : null}
+        <div className="mb-6 space-y-4">
+          <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Invoice Details" }]} />
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="fs-24 break-all font-bold text-slate-950">{invoice?.invoiceNo ?? "--"}</h2>
+                {invoice ? <StatusBadge label={invoice.paymentStatus} /> : null}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-medium text-slate-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays size={15} className="text-slate-400" />
+                  {formatDate(invoice?.invoiceDate)}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <UserRound size={15} className="text-slate-400" />
+                  Created by <span className="font-semibold text-slate-700">{invoice?.createdBy ?? "--"}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <UserCheck size={15} className="text-slate-400" />
+                  Refer by <span className="font-semibold text-slate-700">{invoice?.referByUserName ?? invoice?.referByUsername ?? "--"}</span>
+                </span>
+              </div>
             </div>
-            <p className="mt-2 text-sm font-semibold text-slate-500">Invoice Date: {formatDate(invoice?.invoiceDate)} | Created by {invoice?.createdBy ?? "--"}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-500">Refer By: {invoice?.referByUserName ?? invoice?.referByUsername ?? "--"}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {canRecordPayment ? (
-              <Link to={`/payments/new?invoiceId=${invoice?.id}`}>
-                <Button type="button"><CreditCard size={16} />Record Payment</Button>
-              </Link>
-            ) : null}
-            {canCollectOnline ? (
-              <Button type="button" variant="secondary" onClick={() => setCollectOnlineOpen(true)}>
-                <Smartphone size={16} />Collect Online
-              </Button>
-            ) : null}
-            {invoice ? (
-              <Button type="button" variant="secondary" onClick={() => void handlePrint()}>
-                <Printer size={16} />Print
-              </Button>
-            ) : null}
-            {invoice && invoice.customerEmail && can("EMAIL_TEMPLATES", "EMAIL_SEND") ? (
-              <Button type="button" variant="secondary" onClick={() => setEmailOpen(true)}>
-                <Send size={16} />Send Email
-              </Button>
-            ) : null}
-            {canSendWhatsApp ? (
-              <Button type="button" variant="secondary" onClick={() => setWhatsAppOpen(true)}>
-                <Send size={16} />Send WhatsApp
-              </Button>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2 xl:shrink-0 xl:justify-end">
+              {canRecordPayment || canCollectOnline ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {canRecordPayment ? (
+                    <Link to={`/payments/new?invoiceId=${invoice?.id}`}>
+                      <Button type="button"><CreditCard size={16} />Record Payment</Button>
+                    </Link>
+                  ) : null}
+                  {canCollectOnline ? (
+                    <Button type="button" variant="secondary" onClick={() => setCollectOnlineOpen(true)}>
+                      <Smartphone size={16} />Collect Online
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              {(canRecordPayment || canCollectOnline) && invoice ? <span className="mx-1 hidden h-8 w-px bg-slate-200 sm:block" aria-hidden="true" /> : null}
+              <div className="flex flex-wrap items-center gap-2">
+                {invoice ? (
+                  <Button type="button" variant="secondary" onClick={() => void handlePrint()}>
+                    <Printer size={16} />Print
+                  </Button>
+                ) : null}
+                {invoice && invoice.customerEmail && can("EMAIL_TEMPLATES", "EMAIL_SEND") ? (
+                  <Button type="button" variant="secondary" onClick={() => setEmailOpen(true)} title="Send Email">
+                    <Mail size={16} />Email
+                  </Button>
+                ) : null}
+                {canSendWhatsApp ? (
+                  <Button type="button" variant="secondary" onClick={() => setWhatsAppOpen(true)} title="Send WhatsApp">
+                    <MessageCircle size={16} />WhatsApp
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <InfoPanel icon={<Building2 size={18} />} title="Company Details">
             <p className="font-extrabold text-slate-950">{user?.company?.name ?? "--"}</p>
-            <p>{user?.company?.email ?? "--"}</p>
-            <p>{user?.company?.phone ?? "--"}</p>
-            <p>{user?.company?.state ?? "--"}</p>
+            {/* Khaali value ki line hi mat dikhao ("--" ki lines panel bikhra deti thi). */}
+            {user?.company?.email ? <p className="break-all">{user.company.email}</p> : null}
+            {user?.company?.phone ? <p>{user.company.phone}</p> : null}
+            {user?.company?.state ? <p>{user.company.state}</p> : null}
           </InfoPanel>
           <InfoPanel icon={<UserRound size={18} />} title="Customer Details">
             <p className="font-extrabold text-slate-950">{invoice?.customerName ?? "--"}</p>
-            <p>{invoice?.customerMobile ?? "--"}</p>
-            <p>{invoice?.customerAddress ?? "--"}</p>
-            <p>{invoice?.customerState ?? "--"}</p>
-            <p className="pt-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Refer By</p>
-            <p>{invoice?.referByUserName ?? "--"}</p>
+            {invoice?.customerMobile ? <p>{invoice.customerMobile}</p> : null}
+            {invoice?.customerEmail ? <p className="break-all">{invoice.customerEmail}</p> : null}
+            {invoice?.customerAddress ? <p>{invoice.customerAddress}</p> : null}
+            {invoice?.customerState ? <p>{invoice.customerState}</p> : null}
+            {invoice?.customerGstin ? <p className="text-xs font-semibold text-slate-500">GSTIN: {invoice.customerGstin}</p> : null}
           </InfoPanel>
           <InfoPanel icon={<Wallet size={18} />} title="Payment Summary">
             <SummaryLine label="Total" value={formatCurrency(invoice?.totalAmount)} />
@@ -324,7 +346,7 @@ export const InvoiceDetailPage = () => {
               <p className="mt-1 text-sm font-medium text-slate-500">Item-wise billing details and invoice totals.</p>
             </div>
           </div>
-          <Table data={invoice?.items ?? []} columns={[
+          <Table data={invoice?.items ?? []} minHeightClass="min-h-0" columns={[
             { key: "product", header: "Product", render: (item) => <span className="font-semibold">{item.productName}</span> },
             { key: "hsn", header: "HSN", render: (item) => item.hsnCode ?? "--" },
             { key: "qty", header: "Qty", className: "text-right", render: (item) => <span className="block text-right">{item.qty}</span> },
@@ -354,7 +376,7 @@ export const InvoiceDetailPage = () => {
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <GlassCard className="p-5 md:p-7">
           <h3 className="mb-4 fs-18 font-bold text-slate-950">Payment History</h3>
-          <Table data={payments} emptyText="No payments received for this invoice." columns={[
+          <Table data={payments} minHeightClass="min-h-[180px]" emptyText="No payments received for this invoice." columns={[
             { key: "date", header: "Date", render: (item) => formatDate(item.paymentDate) },
             { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-bold text-slate-950">{formatCurrency(item.amount)}</span> },
             { key: "mode", header: "Mode", render: (item) => (
@@ -380,9 +402,16 @@ export const InvoiceDetailPage = () => {
           <GlassCard className="p-5 md:p-7">
             <h3 className="mb-4 fs-18 font-bold text-slate-950">Profitability</h3>
             <div className="space-y-3">
-              <SummaryBox label="Revenue" value={formatCurrency(profitability.revenue)} />
-              <SummaryBox label="Expense" value={formatCurrency(profitability.expense)} />
-              <SummaryBox label="Net Revenue" value={formatCurrency(profitability.netRevenue)} strong />
+              {/* Net = revenue − maal ki laagat − kharcha. Pehle laagat dikhti hi nahi thi:
+                  "Revenue 90,000 · Expense 0 · Net 15,000" galat lagta tha. */}
+              <SummaryBox label="Revenue (before tax)" value={formatCurrency(profitability.revenue)} />
+              <SummaryBox label="Cost of goods sold" value={`− ${formatCurrency(profitability.costOfGoodsSold)}`} />
+              <SummaryBox label="Linked expenses" value={`− ${formatCurrency(profitability.expense)}`} />
+              <SummaryBox
+                label={`Net profit${Number(profitability.revenue) > 0 ? ` · ${((Number(profitability.netRevenue) / Number(profitability.revenue)) * 100).toFixed(1)}% margin` : ""}`}
+                value={formatCurrency(profitability.netRevenue)}
+                strong
+              />
             </div>
           </GlassCard>
         ) : null}

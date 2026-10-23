@@ -1,8 +1,8 @@
 import { apiClient } from "./apiClient";
-import { sessionCache } from "../lib/sessionCache";
 import type { ApiResponse, PageResponse, Product, ProductRequest } from "../types/api";
 
-const ACTIVE_PRODUCTS_CACHE_KEY = "billing_frontend_active_products";
+// Koi cache nahi: list hamesha server se live (price / stock / naam turant sahi dikhein).
+// Pehle sessionStorage cache tab band hone tak purana data dikhata tha.
 let activeProductsPromise: Promise<Product[]> | null = null;
 
 const isActiveLookupRequest = (params?: { search?: string; active?: boolean; categoryId?: number; subCategoryId?: number; page?: number; size?: number }) =>
@@ -22,16 +22,9 @@ export const getProductsPage = async (params?: { search?: string; active?: boole
 
 export const getProducts = async (params?: { search?: string; active?: boolean; categoryId?: number; subCategoryId?: number; page?: number; size?: number }) => {
   if (isActiveLookupRequest(params)) {
-    const cached = sessionCache.get<Product[]>(ACTIVE_PRODUCTS_CACHE_KEY);
-    if (cached) {
-      return cached;
-    }
     if (!activeProductsPromise) {
       activeProductsPromise = getProductsPage(params)
-        .then((response) => {
-          sessionCache.set(ACTIVE_PRODUCTS_CACHE_KEY, response.records);
-          return response.records;
-        })
+        .then((response) => response.records)
         .finally(() => {
           activeProductsPromise = null;
         });
@@ -51,23 +44,19 @@ export const getProduct = async (id: number) => {
 
 export const createProduct = async (payload: ProductRequest) => {
   const response = await apiClient.post<ApiResponse<Product>>("/v1/products", payload);
-  sessionCache.clear(ACTIVE_PRODUCTS_CACHE_KEY);
   return response.data.data;
 };
 
 export const updateProduct = async (id: number, payload: ProductRequest) => {
   const response = await apiClient.put<ApiResponse<Product>>(`/v1/products/${id}`, payload);
-  sessionCache.clear(ACTIVE_PRODUCTS_CACHE_KEY);
   return response.data.data;
 };
 
 export const deleteProduct = async (id: number) => {
   await apiClient.delete(`/v1/products/${id}`);
-  sessionCache.clear(ACTIVE_PRODUCTS_CACHE_KEY);
 };
 
 export const deleteProductsBulk = async (ids: number[]) => {
   const response = await apiClient.delete<ApiResponse<{ deleted: number; failed: number; failures: Record<number, string> }>>(`/v1/products/bulk-delete`, { data: { ids } });
-  sessionCache.clear(ACTIVE_PRODUCTS_CACHE_KEY);
   return response.data.data;
 };

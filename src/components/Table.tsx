@@ -22,20 +22,23 @@ export const Table = <T,>({
   columns,
   emptyText = "No records found.",
   emptyAction,
-  rowSelection
+  rowSelection,
+  minHeightClass = "min-h-[360px]"
 }: {
   data: T[];
   columns: Column<T>[];
   emptyText?: string;
   emptyAction?: ReactNode;
   rowSelection?: TableRowSelection<T>;
+  /** Default 360px (list pages). Dashboard jaise chhote widgets "min-h-0" de sakte hain. */
+  minHeightClass?: string;
 }) => {
   const rowCount = data.length;
   const allSelected = rowSelection?.allSelected ?? false;
   const someSelected = rowSelection?.someSelected ?? false;
 
   return (
-    <div className="scrollbar-thin min-h-[360px] overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <div className={`scrollbar-thin ${minHeightClass} overflow-x-auto rounded-lg border border-slate-200 bg-white`}>
       <table className="min-w-full border-separate border-spacing-0 text-left fs-13 text-slate-700">
         <thead className="sticky top-0 z-10 bg-slate-50">
           <tr className="border-b border-slate-200 text-slate-500">

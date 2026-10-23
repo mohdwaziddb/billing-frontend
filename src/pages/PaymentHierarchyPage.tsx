@@ -1,8 +1,8 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Maximize2, Minimize2, RefreshCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { type CSSProperties, forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronRight, ExternalLink, Maximize2, Minimize2, Receipt, RefreshCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { Link } from "react-router-dom";
 import { getPaymentHierarchyChildren, type PaymentHierarchyParams } from "../api/paymentHierarchy";
 import { Button } from "../components/Button";
-import { CommonBreadcrumb } from "../components/CommonBreadcrumb";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
@@ -158,13 +158,17 @@ export const PaymentHierarchyPage = () => {
   const activeRange = useMemo(() => (preset === "custom" ? customRange : buildRange(preset)), [customRange, preset]);
   const root = companyRootNode(summary);
   const metricNodes = summaryMetricNodes(summary, metricCounts);
-  const activeRecords = activeNode?.type === "day" ? recordsByDay[activeNode.id] ?? [] : [];
+  // Backend payment records sirf invoice node par bhejta hai. Pehle yahan "day" check tha jo kabhi
+  // aata hi nahi — isliye "actual payment records" tak pahunch hi nahi paate the.
+  const activeRecords = activeNode?.type === "invoice" ? recordsByDay[activeNode.id] ?? null : null;
+  const recordsRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setSummary(defaultSummary);
     setMetricCounts({});
     setRecordsByDay({});
-    setExpanded(new Set());
+    // Company pehle se khula — warna page par sirf ek card dikhta tha aur user ko samajh nahi aata.
+    setExpanded(new Set(["company"]));
     setChildrenByParent({ company: summaryMetricNodes(defaultSummary, {}) });
     setLoaded(new Set());
     setActiveNode(null);
@@ -225,7 +229,7 @@ export const PaymentHierarchyPage = () => {
         netRevenue: response.netRevenue
       });
       setChildrenByParent((current) => ({ ...current, [node.id]: response.nodes }));
-      if (node.type === "day") {
+      if (node.type === "invoice") {
         setRecordsByDay((current) => ({ ...current, [node.id]: response.records }));
       }
       setLoaded((current) => new Set(current).add(node.id));
@@ -247,6 +251,13 @@ export const PaymentHierarchyPage = () => {
         return;
       }
       setExpanded(new Set(["company"]));
+      return;
+    }
+    if (node.type === "invoice") {
+      if (!recordsByDay[node.id]) {
+        await loadChildren({ ...node, hasChildren: true });
+      }
+      window.setTimeout(() => recordsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
       return;
     }
     if (!node.hasChildren) {
@@ -284,22 +295,19 @@ export const PaymentHierarchyPage = () => {
     <div className="space-y-4 pb-6">
       <Header title="Payment Hierarchy" subtitle="Drill down from collection totals to actual payment records." />
 
+      {/* Dashboard jaisa: heading left, date filter right. */}
       <GlassCard className="p-4 md:p-5">
-        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <CommonBreadcrumb items={[{ label: "Reports" }, { label: "Payment Hierarchy" }]} />
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Filters</p>
+            <h2 className="fs-18 mt-1.5 font-semibold text-slate-950">Payment Hierarchy Filters</h2>
           </div>
-        </div>
-
-        <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--panel-border)" }}>
-          <div className="min-w-0">
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             {DATE_PRESET_OPTIONS.map(({ value, label }) => (
               <Button key={value} type="button" variant={preset === value ? "primary" : "secondary"} onClick={() => setPreset(value)}>
                 {label}
               </Button>
             ))}
-            </div>
           </div>
         </div>
 
@@ -338,8 +346,10 @@ export const PaymentHierarchyPage = () => {
           </div>
         </div>
 
-        <div className={`${fullscreen ? "min-h-0" : "max-h-[70vh] min-h-[420px]"} flex-1 overflow-auto overscroll-contain rounded-[var(--radius-card)] border p-4`} style={{ borderColor: "var(--panel-border)", background: "var(--panel-soft)", WebkitOverflowScrolling: "touch" } as CSSProperties}>
-          <div className="flex min-h-max min-w-full justify-center">
+        <div className={`${fullscreen ? "min-h-0" : "max-h-[70vh] min-h-[420px]"} flex-1 overflow-auto rounded-[var(--radius-card)] border p-4`} style={{ borderColor: "var(--panel-border)", background: "var(--panel-soft)", WebkitOverflowScrolling: "touch" } as CSSProperties}>
+          {/* w-max: wrapper tree jitna chauda ho. Pehle min-w-full + justify-center se chaudi tree
+              dono taraf bahar nikalti thi aur left hissa scroll se bhi nahi dikhta tha. */}
+          <div className="flex min-h-max w-max min-w-full justify-center">
           <div className="inline-block min-h-max min-w-max transition-[zoom] duration-300" style={{ zoom } as CSSProperties}>
             <TreeNode
               node={root}
@@ -355,7 +365,9 @@ export const PaymentHierarchyPage = () => {
           </div>
         </div>
 
-        {activeRecords.length ? <RecordsPanel records={activeRecords} title={activeNode?.label ?? "Payment Records"} /> : null}
+        {activeNode?.type === "invoice" ? (
+          <RecordsPanel ref={recordsRef} records={activeRecords ?? []} loading={activeRecords === null} title={activeNode.label} invoiceId={invoiceIdFromNode(activeNode.id)} />
+        ) : null}
       </div>
     </div>
   );
@@ -391,10 +403,15 @@ const TreeNode = ({
       {isOpen && children.length ? (
         <>
           <div className="h-8 w-0.5 rounded-full" style={{ background: connectorColor }} />
-          <div className="relative flex items-start gap-4">
-            {children.length > 1 ? <span className="absolute left-8 right-8 top-0 h-0.5 rounded-full" style={{ background: connectorColor }} /> : null}
-            {children.map((child) => (
-              <div key={child.id} className="flex flex-col items-center">
+          <div className="flex items-start">
+            {children.map((child, index) => (
+              <div key={child.id} className="relative flex flex-col items-center px-2">
+                {children.length > 1 ? (
+                  <span
+                    className="absolute top-0 h-0.5"
+                    style={{ background: connectorColor, left: index === 0 ? "50%" : 0, right: index === children.length - 1 ? "50%" : 0 }}
+                  />
+                ) : null}
                 <div className="h-8 w-0.5 rounded-full" style={{ background: connectorColor }} />
                 <TreeNode
                   node={child}
@@ -436,14 +453,18 @@ const HierarchyCard = ({ node, level, active, expanded, loading, canExpand, chil
       {node.type === "invoice" ? (
         <div className="space-y-3">
           <div>
-            <p className="break-words text-sm font-extrabold" style={{ color: "var(--text-primary)" }}>{node.subtitle}</p>
-            <p className="mt-1 break-words text-xs font-bold uppercase tracking-[0.08em]" style={{ color: tone.accent }}>{node.label}</p>
+            <p className="break-words text-sm font-extrabold" style={{ color: "var(--text-primary)" }}>{node.label}</p>
+            <p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--text-tertiary)" }}>{node.subtitle}</p>
           </div>
           <div className="grid gap-2 text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
             <AmountLine label="Amount" value={node.totalAmount ?? node.amount} />
             <AmountLine label="Collected" value={node.collectedAmount ?? 0} />
-            <AmountLine label="Outstanding" value={node.outstandingAmount ?? 0} danger />
+            <AmountLine label="Outstanding" value={node.outstandingAmount ?? 0} danger={(node.outstandingAmount ?? 0) > 0} />
           </div>
+          <p className="flex items-center gap-1.5 border-t pt-2 text-xs font-bold" style={{ borderColor: "var(--panel-border)", color: tone.accent }}>
+            {loading ? <RefreshCcw className="animate-spin" size={13} /> : <Receipt size={13} />}
+            {(node.collectionCount ?? 0) > 0 ? `View ${node.collectionCount} payment${node.collectionCount === 1 ? "" : "s"}` : "No payments yet"}
+          </p>
         </div>
       ) : (
       <>
@@ -486,52 +507,72 @@ const hierarchyTone = (tone?: string | null) => {
     danger: { accent: "var(--danger)" },
     cash: { accent: "var(--success)" },
     upi: { accent: "var(--theme-color)" },
-    card: { accent: "var(--info)" },
+    card: { accent: "#6250d6" },
     bank: { accent: "var(--theme-dark)" },
     cheque: { accent: "var(--warning)" },
     other: { accent: "var(--text-secondary)" },
-    year: { accent: "var(--info)" },
+    year: { accent: "#2a78d6" },
     month: { accent: "var(--warning)" },
     day: { accent: "var(--success)" },
     period: { accent: "var(--success)" },
     customer: { accent: "var(--theme-color)" },
-    invoice: { accent: "var(--danger)" },
-    record: { accent: "var(--danger)" },
+    invoice: { accent: "var(--theme-color)" },
+    record: { accent: "var(--theme-color)" },
     expense: { accent: "var(--warning)" },
     net: { accent: "var(--success)" }
   };
   return tones[tone ?? ""] ?? tones.other;
 };
 
-const RecordsPanel = ({ records, title }: { records: PaymentHierarchyRecord[]; title: string }) => (
-  <section className="mt-5 rounded-[var(--radius-card)] border p-4 shadow-[var(--shadow-soft)]" style={{ background: "var(--panel-bg)", borderColor: "var(--panel-border)" }}>
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)" }}>Payment Records</p>
-        <h2 className="mt-1 fs-16 font-bold" style={{ color: "var(--text-primary)" }}>{title}</h2>
-      </div>
-      <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: "var(--panel-soft)", color: "var(--text-secondary)" }}>{records.length} records</span>
-    </div>
-    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-      {records.map((record) => (
-        <div key={record.paymentId} className="rounded-[var(--radius-control)] border p-3" style={{ borderColor: "var(--panel-border)", background: "var(--panel-soft)" }}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold" style={{ color: "var(--text-primary)" }}>{record.invoiceNo}</p>
-              <p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>{record.customerName}</p>
-            </div>
-            <p className="shrink-0 text-sm font-black" style={{ color: "var(--text-primary)" }}>{formatCurrency(record.amount)}</p>
-          </div>
-          <div className="mt-3 grid gap-1 text-xs font-semibold" style={{ color: "var(--text-tertiary)" }}>
-            <span>{record.paymentMode.replace(/_/g, " ")}</span>
-            <span>{formatDate(record.paymentDate)}</span>
-            <span>{record.collectedBy ?? "--"}</span>
-          </div>
+const RecordsPanel = forwardRef<HTMLElement, { records: PaymentHierarchyRecord[]; title: string; loading: boolean; invoiceId: number | null }>(({ records, title, loading, invoiceId }, ref) => {
+  const total = records.reduce((sum, record) => sum + Number(record.amount ?? 0), 0);
+  return (
+    <section ref={ref} className="rounded-[var(--radius-card)] border p-4 shadow-[var(--shadow-soft)]" style={{ background: "var(--panel-bg)", borderColor: "var(--panel-border)" }}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em]" style={{ color: "var(--text-tertiary)" }}>Payment Records</p>
+          <h2 className="mt-1 fs-16 font-bold" style={{ color: "var(--text-primary)" }}>{title}</h2>
         </div>
-      ))}
-    </div>
-  </section>
-);
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ background: "var(--panel-soft)", color: "var(--text-secondary)" }}>
+            {records.length} {records.length === 1 ? "payment" : "payments"} · {formatCurrency(total)}
+          </span>
+          {invoiceId ? (
+            <Link to={`/invoices/${invoiceId}`} target="_blank" rel="noopener noreferrer" title="Opens in a new tab — hierarchy yahin khuli rahegi" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-bold" style={{ borderColor: "var(--panel-border)", color: "var(--theme-color)" }}>
+              <ExternalLink size={13} />Open invoice
+            </Link>
+          ) : null}
+        </div>
+      </div>
+      {loading ? (
+        <p className="py-4 text-sm" style={{ color: "var(--text-tertiary)" }}>Loading payments...</p>
+      ) : records.length ? (
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {records.map((record) => (
+            <div key={record.paymentId} className="rounded-[var(--radius-control)] border p-3" style={{ borderColor: "var(--panel-border)", background: "var(--panel-soft)" }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-extrabold" style={{ color: "var(--text-primary)" }}>{/^(upi|neft|rtgs|imps)$/i.test(record.paymentMode) ? record.paymentMode.toUpperCase() : record.paymentMode.replace(/_/g, " ")}</p>
+                  <p className="mt-1 truncate text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>{formatDate(record.paymentDate)}</p>
+                </div>
+                <p className="shrink-0 text-sm font-black" style={{ color: "var(--text-primary)" }}>{formatCurrency(record.amount)}</p>
+              </div>
+              <p className="mt-3 text-xs font-semibold" style={{ color: "var(--text-tertiary)" }}>Collected by {record.collectedBy ?? "--"}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="py-4 text-sm" style={{ color: "var(--text-tertiary)" }}>No payments recorded for this invoice in the selected period.</p>
+      )}
+    </section>
+  );
+});
+RecordsPanel.displayName = "RecordsPanel";
+
+const invoiceIdFromNode = (nodeId: string) => {
+  const id = Number(nodeId.split("|").pop());
+  return Number.isFinite(id) && id > 0 ? id : null;
+};
 
 const paramsForNode = (node: PaymentHierarchyNode): PaymentHierarchyParams => {
   if (node.id === "company") {

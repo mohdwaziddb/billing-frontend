@@ -240,23 +240,13 @@ export const InvoiceListPage = () => {
     return buildInvoiceDateRange(exportRows);
   }, [list.activeFilters, exportRows]);
 
-  const computeTrendGrowth = (trend: number[]) => {
-    if (trend.length < 2) {
-      return undefined;
-    }
-
-    const latest = trend[trend.length - 1];
-    const previous = trend[trend.length - 2];
-    if (latest === previous) {
-      return "0%";
-    }
-    if (previous === 0) {
-      return latest === 0 ? "0%" : "+100%";
-    }
-
-    const change = ((latest - previous) / Math.abs(previous)) * 100;
-    const sign = change >= 0 ? "+" : "";
-    return `${sign}${change.toFixed(0)}%`;
+  // Sparkline = period me ab tak ka running total. Pehle har din ka alag count tha (beech ke
+  // khaali din par "V" gaddha) aur badge aakhri din vs pichhla din compare karta (0 se = "+100%").
+  const runningTotal = (trend: number[]) => {
+    let total = 0;
+    const cumulative = trend.map((value) => (total += Number(value) || 0));
+    // Sab zero = sapaat line ka koi matlab nahi (Partial "0" par kaali line dikhti thi) — sparkline hi mat dikhao.
+    return total > 0 ? cumulative : undefined;
   };
 
   const totalInvoiceTrend = useMemo(
@@ -362,24 +352,29 @@ export const InvoiceListPage = () => {
   };
 
   const invoiceColumns = useMemo<Column<Invoice>[]>(() => [
-    { key: "invoice", header: "Invoice No", render: (item) => <span className="font-semibold text-white">{item.invoiceNo}</span> },
-    { key: "date", header: "Date", render: (item) => formatDate(item.invoiceDate) },
+    { key: "invoice", header: "Invoice No", render: (item) => (
+      // "Created by" alag column ki jagah yahan chhota — 1366px screen par Actions scroll ke peeche chala jata tha.
+      <div className="min-w-[150px] max-w-[190px]">
+        <p className="break-words font-semibold text-white">{item.invoiceNo}</p>
+        {item.createdBy ? <p className="mt-0.5 whitespace-nowrap fs-12 text-slate-500">by {item.createdBy}</p> : null}
+      </div>
+    ) },
+    { key: "date", header: "Date", render: (item) => <span className="whitespace-nowrap">{formatDate(item.invoiceDate)}</span> },
     {
       key: "customer",
       header: "Customer",
       render: (item) => (
-        <div>
+        // Mobile alag column ki jagah naam ke neeche — alag column se table chaudi ho kar Status/Actions kat jaate the.
+        <div className="whitespace-nowrap">
           <p className="font-semibold text-white">{item.customerName}</p>
-          <p className="text-xs text-slate-400">{item.customerMobile}</p>
+          {item.customerMobile ? <p className="mt-0.5 fs-12 text-slate-500">{item.customerMobile}</p> : null}
         </div>
       )
     },
-    { key: "mobile", header: "Mobile", render: (item) => item.customerMobile },
     { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.totalAmount)}</span> },
-    { key: "paid", header: "Paid Amount", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.paidAmount)}</span> },
-    { key: "outstanding", header: "Outstanding", className: "text-right", render: (item) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.balanceAmount)}</span> },
-    { key: "status", header: "Status", render: (item) => <div className="flex flex-wrap gap-2"><StatusBadge label={item.paymentStatus} />{item.deleted ? <StatusBadge label="Deleted" /> : null}</div> },
-    { key: "createdBy", header: "Created By", render: (item) => item.createdBy ?? "--" }
+    { key: "paid", header: "Paid", className: "text-right", render: (item) => <span className="block text-right font-semibold text-white">{formatCurrency(item.paidAmount)}</span> },
+    { key: "outstanding", header: "Outstanding", className: "text-right", render: (item) => <span className={`block whitespace-nowrap text-right font-semibold ${Number(item.balanceAmount) > 0 ? "text-rose-600" : "text-slate-500"}`}>{formatCurrency(item.balanceAmount)}</span> },
+    { key: "status", header: "Status", render: (item) => <div className="flex flex-wrap gap-2"><StatusBadge label={item.paymentStatus} />{item.deleted ? <StatusBadge label="Deleted" /> : null}</div> }
   ], []);
 
   const buildTableColumns = (canDelete: boolean): Column<Invoice>[] => [
@@ -417,8 +412,7 @@ export const InvoiceListPage = () => {
             value={String(summary.total)}
             caption="Current filtered invoices"
             icon={<FileText size={18} />}
-            growth={computeTrendGrowth(totalInvoiceTrend)}
-            trend={totalInvoiceTrend}
+            trend={runningTotal(totalInvoiceTrend)}
             onClick={() => openSummary("total")}
           />
           <StatCard
@@ -426,8 +420,7 @@ export const InvoiceListPage = () => {
             value={String(summary.paid)}
             caption="Fully paid invoices"
             icon={<CheckCircle size={18} />}
-            growth={computeTrendGrowth(paidInvoiceTrend)}
-            trend={paidInvoiceTrend}
+            trend={runningTotal(paidInvoiceTrend)}
             onClick={() => openSummary("paid")}
           />
           <StatCard
@@ -435,8 +428,7 @@ export const InvoiceListPage = () => {
             value={String(summary.pending)}
             caption="Unpaid invoices"
             icon={<Clock size={18} />}
-            growth={computeTrendGrowth(pendingInvoiceTrend)}
-            trend={pendingInvoiceTrend}
+            trend={runningTotal(pendingInvoiceTrend)}
             onClick={() => openSummary("pending")}
           />
           <StatCard
@@ -444,8 +436,7 @@ export const InvoiceListPage = () => {
             value={String(summary.partial)}
             caption="Partially paid invoices"
             icon={<AlertCircle size={18} />}
-            growth={computeTrendGrowth(partialInvoiceTrend)}
-            trend={partialInvoiceTrend}
+            trend={runningTotal(partialInvoiceTrend)}
             onClick={() => openSummary("partial")}
           />
           <StatCard
@@ -453,8 +444,7 @@ export const InvoiceListPage = () => {
             value={formatCurrency(summary.outstandingAmount)}
             caption="Current filtered balance"
             icon={<Wallet size={18} />}
-            growth={computeTrendGrowth(outstandingTrend)}
-            trend={outstandingTrend}
+            trend={runningTotal(outstandingTrend)}
             onClick={() => openSummary("outstanding")}
           />
         </div>

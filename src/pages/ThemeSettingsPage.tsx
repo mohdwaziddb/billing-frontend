@@ -238,7 +238,7 @@ export const ThemeSettingsPage = () => {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="fs-11 uppercase tracking-[0.18em] text-white/60">Header</p>
-                  <h3 className="mt-2 fs-18 font-semibold text-white">{preview.hasGradient ? "Gradient theme" : "Company Workspace"}</h3>
+                  <h3 className="mt-2 fs-18 font-semibold" style={{ color: "#ffffff" }}>{preview.hasGradient ? "Gradient theme" : "Company Workspace"}</h3>
                 </div>
                 <div className="rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: preview.gradient, color: preview.contrast }}>
                   Active
@@ -248,15 +248,16 @@ export const ThemeSettingsPage = () => {
             <div className="grid gap-4 bg-slate-950/70 p-5 md:grid-cols-[180px_1fr]">
               <div className="flex flex-col gap-2 rounded-lg p-3" style={{ background: `linear-gradient(180deg, ${preview.sidebarBgTop}, ${preview.sidebarBgDeep})` }}>
                 <div className="rounded-lg px-4 py-3 text-sm font-semibold" style={{ background: preview.gradient, color: preview.contrast }}>Dashboard</div>
-                <div className="rounded-lg bg-white/8 px-4 py-3 text-sm font-semibold text-white/85">Customers</div>
-                <div className="rounded-lg px-4 py-3 text-sm font-semibold text-white/70">Invoices</div>
+                <div className="rounded-lg px-4 py-3 text-sm font-semibold" style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)" }}>Customers</div>
+                <div className="rounded-lg px-4 py-3 text-sm font-semibold" style={{ color: "rgba(255,255,255,0.7)" }}>Invoices</div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border p-5" style={{ borderColor: preview.border, backgroundColor: `${preview.color}18` }}>
-                  <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Card tint</p>
-                  <p className="mt-3 fs-18 font-semibold text-white">Theme aware</p>
+                  {/* Preview hamesha dark surface hai — inline colors, taaki light-mode utility overrides text na chhupaye. */}
+                  <p className="fs-11 uppercase tracking-[0.18em]" style={{ color: "#94a3b8" }}>Card tint</p>
+                  <p className="mt-3 fs-18 font-semibold" style={{ color: "#ffffff" }}>Theme aware</p>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/5 p-5">
+                <div className="rounded-lg border p-5" style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)" }}>
                   <button className={`${gradientSurfaceClass} rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold`}>
                     Primary Button
                   </button>

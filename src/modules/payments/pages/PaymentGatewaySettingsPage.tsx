@@ -12,7 +12,6 @@ import { useAuth } from "../../../context/AuthContext";
 import { useApiMessage } from "../../../hooks/useApiFeedback";
 import { formatDateTime } from "../../../lib/format";
 import { notificationService } from "../../../services/notificationService";
-import { clearPaymentGatewayConfigCache } from "../hooks/usePaymentGatewayConfig";
 import {
   getPaymentGatewayProviders,
   getPaymentGatewaySettings,
@@ -97,7 +96,6 @@ export const PaymentGatewaySettingsPage = () => {
     try {
       const next = await savePaymentGatewaySettings(buildPayload());
       setSettings((current) => [...current.filter((item) => item.gatewayType !== next.gatewayType), next]);
-      clearPaymentGatewayConfigCache();
       notificationService.showSuccess(next.active ? `${provider?.gatewayName ?? "Gateway"} enabled for online payments` : "Payment gateway settings saved");
     } catch (error) {
       setApiError(error, "Unable to save payment gateway settings");

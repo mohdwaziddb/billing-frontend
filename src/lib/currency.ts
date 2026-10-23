@@ -44,6 +44,26 @@ export const formatCompactCurrency = (value: number | string | null | undefined)
   return formatCurrency(amount);
 };
 
+/**
+ * Chart axis / chhote labels ke liye Indian short form: ₹950, ₹12K, ₹1.25L, ₹2.4Cr.
+ * (formatCompactCurrency 10L se neeche poora "₹1,00,000.00" deta hai — axis par kat jata tha.)
+ */
+export const formatShortCurrency = (value: number | string | null | undefined) => {
+  const amount = normalizeAmount(value);
+  const absolute = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  if (absolute >= 1e7) {
+    return `${sign}₹${trimDecimals(Math.round((absolute / 1e7) * 100) / 100)}Cr`;
+  }
+  if (absolute >= 1e5) {
+    return `${sign}₹${trimDecimals(Math.round((absolute / 1e5) * 100) / 100)}L`;
+  }
+  if (absolute >= 1e3) {
+    return `${sign}₹${trimDecimals(Math.round((absolute / 1e3) * 10) / 10)}K`;
+  }
+  return `${sign}₹${trimDecimals(absolute)}`;
+};
+
 export const formatAmount = (value: number | string | null | undefined) => {
   return amountFormatter.format(normalizeAmount(value));
 };
