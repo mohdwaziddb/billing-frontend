@@ -6,17 +6,55 @@ import { tenantKeySuffix } from "./hosts";
 const AUTH_KEY = `billing_frontend_auth${tenantKeySuffix()}`;
 const PLATFORM_ADMIN_COLUMN_PREFS_KEY = "billing_frontend_platform_admin_column_prefs";
 
+// apiClient token refresh ke baad fire hota hai; AuthContext isse React state
+// sync karta hai, warna purane state se stale tokens wapas storage me likhe jaate.
+export const AUTH_SESSION_REFRESHED_EVENT = "billing:auth-session-refreshed";
+
+export const REMEMBER_ME_KEY = "billing_frontend_remember_me";
+
+// "Remember me" off: session sirf is tab tak (sessionStorage, tab band = logout).
+// Default ON, taaki pehle se logged-in users achanak logout na hon.
+export const isRememberMe = () => {
+  try {
+    return localStorage.getItem(REMEMBER_ME_KEY) !== "0";
+  } catch {
+    return true;
+  }
+};
+
+const readSession = (storage: Storage): StoredAuthSession | null => {
+  try {
+    const raw = storage.getItem(AUTH_KEY);
+    return raw ? (JSON.parse(raw) as StoredAuthSession) : null;
+  } catch {
+    // Corrupt/hand-edited value se poora app crash hota tha: bas session nahi maano.
+    return null;
+  }
+};
+
 export const authStorage = {
   get(): StoredAuthSession | null {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? (JSON.parse(raw) as StoredAuthSession) : null;
+    return readSession(localStorage) ?? readSession(sessionStorage);
   },
   set(value: StoredAuthSession) {
-    localStorage.setItem(AUTH_KEY, JSON.stringify(value));
+    const target = isRememberMe() ? localStorage : sessionStorage;
+    const other = target === localStorage ? sessionStorage : localStorage;
+    try {
+      other.removeItem(AUTH_KEY);
+    } catch {
+      // Ignore storage errors in private / restricted browser modes.
+    }
+    target.setItem(AUTH_KEY, JSON.stringify(value));
   },
   clear() {
-    localStorage.removeItem(AUTH_KEY);
-  }
+    try {
+      localStorage.removeItem(AUTH_KEY);
+      sessionStorage.removeItem(AUTH_KEY);
+    } catch {
+      // Ignore storage errors in private / restricted browser modes.
+    }
+  },
+  key: AUTH_KEY
 };
 
 export const platformAdminColumnPrefsStorage = {

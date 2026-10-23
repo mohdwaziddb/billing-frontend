@@ -26,6 +26,8 @@ export type UpdatePlatformAdminSettingsPayload = {
   platformTagline?: string;
   username?: string;
   password?: string;
+  // Username/password badalne par backend current password maangta hai.
+  currentPassword?: string;
 };
 
 export const getPlatformAdminDashboard = async () => {

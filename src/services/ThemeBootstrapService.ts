@@ -4,6 +4,10 @@ import type { CompanyTheme, UserPreference } from "../types/api";
 
 // Tenant-suffixed so one tenant's theme never flashes on another's login.
 const THEME_BOOTSTRAP_KEY = `billing_frontend_theme_bootstrap${tenantKeySuffix()}`;
+// public/theme-bootstrap.js (React se pehle chalta hai) host logic nahi jaanta,
+// isliye plain key bhi likhte hain. Har tenant subdomain ka apna origin (apna
+// localStorage) hai, to ye bhi tenant-wise hi rehta hai.
+const PLAIN_BOOTSTRAP_KEY = "billing_frontend_theme_bootstrap";
 
 export type ThemeBootstrapState = {
   themeColor: string;
@@ -33,10 +37,12 @@ const read = (): ThemeBootstrapState => {
 
 const write = (state: ThemeBootstrapState) => {
   try {
-    localStorage.setItem(THEME_BOOTSTRAP_KEY, JSON.stringify({
+    const value = JSON.stringify({
       themeColor: normalizeThemeValue(state.themeColor),
       darkModeEnabled: state.darkModeEnabled
-    }));
+    });
+    localStorage.setItem(THEME_BOOTSTRAP_KEY, value);
+    localStorage.setItem(PLAIN_BOOTSTRAP_KEY, value);
   } catch {
     // Storage can be unavailable in private or restricted browser contexts.
   }
@@ -80,6 +86,7 @@ export const ThemeBootstrapService = {
   clear() {
     try {
       localStorage.removeItem(THEME_BOOTSTRAP_KEY);
+      localStorage.removeItem(PLAIN_BOOTSTRAP_KEY);
     } catch {
       // Ignore storage failures.
     }

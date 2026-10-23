@@ -13,6 +13,9 @@ import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { firstFormErrorMessage } from "../lib/formValidation";
+import { CollectOnlineModal } from "../modules/payments/components/CollectOnlineModal";
+import { usePaymentGatewayConfig } from "../modules/payments/hooks/usePaymentGatewayConfig";
+import { findPaymentMode, isOnlineModeMaster, paymentModeOptions, referenceLabelForMode } from "../modules/payments/paymentModeOptions";
 import { notificationService } from "../services/notificationService";
 import type { Customer, Invoice, PaymentMode, PaymentModeMaster, PaymentRequest } from "../types/api";
 
@@ -23,7 +26,12 @@ type FormValues = {
   paymentDate: string;
   mode: PaymentMode;
   remarks: string;
+  referenceNo: string;
 };
+
+// Default kabhi Online nahi (wo invoice + gateway flow hai).
+const defaultModeCode = (modes: PaymentModeMaster[]) =>
+  modes.find((mode) => mode.modeCode === "CASH")?.modeCode ?? modes.find((mode) => !isOnlineModeMaster(mode))?.modeCode ?? "";
 
 const todayIso = () => {
   const today = new Date();
@@ -36,6 +44,9 @@ export const PaymentEntryPage = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
   const [lockedInvoice, setLockedInvoice] = useState<Invoice | null>(null);
+  const [onlineCollectInvoice, setOnlineCollectInvoice] = useState<{ invoice: Invoice; amount: number } | null>(null);
+  const onlinePaidRef = useRef(false);
+  const { config: gatewayConfig, onlineEnabled } = usePaymentGatewayConfig();
   const { clearMessage, setApiError } = useApiMessage();
   const {
     register,
@@ -53,7 +64,8 @@ export const PaymentEntryPage = () => {
       amount: "",
       paymentDate: todayIso(),
       mode: "",
-      remarks: ""
+      remarks: "",
+      referenceNo: ""
     }
   });
 
@@ -70,11 +82,12 @@ export const PaymentEntryPage = () => {
       setCustomers(customerData.filter((customer) => customer.active));
       setInvoices(invoiceData);
       setPaymentModes(modeData);
-      if (modeData[0] && !getValues("mode")) {
-        setValue("mode", modeData[0].modeCode, { shouldValidate: true });
+      const initialMode = defaultModeCode(modeData);
+      if (initialMode && !getValues("mode")) {
+        setValue("mode", initialMode, { shouldValidate: true });
       }
-    });
-  }, [setValue, getValues]);
+    }).catch((err: any) => setApiError(err, "Unable to load customers, invoices or payment modes"));
+  }, [setValue, getValues, setApiError]);
 
   const selectedCustomerId = watch("customerId");
   const selectedInvoiceId = watch("invoiceId");
@@ -89,6 +102,8 @@ export const PaymentEntryPage = () => {
     }));
   }, [invoices, selectedCustomerId]);
   const selectedInvoice = invoices.find((item) => String(item.id) === selectedInvoiceId);
+  const selectedMode = findPaymentMode(paymentModes, watchedMode);
+  const onlineSelected = isOnlineModeMaster(selectedMode);
   const paymentAmount = Number(watchedAmount);
   const canSavePayment = Boolean(
     (lockedInvoice || selectedCustomerId) &&
@@ -97,7 +112,9 @@ export const PaymentEntryPage = () => {
     paymentAmount > 0 &&
     (!selectedInvoice || paymentAmount <= Number(selectedInvoice.balanceAmount)) &&
     watchedPaymentDate &&
-    watchedMode
+    watchedMode &&
+    // Online payment hamesha kisi invoice par (gateway order invoice se banta hai).
+    (!onlineSelected || Boolean(lockedInvoice || selectedInvoice))
   );
 
   useEffect(() => {
@@ -152,8 +169,35 @@ export const PaymentEntryPage = () => {
     }
   }, [invoices, selectedInvoiceId, setValue, getValues]);
 
+  const resetForm = () => {
+    reset({
+      customerId: "",
+      invoiceId: "",
+      amount: "",
+      paymentDate: todayIso(),
+      mode: defaultModeCode(paymentModes),
+      remarks: "",
+      referenceNo: ""
+    });
+    setLockedInvoice(null);
+    lastAutoAmount.current = null;
+    lastInvoiceId.current = "";
+    prefilledInvoiceId.current = null;
+  };
+
   const onSubmit = async (values: FormValues) => {
     clearMessage();
+
+    if (onlineSelected) {
+      const invoice = lockedInvoice ?? invoices.find((item) => String(item.id) === values.invoiceId);
+      if (!invoice) {
+        setApiError({ message: "Select an invoice to collect online payment" }, "Select an invoice to collect online payment");
+        return;
+      }
+      onlinePaidRef.current = false;
+      setOnlineCollectInvoice({ invoice, amount: Number(values.amount) });
+      return;
+    }
 
     const payload: PaymentRequest = {
       customerId: lockedInvoice ? Number(lockedInvoice.customerId) : Number(values.customerId),
@@ -161,7 +205,8 @@ export const PaymentEntryPage = () => {
       amount: Number(values.amount),
       paymentDate: values.paymentDate,
       mode: values.mode,
-      remarks: values.remarks || undefined
+      remarks: values.remarks || undefined,
+      referenceNo: selectedMode?.requiresReference && values.referenceNo.trim() ? values.referenceNo.trim() : undefined
     };
 
     if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
@@ -177,18 +222,7 @@ export const PaymentEntryPage = () => {
     try {
       await createPayment(payload);
       notificationService.showSuccess("Payment Recorded Successfully");
-      reset({
-        customerId: "",
-        invoiceId: "",
-        amount: "",
-        paymentDate: todayIso(),
-        mode: paymentModes[0]?.modeCode ?? "",
-        remarks: ""
-      });
-      setLockedInvoice(null);
-      lastAutoAmount.current = null;
-      lastInvoiceId.current = "";
-      prefilledInvoiceId.current = null;
+      resetForm();
     } catch (err: any) {
       setApiError(err, "Unable to record payment");
     }
@@ -210,7 +244,7 @@ export const PaymentEntryPage = () => {
           items={[{ label: "Payments", to: "/payments" }, { label: "Add Payment" }]}
           backTo="/payments"
           formId="payment-form"
-          saveLabel="Save Payment"
+          saveLabel={onlineSelected ? "Collect Online" : "Save Payment"}
           saving={isSubmitting}
           saveDisabled={!canSavePayment}
         />
@@ -308,7 +342,7 @@ export const PaymentEntryPage = () => {
                     requiredMark
                     placeholder="Select Mode"
                     error={errors.mode?.message}
-                    options={paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))}
+                    options={paymentModeOptions(paymentModes, onlineEnabled, gatewayConfig?.gatewayName)}
                     name={field.name}
                     value={field.value}
                     onChange={(event) => field.onChange(event.target.value)}
@@ -317,11 +351,44 @@ export const PaymentEntryPage = () => {
                   />
                 )}
               />
+              {selectedMode?.requiresReference ? (
+                <Input label={referenceLabelForMode(watchedMode)} placeholder="Optional" maxLength={120} {...register("referenceNo")} />
+              ) : null}
               <Input label="Notes" {...register("remarks")} />
             </div>
+            {onlineSelected ? (
+              <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 fs-12 text-emerald-800">
+                {lockedInvoice || selectedInvoice
+                  ? `Collect Online opens ${gatewayConfig?.gatewayName ?? "the payment gateway"} (Pay Now or payment link). The payment is recorded automatically once it succeeds.`
+                  : "Select an invoice to collect an online payment."}
+              </p>
+            ) : null}
           </FormSection>
         </form>
       </div>
+
+      {onlineCollectInvoice ? (
+        <CollectOnlineModal
+          open
+          invoiceId={onlineCollectInvoice.invoice.id}
+          invoiceNo={onlineCollectInvoice.invoice.invoiceNo}
+          customerName={onlineCollectInvoice.invoice.customerName}
+          customerMobile={onlineCollectInvoice.invoice.customerMobile}
+          balanceAmount={Number(onlineCollectInvoice.invoice.balanceAmount)}
+          defaultAmount={onlineCollectInvoice.amount}
+          onPaid={() => {
+            onlinePaidRef.current = true;
+          }}
+          onClose={() => {
+            setOnlineCollectInvoice(null);
+            if (onlinePaidRef.current) {
+              resetForm();
+              // Balance badal gaya: dropdown ke dues taaze karo.
+              void getInvoices({ size: 1000 }).then(setInvoices).catch(() => undefined);
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 };

@@ -8,13 +8,13 @@ export const StatusBadge = ({ label }: { label?: string | null }) => {
     <span
       className={clsx(
         "status-badge inline-flex rounded-full border px-2.5 py-0.5 fs-11 font-semibold tracking-wide",
-        (normalized === "PAID" || normalized === "SENT") && "status-badge-success",
-        (normalized === "PARTIAL" || normalized === "PENDING") && "status-badge-warning",
+        (normalized === "PAID" || normalized === "SENT" || normalized === "SUCCESS") && "status-badge-success",
+        (normalized === "PARTIAL" || normalized === "PENDING" || normalized === "CREATED") && "status-badge-warning",
         (normalized === "UNPAID" || normalized === "FAILED" || normalized === "DELETED") && "status-badge-danger",
         normalized === "ACTIVE" && "status-badge-active",
         normalized === "ON" && "status-badge-success",
-        (normalized === "OFF" || normalized === "INACTIVE" || normalized === "UNKNOWN" || normalized === "CANCELLED") && "status-badge-muted",
-        !["PAID", "PARTIAL", "UNPAID", "SENT", "FAILED", "PENDING", "ACTIVE", "ON", "OFF", "INACTIVE", "UNKNOWN", "DELETED", "CANCELLED"].includes(normalized) &&
+        (normalized === "OFF" || normalized === "INACTIVE" || normalized === "UNKNOWN" || normalized === "CANCELLED" || normalized === "EXPIRED") && "status-badge-muted",
+        !["PAID", "PARTIAL", "UNPAID", "SENT", "SUCCESS", "FAILED", "PENDING", "CREATED", "ACTIVE", "ON", "OFF", "INACTIVE", "UNKNOWN", "DELETED", "CANCELLED", "EXPIRED"].includes(normalized) &&
           "status-badge-active"
       )}
     >

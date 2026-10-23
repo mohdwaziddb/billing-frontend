@@ -3,7 +3,7 @@ import { type ReactNode, useState } from "react";
 import { ForgotPasswordModal } from "../ForgotPasswordModal";
 import { loginInputClass, loginPrimaryButtonClass } from "./loginStyles";
 
-const REMEMBER_ME_KEY = "billing_frontend_remember_me";
+import { isRememberMe, REMEMBER_ME_KEY } from "../../lib/storage";
 
 type LoginCardProps = {
   username: string;
@@ -42,13 +42,8 @@ export const LoginCard = ({
   showForgotPassword = true,
   bottomBox
 }: LoginCardProps) => {
-  const [remember, setRemember] = useState(() => {
-    try {
-      return localStorage.getItem(REMEMBER_ME_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  // Ab ye sach me kaam karta hai: off = session sirf is tab tak (lib/storage).
+  const [remember, setRemember] = useState(isRememberMe);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
 

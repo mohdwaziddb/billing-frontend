@@ -18,12 +18,12 @@ import { useApiMessage } from "../hooks/useApiFeedback";
 import { useListPage } from "../hooks/useListPage";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
-import { formatDate } from "../lib/format";
+import { formatDate, localIsoDate } from "../lib/format";
 import type { Product, Purchase, PurchaseRequest } from "../types/api";
 
 const emptyLine = { productId: "", qty: "1", purchaseRate: "", sellingRate: "" };
 const defaultSupplierName = "Opening Balance";
-const todayString = () => new Date().toISOString().slice(0, 10);
+const todayString = () => localIsoDate();
 
 type PurchaseFilters = {
   search: string;

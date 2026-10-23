@@ -10,6 +10,7 @@ export type PaymentFilterParams = {
   maxAmount?: string | number;
   mode?: string;
   invoiceLinked?: boolean;
+  invoiceId?: number;
   createdByRole?: string;
   recordStatus?: "ACTIVE" | "DELETED" | "ALL";
   page?: number;

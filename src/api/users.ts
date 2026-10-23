@@ -1,5 +1,5 @@
   import { apiClient } from "./apiClient";
-import type { ApiResponse, CompanyUserRequest, PageResponse, Role, UserProfile } from "../types/api";
+import type { ApiResponse, CompanyUserRequest, OwnProfileRequest, PageResponse, Role, UserProfile } from "../types/api";
 
 const companyRoles: Role[] = ["OWNER", "ADMIN", "USER"];
 
@@ -50,4 +50,41 @@ export const updateCompanyUser = async (id: number, payload: CompanyUserRequest)
 
 export const deactivateCompanyUser = async (id: number) => {
   await apiClient.delete(`/v1/users/${id}`);
+};
+
+const photoForm = (photo: File) => {
+  const formData = new FormData();
+  formData.append("photo", photo);
+  return formData;
+};
+
+/** Logged-in user apni profile (naam / email / mobile) khud badle. */
+export const updateMyProfile = async (payload: OwnProfileRequest) => {
+  const response = await apiClient.put<ApiResponse<UserProfile>>("/v1/users/me", payload);
+  return response.data.data;
+};
+
+export const uploadMyPhoto = async (photo: File) => {
+  const response = await apiClient.put<ApiResponse<UserProfile>>("/v1/users/me/photo", photoForm(photo), {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return response.data.data;
+};
+
+export const deleteMyPhoto = async () => {
+  const response = await apiClient.delete<ApiResponse<UserProfile>>("/v1/users/me/photo");
+  return response.data.data;
+};
+
+/** Users page (owner): kisi bhi user ki photo. */
+export const uploadUserPhoto = async (id: number, photo: File) => {
+  const response = await apiClient.put<ApiResponse<UserProfile>>(`/v1/users/${id}/photo`, photoForm(photo), {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+  return response.data.data;
+};
+
+export const deleteUserPhoto = async (id: number) => {
+  const response = await apiClient.delete<ApiResponse<UserProfile>>(`/v1/users/${id}/photo`);
+  return response.data.data;
 };

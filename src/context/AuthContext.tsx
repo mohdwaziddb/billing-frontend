@@ -7,7 +7,7 @@ import { getMyPreferences, updateMyPreferences } from "../api/userPreferences";
 import { loginRequest, logoutRequest, meRequest, platformAdminLoginRequest, verifyMfaRequest } from "../api/auth";
 import { compareMenuOrder, isMenuGroup } from "../lib/menu";
 import { resetMfaEnrollBanner } from "../lib/mfaBanner";
-import { authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
+import { AUTH_SESSION_REFRESHED_EVENT, authStorage, platformAdminColumnPrefsStorage } from "../lib/storage";
 import { tenantKeySuffix } from "../lib/hosts";
 import { sessionCache } from "../lib/sessionCache";
 import { applyThemeColor, DEFAULT_THEME_COLOR } from "../lib/theme";
@@ -104,6 +104,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const platformAdmin = isPlatformAdmin ? session.auth : null;
   const usePublicTheme = PUBLIC_THEME_ROUTES.has(location.pathname);
 
+  // Interceptor ne token rotate kiya: React state ko storage se sync karo, taaki
+  // refreshProfile/logout purana (server par delete ho chuka) refresh token na likhein.
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const latest = authStorage.get();
+      if (latest) {
+        setSession(latest);
+      }
+    };
+    // Doosre tab me login/logout/refresh: localStorage "storage" event sirf
+    // DOOSRE tabs me aata hai. Logout hua to yahan bhi session hatao.
+    const syncFromOtherTab = (event: StorageEvent) => {
+      if (event.key !== authStorage.key) {
+        return;
+      }
+      setSession(authStorage.get());
+    };
+    window.addEventListener(AUTH_SESSION_REFRESHED_EVENT, syncFromStorage);
+    window.addEventListener("storage", syncFromOtherTab);
+    return () => {
+      window.removeEventListener(AUTH_SESSION_REFRESHED_EVENT, syncFromStorage);
+      window.removeEventListener("storage", syncFromOtherTab);
+    };
+  }, []);
+
   useEffect(() => {
     applyThemeColor(usePublicTheme ? DEFAULT_THEME_COLOR : theme.themeColor);
   }, [theme.themeColor, usePublicTheme]);
@@ -171,8 +196,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, bootstrap);
         ThemeBootstrapService.remember(bootstrap.theme, bootstrap.preferences);
       })
-      .catch(() => {
-        clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
+      .catch((err: any) => {
+        // Sirf auth fail (401) par session hatao. Pehle network blip / 500 par
+        // bhi reload karte hi user logout ho jata tha.
+        if (err?.response?.status === 401) {
+          clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
+        }
       })
       .finally(() => {
         bootstrapPromise = null;
@@ -231,13 +260,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         const profile = await meRequest(options);
         setUser(profile);
+        // meRequest ke dauraan token refresh ho sakta hai: tokens hamesha storage se lo.
+        const latest = authStorage.get();
+        const latestAuth = latest?.type === "user" ? latest.auth : session.auth;
         const cached = sessionCache.get<AuthBootstrapCache>(AUTH_BOOTSTRAP_CACHE_KEY);
-        if (cached && cached.accessToken === session.auth.accessToken) {
+        if (cached && cached.accessToken === latestAuth.accessToken) {
           sessionCache.set(AUTH_BOOTSTRAP_CACHE_KEY, { ...cached, user: profile });
         }
         const nextSession: StoredAuthSession = {
           type: "user",
-          auth: { ...session.auth, user: profile }
+          auth: { ...latestAuth, user: profile }
         };
         authStorage.set(nextSession);
         setSession(nextSession);
@@ -351,9 +383,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return "/platform-admin/dashboard";
       },
       async logout() {
-        if (session?.type === "user" && session.auth.refreshToken) {
+        // Storage wala token hi server par live hai (refresh ke baad state purana ho sakta hai).
+        const latest = authStorage.get();
+        const refreshToken = latest?.type === "user" ? latest.auth.refreshToken : session?.type === "user" ? session.auth.refreshToken : null;
+        if (refreshToken) {
           try {
-            await logoutRequest(session.auth.refreshToken);
+            await logoutRequest(refreshToken);
           } catch {
             // Ignore logout failures and clear local session anyway.
           }

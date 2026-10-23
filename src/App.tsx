@@ -37,6 +37,7 @@ import { PaymentEntryPage } from "./pages/PaymentEntryPage";
 import { PaymentHierarchyPage } from "./pages/PaymentHierarchyPage";
 import { PaymentListPage } from "./pages/PaymentListPage";
 import { PaymentModePage } from "./pages/PaymentModePage";
+import { PaymentGatewaySettingsPage } from "./modules/payments/pages/PaymentGatewaySettingsPage";
 import { ExpenseCategoryPage } from "./pages/ExpenseCategoryPage";
 import { CommunicationHistoryPage } from "./pages/CommunicationHistoryPage";
 import { ExpenseListPage } from "./pages/ExpenseListPage";
@@ -203,6 +204,7 @@ function App() {
           <Route path="/setup/product-sub-categories" element={<PermissionRoute menuCode="PRODUCT_SUB_CATEGORIES"><ProductSubCategoryPage /></PermissionRoute>} />
           <Route path="/setup/expense-categories" element={<PermissionRoute menuCode="EXPENSE_CATEGORIES"><ExpenseCategoryPage /></PermissionRoute>} />
           <Route path="/setup/payment-modes" element={<PermissionRoute menuCode="PAYMENT_MODES"><PaymentModePage /></PermissionRoute>} />
+          <Route path="/setup/payment-gateway" element={<PermissionRoute menuCode="PAYMENT_GATEWAY"><PaymentGatewaySettingsPage /></PermissionRoute>} />
           <Route path="/setup/tax-master" element={<PermissionRoute menuCode="TAX_MASTER"><TaxMasterPage /></PermissionRoute>} />
           <Route path="/setup/theme-settings" element={<PermissionRoute menuCode="THEME_SETTINGS"><ThemeSettingsPage /></PermissionRoute>} />
           <Route path="/setup/about-company" element={<PermissionRoute menuCode="ABOUT_COMPANY"><AboutCompanyPage /></PermissionRoute>} />

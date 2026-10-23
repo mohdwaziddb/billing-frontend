@@ -176,7 +176,9 @@ export const ForgotPasswordModal = ({
       setChallengeId(challenge.challengeId);
       setMaskedDestination(challenge.maskedDestination ?? "");
       setStep(2);
-      notificationService.showSuccess(`OTP sent to ${challenge.maskedDestination ?? "your contact"}`);
+      notificationService.showSuccess(
+        challenge.maskedDestination ? `OTP sent to ${challenge.maskedDestination}` : "If an account exists, an OTP has been sent to its registered email."
+      );
     } catch (err: any) {
       setApiError(err, "Unable to send OTP");
     } finally {

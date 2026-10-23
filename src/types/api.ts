@@ -99,6 +99,14 @@ export type UserProfile = {
   company: CompanySummary | null;
   /** True only for tenant super-admin sessions (backend additive flag). */
   superAdmin?: boolean;
+  /** Profile photo display URL (relative /uploads/... ya S3 URL) — resolveAssetUrl se dikhao. */
+  photoUrl?: string | null;
+  photoFile?: CompanyFileInfo | null;
+};
+
+/** Self profile: sirf naam (email / mobile owner hi badalta hai; backend baaki fields padhta hi nahi). */
+export type OwnProfileRequest = {
+  fullName: string;
 };
 
 export type AuthPayload = {
@@ -890,6 +898,7 @@ export type InvoiceRequest = {
   discountAmount: number;
   paidAmount?: number;
   paymentMode?: string;
+  referenceNo?: string;
   items: InvoiceRequestItem[];
 };
 
@@ -907,10 +916,17 @@ export type Payment = {
   paymentDate: string;
   mode: PaymentMode;
   remarks: string | null;
+  referenceNo?: string | null;
+  source?: PaymentSource;
+  transactionRef?: string | null;
+  gatewayType?: string | null;
   deleted: boolean;
   createdAt: string;
   createdBy: string | null;
 };
+
+/** MANUAL = user entry, GATEWAY = online gateway (Razorpay etc.) se auto record. */
+export type PaymentSource = "MANUAL" | "GATEWAY";
 
 export type PaymentHierarchyNode = {
   id: string;
@@ -997,6 +1013,7 @@ export type PaymentRequest = {
   paymentDate: string;
   mode: PaymentMode;
   remarks?: string;
+  referenceNo?: string;
 };
 
 export type PaymentModeMaster = {
@@ -1005,16 +1022,23 @@ export type PaymentModeMaster = {
   modeCode: string;
   description: string | null;
   active: boolean;
+  modeType?: PaymentModeType;
+  requiresReference?: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy: string | null;
   updatedBy: string | null;
 };
 
+/** OFFLINE = counter (Cash/UPI/Card…), ONLINE = payment gateway se. */
+export type PaymentModeType = "OFFLINE" | "ONLINE";
+
 export type PaymentModeRequest = {
   modeName: string;
   description?: string;
   active: boolean;
+  modeType?: PaymentModeType;
+  requiresReference?: boolean;
 };
 
 export type ExpenseType = "GENERAL" | "CUSTOMER_RELATED" | "INVOICE_RELATED";
@@ -1174,6 +1198,8 @@ export type GstReport = {
   sgstAmount: number;
   igstAmount: number;
   totalTaxAmount: number;
+  // VAT / Sales tax (non-GST); GST totals me shamil nahi.
+  otherTaxAmount?: number;
   grandTotal: number;
   invoiceWise: GstInvoiceWiseRow[];
   customerWise: GstCustomerWiseRow[];

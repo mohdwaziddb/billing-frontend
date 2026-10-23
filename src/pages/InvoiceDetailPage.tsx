@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Building2, CreditCard, Printer, ReceiptText, Send, UserRound, Wallet } from "lucide-react";
+import { Building2, CreditCard, Printer, ReceiptText, Send, Smartphone, UserRound, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { getInvoiceProfitability } from "../api/expenses";
 import { getInvoice } from "../api/invoices";
@@ -21,6 +21,12 @@ import { useApiMessage } from "../hooks/useApiFeedback";
 import { formatCurrency } from "../lib/currency";
 import { formatDate, formatDateTime } from "../lib/format";
 import { sanitizeHtml } from "../lib/sanitizeHtml";
+import { CollectOnlineModal } from "../modules/payments/components/CollectOnlineModal";
+import { PaymentTransactionsList } from "../modules/payments/components/PaymentTransactionsList";
+import { usePaymentGatewayConfig } from "../modules/payments/hooks/usePaymentGatewayConfig";
+import { getInvoiceTransactions } from "../modules/payments/paymentGateway.api";
+import type { PaymentTransaction } from "../modules/payments/payment.types";
+import { paymentModeDisplay } from "../modules/payments/paymentModeOptions";
 import { notificationService } from "../services/notificationService";
 import type { AuditLog, Invoice, NotificationLog, Payment, Profitability } from "../types/api";
 
@@ -29,6 +35,10 @@ export const InvoiceDetailPage = () => {
   const { user, can } = useAuth();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
+  const [collectOnlineOpen, setCollectOnlineOpen] = useState(false);
+  // Online payment success par invoice / payments dobara laao.
+  const [reloadKey, setReloadKey] = useState(0);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [profitability, setProfitability] = useState<Profitability | null>(null);
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
@@ -48,25 +58,39 @@ export const InvoiceDetailPage = () => {
     includePdf: true
   });
   const { setApiError } = useApiMessage();
+  const { onlineEnabled } = usePaymentGatewayConfig(can("PAYMENTS", "VIEW"));
 
   useEffect(() => {
     if (!invoiceId) return;
     const id = Number(invoiceId);
+    // Invoice badalne par purani requests ka jawab naye page par na likhe.
+    let cancelled = false;
     void Promise.all([
       getInvoice(id),
       getInvoiceTemplateSettings().catch(() => null),
-      getPayments({ size: 1000 }).then((rows) => rows.filter((payment) => payment.invoiceId === id)),
+      getPayments({ invoiceId: id, size: 1000 }),
+      can("PAYMENTS", "VIEW") ? getInvoiceTransactions(id).catch(() => []) : Promise.resolve([]),
       can("EXPENSES", "VIEW") ? getInvoiceProfitability(id) : Promise.resolve(null),
       can("INVOICES", "LOGS") ? getAuditLogs({ moduleName: "Invoice", entityId: id, page: 0, size: 20 }).then((response) => response.records) : Promise.resolve([])
-    ]).then(([invoiceData, templateSettings, paymentData, profitabilityData, logData]) => {
+    ]).then(([invoiceData, templateSettings, paymentData, transactionData, profitabilityData, logData]) => {
+      if (cancelled) return;
       setInvoice(invoiceData);
       setSelectedTemplateId(templateSettings?.defaultTemplateId);
       setPayments(paymentData);
+      setTransactions(transactionData);
       setProfitability(profitabilityData);
       setLogs(logData);
-      return renderInvoiceHtml(id, templateSettings?.defaultTemplateId).then((render) => setRenderedHtml(render.html));
+      return renderInvoiceHtml(id, templateSettings?.defaultTemplateId).then((render) => {
+        if (!cancelled) setRenderedHtml(render.html);
+      });
+    }).catch((err: any) => {
+      // Pehle .catch nahi tha: ek bhi call fail = khali page, koi message nahi.
+      if (!cancelled) setApiError(err, "Unable to load invoice");
     });
-  }, [can, invoiceId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [can, invoiceId, reloadKey, setApiError]);
 
   const resolveRenderedInvoiceHtml = async () => {
     if (!invoice) {
@@ -78,6 +102,7 @@ export const InvoiceDetailPage = () => {
   };
 
   const canRecordPayment = Boolean(invoice && invoice.paymentStatus !== "PAID" && Number(invoice.balanceAmount) > 0 && can("PAYMENTS", "ADD"));
+  const canCollectOnline = canRecordPayment && onlineEnabled;
   const canSendWhatsApp = Boolean(invoice?.customerMobile && can("COMMUNICATION", "WHATSAPP_SEND"));
 
   useEffect(() => {
@@ -168,7 +193,7 @@ export const InvoiceDetailPage = () => {
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${invoice.invoiceNo}.pdf`;
+      link.download = invoicePdfFileName(invoice);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -243,6 +268,11 @@ export const InvoiceDetailPage = () => {
               <Link to={`/payments/new?invoiceId=${invoice?.id}`}>
                 <Button type="button"><CreditCard size={16} />Record Payment</Button>
               </Link>
+            ) : null}
+            {canCollectOnline ? (
+              <Button type="button" variant="secondary" onClick={() => setCollectOnlineOpen(true)}>
+                <Smartphone size={16} />Collect Online
+              </Button>
             ) : null}
             {invoice ? (
               <Button type="button" variant="secondary" onClick={() => void handlePrint()}>
@@ -327,9 +357,23 @@ export const InvoiceDetailPage = () => {
           <Table data={payments} emptyText="No payments received for this invoice." columns={[
             { key: "date", header: "Date", render: (item) => formatDate(item.paymentDate) },
             { key: "amount", header: "Amount", className: "text-right", render: (item) => <span className="block text-right font-bold text-slate-950">{formatCurrency(item.amount)}</span> },
-            { key: "mode", header: "Mode", render: (item) => item.mode.replace(/_/g, " ") },
+            { key: "mode", header: "Mode", render: (item) => (
+              item.source === "GATEWAY"
+                ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 fs-11 font-semibold text-emerald-700">{paymentModeDisplay(item)}</span>
+                : paymentModeDisplay(item)
+            ) },
+            { key: "reference", header: "Reference", render: (item) => <span className="break-all text-xs">{item.referenceNo ?? "--"}</span> },
             { key: "user", header: "Collected By", render: (item) => item.createdBy ?? "--" }
           ]} />
+          <PaymentTransactionsList
+            transactions={transactions}
+            onUpdated={(updated) => {
+              setTransactions((current) => current.map((item) => (item.txnRef === updated.txnRef ? updated : item)));
+              if (updated.status === "SUCCESS") {
+                setReloadKey((key) => key + 1);
+              }
+            }}
+          />
         </GlassCard>
 
         {profitability ? (
@@ -343,6 +387,23 @@ export const InvoiceDetailPage = () => {
           </GlassCard>
         ) : null}
       </div>
+
+      {invoice ? (
+        <CollectOnlineModal
+          open={collectOnlineOpen}
+          invoiceId={invoice.id}
+          invoiceNo={invoice.invoiceNo}
+          customerName={invoice.customerName}
+          customerMobile={invoice.customerMobile}
+          balanceAmount={Number(invoice.balanceAmount)}
+          onClose={() => {
+            setCollectOnlineOpen(false);
+            // Link bana ho to attempts list me dikhe.
+            setReloadKey((key) => key + 1);
+          }}
+          onPaid={() => setReloadKey((key) => key + 1)}
+        />
+      ) : null}
 
       <Modal open={whatsAppOpen} title="Send Invoice on WhatsApp" onClose={() => setWhatsAppOpen(false)}>
         <div className="space-y-4">
@@ -397,8 +458,11 @@ export const InvoiceDetailPage = () => {
 const defaultInvoiceWhatsAppMessage = (invoice: Invoice) =>
   `Hello ${invoice.customerName}, your invoice ${invoice.invoiceNo} for Rs. ${Number(invoice.totalAmount).toFixed(2)} is ready. Outstanding amount: Rs. ${Number(invoice.balanceAmount).toFixed(2)}.`;
 
+// Invoice no me "/" hota hai (INV/2627/00001); file name me allowed nahi.
+const invoicePdfFileName = (invoice: Invoice) => `${invoice.invoiceNo.replace(/[\/]/g, "-")}.pdf`;
+
 const buildInvoiceAttachment = async (invoice: Invoice, templateId?: string) => ({
-  fileName: `${invoice.invoiceNo}.pdf`,
+  fileName: invoicePdfFileName(invoice),
   contentType: "application/pdf",
   base64Content: await blobToBase64(await downloadInvoicePdfFile(invoice.id, templateId))
 });

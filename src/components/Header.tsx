@@ -7,7 +7,8 @@ import {
   Palette,
   Search,
   ShieldCheck,
-  Sun
+  Sun,
+  UserRound
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -19,6 +20,8 @@ import { TOGGLE_SIDEBAR_EVENT } from "../layouts/DashboardLayout";
 import { MenuSearchService, type MenuSearchResult } from "../services/MenuSearchService";
 import { ForgotPasswordModal } from "./ForgotPasswordModal";
 import { Modal } from "./Modal";
+import { MyProfileModal } from "./MyProfileModal";
+import { UserAvatar } from "./UserAvatar";
 
 const headerIconButtonClass =
   "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.04)] transition hover:text-[var(--theme-color)]";
@@ -31,6 +34,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [myProfileOpen, setMyProfileOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   // Company MFA flag session user object se nahi, live API se: purane
   // sessions (backend deploy se pehle ke login) me applyMfa field hoti hi
@@ -238,9 +242,13 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
               aria-expanded={profileOpen}
               onClick={() => setProfileOpen((current) => !current)}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--theme-color)] bg-[image:var(--theme-gradient)] text-sm font-bold text-[var(--theme-contrast)]">
-                {profileInitial}
-              </div>
+              {sessionType === "user" ? (
+                <UserAvatar name={user?.fullName} photoUrl={user?.photoUrl} />
+              ) : (
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--theme-color)] bg-[image:var(--theme-gradient)] text-sm font-bold text-[var(--theme-contrast)]">
+                  {profileInitial}
+                </div>
+              )}
               <div className="hidden min-w-0 text-left sm:block">
                 <p className="fs-13 truncate font-bold text-slate-950">{profileName}</p>
                 <p className="fs-11 truncate text-slate-500">{profileRole}</p>
@@ -254,6 +262,20 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
                   <p className="fs-13 truncate font-bold text-slate-950">{profileName}</p>
                   <p className="fs-11 mt-0.5 truncate text-slate-500">{profileEmail}</p>
                 </div>
+                {sessionType === "user" ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`${profileMenuItemClass} text-slate-700 hover:bg-slate-50 hover:text-slate-950`}
+                    onClick={() => {
+                      setProfileOpen(false);
+                      setMyProfileOpen(true);
+                    }}
+                  >
+                    <UserRound size={17} />
+                    My Profile
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   role="menuitem"
@@ -297,6 +319,7 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
           </div>
         </div>
       </div>
+      {sessionType === "user" ? <MyProfileModal open={myProfileOpen} onClose={() => setMyProfileOpen(false)} /> : null}
       <ForgotPasswordModal
         open={forgotPasswordOpen}
         initialUsername={user?.email ?? user?.mobileNumber ?? ""}

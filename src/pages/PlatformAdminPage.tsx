@@ -94,7 +94,8 @@ const settingsFormInitial = {
   platformName: "",
   platformTagline: "",
   username: "",
-  password: ""
+  password: "",
+  currentPassword: ""
 };
 
 export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
@@ -283,7 +284,8 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
       platformName: response.platformName ?? "",
       platformTagline: response.platformTagline ?? "",
       username: response.username ?? "",
-      password: ""
+      password: "",
+      currentPassword: ""
     });
   };
 
@@ -357,10 +359,11 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
         platformName: settingsForm.platformName.trim(),
         platformTagline: settingsForm.platformTagline.trim(),
         username: settingsForm.username.trim(),
-        password: settingsForm.password.trim() || undefined
+        password: settingsForm.password.trim() || undefined,
+        currentPassword: settingsForm.currentPassword || undefined
       });
       setSettings(updated);
-      setSettingsForm((current) => ({ ...current, password: "" }));
+      setSettingsForm((current) => ({ ...current, password: "", currentPassword: "" }));
       notificationService.showSuccess("Platform settings updated successfully");
     } catch (err) {
       setApiError(err, "Unable to update platform settings");
@@ -812,6 +815,7 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
                 <textarea className="min-h-[108px] rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color-mix(in_srgb,var(--theme-color)_18%,transparent)]" rows={3} value={settingsForm.platformTagline} onChange={(event) => setSettingsForm((current) => ({ ...current, platformTagline: event.target.value }))} />
               </label>
             </div>
+            <PasswordInput label="Current Password" autoComplete="current-password" value={settingsForm.currentPassword} onChange={(event) => setSettingsForm((current) => ({ ...current, currentPassword: event.target.value }))} />
             <PasswordInput label="New Password" autoComplete="new-password" value={settingsForm.password} onChange={(event) => setSettingsForm((current) => ({ ...current, password: event.target.value }))} />
             <div className="flex items-end">
               <Button type="button" disabled={settingsSaving} onClick={() => void saveSettings()}>

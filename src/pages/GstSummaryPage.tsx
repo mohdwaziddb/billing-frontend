@@ -173,7 +173,11 @@ export const GstSummaryPage = () => {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Total GST" value={formatCurrency(report.totalTaxAmount)} caption="CGST + SGST + IGST" />
-        <StatCard label="Grand Total" value={formatCurrency(report.grandTotal)} caption="Invoice totals including tax" />
+        <StatCard
+          label="Grand Total"
+          value={formatCurrency(report.grandTotal)}
+          caption={report.otherTaxAmount ? `Includes ${formatCurrency(report.otherTaxAmount)} VAT / Sales tax (non-GST)` : "Invoice totals including tax"}
+        />
         <GlassCard className="p-4">
           <Select
             label="Report View"

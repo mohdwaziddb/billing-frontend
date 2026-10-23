@@ -1,7 +1,7 @@
 import { Download, Edit3, History, KeyRound, Plus, UserX } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
-import { createCompanyUser, deactivateCompanyUser, getCompanyUsersPage, getRoles, updateCompanyUser } from "../api/users";
+import { createCompanyUser, deactivateCompanyUser, deleteUserPhoto, getCompanyUsersPage, getRoles, updateCompanyUser, uploadUserPhoto } from "../api/users";
 import { resetUserMfa } from "../api/mfa";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -15,9 +15,11 @@ import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PasswordInput } from "../components/PasswordInput";
+import { PhotoUploadField } from "../components/PhotoUploadField";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { UserAvatar } from "../components/UserAvatar";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { useListPage } from "../hooks/useListPage";
@@ -75,12 +77,15 @@ const emptyUserPage: PageResponse<UserProfile> = {
 };
 
 export const UserManagementPage = () => {
-  const { can, user: activeUser } = useAuth();
+  const { can, user: activeUser, refreshProfile } = useAuth();
   const isOwner = activeUser?.role === "OWNER" || Boolean(activeUser?.superAdmin);
   const [roles, setRoles] = useState<Role[]>(["OWNER", "ADMIN", "USER"]);
   const [exportRows, setExportRows] = useState<UserProfile[]>([]);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  // Add User: photo save ke baad upload hoti hai (user id tab milti hai). Edit: turant upload.
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
   const [mfaResetTarget, setMfaResetTarget] = useState<UserProfile | null>(null);
   const [mfaResetting, setMfaResetting] = useState(false);
@@ -202,6 +207,7 @@ export const UserManagementPage = () => {
   const openCreateModal = () => {
     clearFeedback();
     setEditingUser(null);
+    setPendingPhoto(null);
     reset({
       fullName: "",
       username: "",
@@ -217,6 +223,7 @@ export const UserManagementPage = () => {
   const openEditModal = (target: UserProfile) => {
     clearFeedback();
     setEditingUser(target);
+    setPendingPhoto(null);
     reset({
       fullName: target.fullName,
       username: target.username,
@@ -250,8 +257,16 @@ export const UserManagementPage = () => {
         await updateCompanyUser(editingUser.id, payload);
         notificationService.showSuccess(CommonSuccessMessageUtil.updated("User"));
       } else {
-        await createCompanyUser({ ...payload, password: values.password.trim() });
+        const created = await createCompanyUser({ ...payload, password: values.password.trim() });
         notificationService.showSuccess(CommonSuccessMessageUtil.created("User"));
+        if (pendingPhoto) {
+          try {
+            await uploadUserPhoto(created.id, pendingPhoto);
+          } catch (photoError) {
+            // User ban chuka hai; sirf photo reh gayi — edit se dobara laga sakte hain.
+            setApiError(photoError, "User created, but the photo could not be uploaded. Edit the user to try again.");
+          }
+        }
       }
       setModalOpen(false);
       clearMessage();
@@ -259,6 +274,28 @@ export const UserManagementPage = () => {
       await loadExportRows(list.activeFilters);
     } catch (err: any) {
       applyApiError(err, editingUser ? "Unable to update user" : "Unable to create user");
+    }
+  };
+
+  // Edit modal: photo turant upload / remove (list + agar khud ka record ho to header bhi taaza).
+  const changeEditingUserPhoto = async (file: File | null) => {
+    if (!editingUser) {
+      setPendingPhoto(file);
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const updated = file ? await uploadUserPhoto(editingUser.id, file) : await deleteUserPhoto(editingUser.id);
+      setEditingUser(updated);
+      list.refreshTable();
+      if (activeUser?.id === updated.id) {
+        await refreshProfile();
+      }
+      notificationService.showSuccess(CommonSuccessMessageUtil.updated("User Photo"));
+    } catch (err: any) {
+      setApiError(err, file ? "Unable to upload photo" : "Unable to remove photo");
+    } finally {
+      setPhotoBusy(false);
     }
   };
 
@@ -309,7 +346,12 @@ export const UserManagementPage = () => {
     {
       key: "name",
       header: "Name",
-      render: (item: UserProfile) => <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
+      render: (item: UserProfile) => (
+        <span className="flex items-center gap-2.5">
+          <UserAvatar name={item.fullName} photoUrl={item.photoUrl} size="sm" />
+          <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
+        </span>
+      )
     },
     {
       key: "username",
@@ -467,6 +509,17 @@ export const UserManagementPage = () => {
         <>
           <Modal open={modalOpen} title={editingUser ? "Edit User" : "Add User"} onClose={() => setModalOpen(false)}>
             <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
+              <div className="md:col-span-2">
+                <PhotoUploadField
+                  name={watchedValues.fullName || editingUser?.fullName}
+                  photoUrl={editingUser?.photoUrl}
+                  pendingFile={pendingPhoto}
+                  busy={photoBusy}
+                  hint={editingUser ? "JPG, PNG or WEBP, up to 2 MB. Saved immediately." : "JPG, PNG or WEBP, up to 2 MB. Uploaded when you create the user."}
+                  onSelect={(file) => void changeEditingUserPhoto(file)}
+                  onRemove={() => void changeEditingUserPhoto(null)}
+                />
+              </div>
               <Input
                 label="Full Name"
                 requiredMark

@@ -123,7 +123,8 @@ const isGrandTotalRow = <T,>(row: T) => {
   if (record.__rowType === "grandTotal") {
     return true;
   }
-  return Object.values(record).some((value) => typeof value === "string" && /grand total/i.test(value));
+  // Exact "Grand Total" hi: pehle "Grand Total Traders" jaisa customer naam bhi total row ban jata tha.
+  return Object.values(record).some((value) => typeof value === "string" && value.trim().toLowerCase() === "grand total");
 };
 
 export const exportToExcel = <T,>(fileName: string, rows: T[], columns: ExcelColumn<T>[]) => {
@@ -154,7 +155,10 @@ export const exportToExcel = <T,>(fileName: string, rows: T[], columns: ExcelCol
             return `<c r="${ref}" s="${grandTotal ? 4 : 3}"><v>${serial}</v></c>`;
           }
         }
-        const value = String(rawValue).replace(/_/g, " ");
+        // Sirf ENUM_JAISE values (CUSTOMER_RELATED) me "_" -> space. Pehle har text
+        // badalta tha: email, SKU, invoice no ke "_" bhi gayab ho jaate the.
+        const text = String(rawValue);
+        const value = /^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(text) ? text.replace(/_/g, " ") : text;
         widths[columnIndex] = Math.max(widths[columnIndex], Math.min(60, value.length + 2));
         return `<c r="${ref}"${grandTotal ? ' s="4"' : ""} t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
       }).join("");

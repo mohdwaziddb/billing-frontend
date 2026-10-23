@@ -36,9 +36,23 @@ export const renderInvoiceHtml = async (invoiceId: number, templateId?: string) 
 };
 
 export const downloadInvoicePdfFile = async (invoiceId: number, templateId?: string) => {
-  const response = await apiClient.get(`/v1/invoices/${invoiceId}/pdf`, {
-    params: { templateId },
-    responseType: "blob"
-  });
-  return response.data as Blob;
+  try {
+    const response = await apiClient.get(`/v1/invoices/${invoiceId}/pdf`, {
+      params: { templateId },
+      responseType: "blob"
+    });
+    return response.data as Blob;
+  } catch (error: any) {
+    // responseType blob: server ka JSON error bhi Blob aata hai, isliye message
+    // kabhi nahi dikhta tha. JSON padh kar wapas data me rakho.
+    const data = error?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        error.response.data = JSON.parse(await data.text());
+      } catch {
+        // Non-JSON body: generic message hi dikhega.
+      }
+    }
+    throw error;
+  }
 };

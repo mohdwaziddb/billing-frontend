@@ -14,6 +14,7 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { sanitizeHtml } from "../lib/sanitizeHtml";
 import { notificationService } from "../services/notificationService";
 import type { CompanyInvoiceSettings, InvoiceTemplateMetadata } from "../types/api";
 
@@ -184,10 +185,11 @@ export const InvoiceTemplatesPage = () => {
         notificationService.showError("Unable to open print preview right now.");
         return;
       }
-      // First-party backend HTML (on-screen preview jaisa RAW) taaki
-      // template.css print me bhi survive kare.
+      // Ye iframe sandboxed NAHI hai (app ka origin, token tak pahunch): isliye
+      // sanitize zaroori. allowStyle se template.css print me bhi rehta hai
+      // (InvoiceDetailPage print jaisa).
       doc.open();
-      doc.write(previewHtml);
+      doc.write(sanitizeHtml(previewHtml, { allowStyle: true }));
       doc.close();
     } catch {
       notificationService.showError("Unable to print preview right now.");

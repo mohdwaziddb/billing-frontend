@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, RotateCcw, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getAuditLogs } from "../api/auditLogs";
@@ -25,6 +25,7 @@ import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
+import { fetchAllPages } from "../lib/fetchAllPages";
 import { formatDate } from "../lib/format";
 import { notificationService } from "../services/notificationService";
 import type { Invoice, PageResponse, ProductCategory } from "../types/api";
@@ -202,9 +203,15 @@ export const InvoiceListPage = () => {
     fetchPage: ({ page, size, filters }) => getInvoicesPage({ ...buildParams(filters), page, size })
   });
 
+  // Saare pages (pehle sirf pehle 1000: KPI cards aur export galat). Request id:
+  // filter jaldi badle to purana jawab naya data overwrite na kare.
+  const exportRequestId = useRef(0);
   const loadExportRows = async (filters: InvoiceFilters) => {
-    const response = await getInvoicesPage({ ...buildParams(filters), page: 0, size: 1000 });
-    setExportRows(response.records);
+    const requestId = ++exportRequestId.current;
+    const rows = await fetchAllPages((page, size) => getInvoicesPage({ ...buildParams(filters), page, size }));
+    if (requestId === exportRequestId.current) {
+      setExportRows(rows);
+    }
   };
 
   useEffect(() => {

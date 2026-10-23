@@ -18,17 +18,8 @@ export default defineConfig({
           if (id.includes("recharts")) {
             return "charts";
           }
-          if (id.includes("jspdf-autotable")) {
-            return "pdf-table";
-          }
-          if (id.includes("jspdf")) {
-            return "pdf-core";
-          }
-          if (id.includes("html2canvas")) {
-            return "pdf-canvas";
-          }
-          if (id.includes("dompurify") || id.includes("canvg") || id.includes("rgbcolor") || id.includes("raf")) {
-            return "pdf-rendering";
+          if (id.includes("dompurify")) {
+            return "sanitizer";
           }
           if (id.includes("axios") || id.includes("lucide-react") || id.includes("react-hook-form")) {
             return "vendor";

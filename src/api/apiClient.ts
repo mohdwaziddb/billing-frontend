@@ -1,7 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import { env } from "../config/env";
 import { getApiErrorMessage } from "../lib/errors";
-import { authStorage } from "../lib/storage";
+import { AUTH_SESSION_REFRESHED_EVENT, authStorage } from "../lib/storage";
 import { getSubdomainCompanyCode } from "../lib/hosts";
 import { notificationService } from "../services/notificationService";
 import { pageLoadingService } from "../services/pageLoadingService";
@@ -51,6 +51,14 @@ const flushPendingRequests = (error: unknown, token?: string) => {
     request.resolve(token ?? "");
   });
   pendingRequests = [];
+};
+
+// Ek waqt me sirf ek tab refresh kare (Web Locks API; purane browser par tab-level hi).
+const withCrossTabRefreshLock = <T,>(work: () => Promise<T>): Promise<T> => {
+  if (typeof navigator !== "undefined" && navigator.locks?.request) {
+    return navigator.locks.request("billing-auth-refresh", work) as Promise<T>;
+  }
+  return work();
 };
 
 const getLoginPath = (session?: StoredAuthSession | null) => {
@@ -180,6 +188,8 @@ const handleResponseError = async (error: any) => {
     return new Promise((resolve, reject) => {
       pendingRequests.push({
         resolve: (accessToken) => {
+          // Retry bhi fail ho to dobara refresh na ho (loop se bachao).
+          originalRequest._retry = true;
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           resolve(apiClient(originalRequest));
         },
@@ -190,24 +200,39 @@ const handleResponseError = async (error: any) => {
 
   originalRequest._retry = true;
   isRefreshing = true;
+  const usedAccessToken = String(originalRequest.headers?.Authorization ?? "").replace("Bearer ", "");
 
   try {
-    // Tenant routing is header-based: the refresh call must carry the same
-    // X-Company-Code or multi-DB routing lands in the wrong database.
-    const refreshHeaders: Record<string, string> = {};
-    const refreshCompanyCode = getSubdomainCompanyCode();
-    if (refreshCompanyCode) {
-      refreshHeaders["X-Company-Code"] = refreshCompanyCode;
-    }
-    const refreshResponse = await refreshClient.post<ApiResponse<AuthPayload>>(
-      "/v1/auth/refresh",
-      { refreshToken: session.auth.refreshToken },
-      { headers: refreshHeaders }
-    );
-    const nextAuth = refreshResponse.data.data;
-    authStorage.set({ type: "user", auth: nextAuth });
-    flushPendingRequests(null, nextAuth.accessToken);
-    originalRequest.headers.Authorization = `Bearer ${nextAuth.accessToken}`;
+    const nextAccessToken = await withCrossTabRefreshLock(async () => {
+      // Lock milne tak doosre tab ne refresh kar diya ho sakta hai: tab storage
+      // me naya token hoga. Wahi use karo; purana (rotate ho chuka) refresh
+      // token dobara bhejne par backend fail karta tha aur DONO tab logout hote the.
+      const latest = authStorage.get();
+      if (!latest || latest.type !== "user" || !latest.auth.refreshToken) {
+        throw error;
+      }
+      if (latest.auth.accessToken && latest.auth.accessToken !== usedAccessToken) {
+        return latest.auth.accessToken;
+      }
+      // Tenant routing is header-based: the refresh call must carry the same
+      // X-Company-Code or multi-DB routing lands in the wrong database.
+      const refreshHeaders: Record<string, string> = {};
+      const refreshCompanyCode = getSubdomainCompanyCode();
+      if (refreshCompanyCode) {
+        refreshHeaders["X-Company-Code"] = refreshCompanyCode;
+      }
+      const refreshResponse = await refreshClient.post<ApiResponse<AuthPayload>>(
+        "/v1/auth/refresh",
+        { refreshToken: latest.auth.refreshToken },
+        { headers: refreshHeaders }
+      );
+      const nextAuth = refreshResponse.data.data;
+      authStorage.set({ type: "user", auth: nextAuth });
+      return nextAuth.accessToken;
+    });
+    window.dispatchEvent(new Event(AUTH_SESSION_REFRESHED_EVENT));
+    flushPendingRequests(null, nextAccessToken);
+    originalRequest.headers.Authorization = `Bearer ${nextAccessToken}`;
     return apiClient(originalRequest);
   } catch (refreshError) {
     flushPendingRequests(refreshError);

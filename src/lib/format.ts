@@ -63,6 +63,16 @@ const to12h = (hour24: number) => {
 
 const partsFor = (date: Date) => (useUtcSource() ? istParts(date) : localParts(date));
 
+/**
+ * Aaj ki LOCAL date "yyyy-MM-dd" me. toISOString() UTC deta hai: IST me raat
+ * 12:00-5:29 ke beech kal ki date aa jaati thi.
+ */
+export const localIsoDate = (date: Date = new Date()) => {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
 export const formatDate = (value: string | null | undefined) => {
   if (!value) {
     return "--";

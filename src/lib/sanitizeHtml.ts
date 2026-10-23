@@ -41,6 +41,24 @@ export const sanitizeHtml = (
 };
 
 /**
+ * AI chat table: sirf table + basic text tags. Model ka output prompt-injection
+ * se aa sakta hai (customer/product name me chhupi instructions); <img src=...>
+ * se data bahar bhejna ya <a> se phishing link dikhana yahan block hai.
+ */
+export const sanitizeTableHtml = (dirty: string | null | undefined): string => {
+  if (!dirty) {
+    return "";
+  }
+  return String(
+    DOMPurify.sanitize(dirty, {
+      ALLOWED_TAGS: ["table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "b", "strong", "i", "em", "br", "p"],
+      ALLOWED_ATTR: ["colspan", "rowspan"],
+      ALLOW_DATA_ATTR: false
+    } as unknown as Parameters<typeof DOMPurify.sanitize>[1])
+  );
+};
+
+/**
  * Only allow http/https links from window.prompt() style inputs.
  * Returns null for javascript:, data:, vbscript:, file: etc.
  */

@@ -66,9 +66,13 @@ export function useListPage<TRow, TFilters extends FiltersWithSearch>({
   useEffect(() => {
     fetchPageRef.current = fetchPage;
   });
+  // Har load ka id: tez typing/page change par pehle bheji request ka der se
+  // aaya jawab naye result ko overwrite na kare.
+  const requestIdRef = useRef(0);
 
   const load = useCallback(
-    async (nextPage: number, filters: TFilters) => {
+    async (nextPage: number, filters: TFilters): Promise<void> => {
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       try {
         const response = await fetchPageRef.current({
@@ -77,13 +81,24 @@ export function useListPage<TRow, TFilters extends FiltersWithSearch>({
           search: filters.search ?? "",
           filters
         });
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+        // Last page ka last row delete hua: khali page dikhane ki jagah pichhla page.
+        if (!response.records.length && nextPage > 0 && response.totalPages > 0) {
+          return load(Math.min(nextPage - 1, response.totalPages - 1), filters);
+        }
         setPaginationInfo(response);
         setTableData(response.records);
         setPage(nextPage);
       } catch (err: any) {
-        setApiError(err, errorMessage);
+        if (requestId === requestIdRef.current) {
+          setApiError(err, errorMessage);
+        }
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
       }
     },
     [errorMessage, pageSize, setApiError]

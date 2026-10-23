@@ -25,8 +25,9 @@ export const confirmMfaSetup = async (deviceName: string, code: string) => {
   return response.data.data;
 };
 
-export const deleteMfaDevice = async (deviceId: number) => {
-  await apiClient.delete(`/v1/mfa/devices/${deviceId}`);
+// Enabled device hatane ke liye authenticator ka current code chahiye (backend enforce karta hai).
+export const deleteMfaDevice = async (deviceId: number, code: string) => {
+  await apiClient.delete(`/v1/mfa/devices/${deviceId}`, { data: { code } });
 };
 
 export const resetUserMfa = async (userId: number) => {

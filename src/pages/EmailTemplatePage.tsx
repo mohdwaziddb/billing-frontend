@@ -246,11 +246,19 @@ export const EmailTemplatePage = () => {
                     </div>
                     <div
                       key={form.editingEntity?.id ?? "new-template"}
-                      ref={editorRef}
+                      ref={(node) => {
+                        editorRef.current = node;
+                        // Uncontrolled editor: HTML sirf mount par ek baar. Pehle har
+                        // keystroke par state -> innerHTML reset hota tha aur cursor
+                        // shuru me kood jata tha. (key badalne par naya node = naya content.)
+                        if (node && !node.dataset.initialized) {
+                          node.innerHTML = sanitizeHtml(form.formValues.emailBody);
+                          node.dataset.initialized = "1";
+                        }
+                      }}
                       contentEditable
                       suppressContentEditableWarning
                       className="min-h-[260px] w-full overflow-y-auto px-4 py-3 text-sm leading-6 text-slate-900 outline-none"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(form.formValues.emailBody) }}
                       onFocus={() => selectVariableTarget("emailBody")}
                       onInput={syncEditor}
                     />

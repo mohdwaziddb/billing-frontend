@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CreditCard, Download, History, RotateCcw, Send, Wallet } from "lucide-react";
 import { getAuditLogs } from "../api/auditLogs";
 import { sendEmailNotification, sendSmsNotification, sendWhatsAppNotification } from "../api/notifications";
@@ -26,7 +26,9 @@ import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { exportToExcel } from "../lib/excelExport";
+import { fetchAllPages } from "../lib/fetchAllPages";
 import { formatDate } from "../lib/format";
+import { paymentModeDisplay } from "../modules/payments/paymentModeOptions";
 import { notificationService } from "../services/notificationService";
 import type { NotificationLog, PageResponse, Payment, PaymentModeMaster } from "../types/api";
 
@@ -135,9 +137,14 @@ export const PaymentListPage = () => {
     fetchPage: ({ page, size, filters }) => getPaymentsPage({ ...buildParams(filters), page, size })
   });
 
+  // Saare pages (pehle sirf pehle 1000: collection totals aur export galat).
+  const exportRequestId = useRef(0);
   const loadExportRows = async (filters: PaymentFilters) => {
-    const response = await getPaymentsPage({ ...buildParams(filters), page: 0, size: 1000 });
-    setExportRows(response.records);
+    const requestId = ++exportRequestId.current;
+    const rows = await fetchAllPages((page, size) => getPaymentsPage({ ...buildParams(filters), page, size }));
+    if (requestId === exportRequestId.current) {
+      setExportRows(rows);
+    }
   };
 
   useEffect(() => {
@@ -514,7 +521,12 @@ const basePaymentColumns = () => [
   },
   { key: "invoice", header: "Invoice Number", render: (item: Payment) => item.invoiceNo ?? "Unapplied" },
   { key: "date", header: "Payment Date", render: (item: Payment) => formatDate(item.paymentDate) },
-  { key: "mode", header: "Method", render: (item: Payment) => item.mode.replace(/_/g, " ") },
+  { key: "mode", header: "Method", render: (item: Payment) => (
+    item.source === "GATEWAY"
+      ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 fs-11 font-semibold text-emerald-700">{paymentModeDisplay(item)}</span>
+      : paymentModeDisplay(item)
+  ) },
+  { key: "referenceNo", header: "Reference", render: (item: Payment) => <span className="break-all text-xs">{item.referenceNo ?? "--"}</span> },
   { key: "status", header: "Status", render: (item: Payment) => <div className="flex flex-wrap gap-2"><StatusBadge label="SUCCESS" />{item.deleted ? <StatusBadge label="Deleted" /> : null}</div> },
   { key: "createdBy", header: "Created By", render: (item: Payment) => item.createdBy ?? "--" },
   { key: "amount", header: "Amount", className: "text-right", render: (item: Payment) => <span className="block text-right font-semibold text-white">{formatCurrency(item.amount)}</span> }
@@ -607,6 +619,7 @@ const paymentExportColumns = [
   { key: "customerMobile", header: "Mobile Number" },
   { key: "paymentDate", header: "Payment Date", type: "date" as const },
   { key: "mode", header: "Method" },
+  { key: "referenceNo", header: "Reference" },
   { key: "status", header: "Status", value: (row: Payment | Record<string, unknown>) => String((row as Record<string, unknown>).status ?? "Success") },
   { key: "deleted", header: "Record Status", value: (row: Payment | Record<string, unknown>) => (row as Payment).deleted ? "Deleted" : "Active" },
   { key: "amount", header: "Amount", type: "amount" as const },

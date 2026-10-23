@@ -3,7 +3,7 @@ import { BellRing, History } from "lucide-react";
 import { useApiMessage } from "../../../hooks/useApiFeedback";
 import { useListPage } from "../../../hooks/useListPage";
 import { formatCurrency } from "../../../lib/currency";
-import { formatDate, formatDateTime } from "../../../lib/format";
+import { formatDate, formatDateTime, localIsoDate } from "../../../lib/format";
 import { Button } from "../../../components/Button";
 import { ActionDropdown } from "../../../components/ActionDropdown";
 import { applyVisibleColumns } from "../../../components/CommonColumnSelector";
@@ -358,5 +358,5 @@ const reminderVariables = (customer: OverdueCustomer) => ({
   Invoice_Date: customer.oldestOutstandingInvoiceDate ? formatDate(customer.oldestOutstandingInvoiceDate) : "",
   Invoice_Total: customer.oldestOutstandingInvoiceTotal != null ? customer.oldestOutstandingInvoiceTotal.toFixed(2) : "",
   Due_Date: customer.oldestOutstandingInvoiceDate ? formatDate(customer.oldestOutstandingInvoiceDate) : "",
-  Current_Date: formatDate(new Date().toISOString().slice(0, 10))
+  Current_Date: formatDate(localIsoDate())
 });

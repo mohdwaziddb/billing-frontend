@@ -26,6 +26,7 @@ type FormState = {
   modeName: string;
   description: string;
   active: string;
+  requiresReference: string;
 };
 
 const emptyFilters: PaymentModeFilters = {
@@ -36,7 +37,8 @@ const emptyFilters: PaymentModeFilters = {
 const emptyForm: FormState = {
   modeName: "",
   description: "",
-  active: "true"
+  active: "true",
+  requiresReference: "false"
 };
 
 export const PaymentModePage = () => {
@@ -61,12 +63,15 @@ export const PaymentModePage = () => {
     toFormValues: (mode) => ({
       modeName: mode.modeName,
       description: mode.description ?? "",
-      active: mode.active ? "true" : "false"
+      active: mode.active ? "true" : "false",
+      requiresReference: mode.requiresReference ? "true" : "false"
     }),
     buildRequest: (values) => ({
       modeName: values.modeName.trim(),
       description: values.description.trim() || undefined,
-      active: values.active === "true"
+      active: values.active === "true",
+      // Type backend code se tay karta hai (sirf "Online" = gateway mode).
+      requiresReference: values.requiresReference === "true"
     }),
     create: createPaymentMode,
     update: updatePaymentMode,
@@ -81,11 +86,14 @@ export const PaymentModePage = () => {
   });
 
   const canSaveMode = Boolean(form.formValues.modeName.trim());
+  const editingOnlineMode = form.editingEntity?.modeType === "ONLINE";
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const paymentModeColumns = useMemo(() => [
     { key: "modeName", header: "Payment Mode", render: (item: PaymentModeMaster) => <span className="font-semibold text-white">{item.modeName}</span> },
     { key: "modeCode", header: "Code", render: (item: PaymentModeMaster) => item.modeCode },
     { key: "description", header: "Description", render: (item: PaymentModeMaster) => item.description ?? "--" },
+    { key: "modeType", header: "Type", render: (item: PaymentModeMaster) => (item.modeType === "ONLINE" ? "Online (Gateway)" : "Offline") },
+    { key: "requiresReference", header: "Reference No", render: (item: PaymentModeMaster) => (item.requiresReference ? "Asked" : "--") },
     { key: "status", header: "Status", render: (item: PaymentModeMaster) => <StatusBadge label={item.active ? "Active" : "Inactive"} /> }
   ], []);
   const visiblePaymentModeColumns = useMemo(() => applyVisibleColumns(paymentModeColumns, visibleColumns), [paymentModeColumns, visibleColumns]);
@@ -142,9 +150,31 @@ export const PaymentModePage = () => {
         <>
           <Modal open={form.formOpen} title={form.editingEntity ? "Edit Payment Mode" : "Add Payment Mode"} onClose={form.closeForm} maxWidthClass="max-w-2xl">
             <div className="grid gap-4">
-              <Input label="Payment Mode" requiredMark error={form.fieldErrors.modeName} value={form.formValues.modeName} onChange={(event) => form.setFormValues((current) => ({ ...current, modeName: event.target.value }))} />
+              <Input
+                label="Payment Mode"
+                requiredMark
+                error={form.fieldErrors.modeName}
+                value={form.formValues.modeName}
+                disabled={editingOnlineMode}
+                hint={editingOnlineMode ? "Online mode name is fixed; gateway payments are recorded with it." : undefined}
+                onChange={(event) => form.setFormValues((current) => ({ ...current, modeName: event.target.value }))}
+              />
               <Input label="Description" error={form.fieldErrors.description} value={form.formValues.description} onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))} />
               <Select label="Status" value={form.formValues.active} options={[{ label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => form.setFormValues((current) => ({ ...current, active: event.target.value }))} />
+              {editingOnlineMode ? (
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 fs-12 text-emerald-800">
+                  Online (gateway) mode. Payments are collected via Setup → Payment Gateway and recorded automatically with the gateway reference. Set it Inactive to hide online collection.
+                </p>
+              ) : (
+                <Select
+                  label="Ask Reference No"
+                  value={form.formValues.requiresReference}
+                  placeholder={null}
+                  hint="Shows an optional UTR / approval / cheque no. field while recording payments."
+                  options={[{ label: "No", value: "false" }, { label: "Yes (optional field)", value: "true" }]}
+                  onChange={(event) => form.setFormValues((current) => ({ ...current, requiresReference: event.target.value }))}
+                />
+              )}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={form.closeForm}>Cancel</Button>
                 <Button type="button" disabled={form.saving || !canSaveMode} onClick={() => void form.saveForm()}>{form.saving ? "Saving..." : "Save"}</Button>

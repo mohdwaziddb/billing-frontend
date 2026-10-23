@@ -2,7 +2,8 @@ import { apiClient } from "./apiClient";
 import { sessionCache } from "../lib/sessionCache";
 import type { ApiResponse, PageResponse, PaymentModeMaster, PaymentModeRequest } from "../types/api";
 
-const ACTIVE_PAYMENT_MODES_CACHE_KEY = "billing_frontend_active_payment_modes";
+// v2: modeType / requiresReference fields aaye; purana cache inke bina tha.
+const ACTIVE_PAYMENT_MODES_CACHE_KEY = "billing_frontend_active_payment_modes_v2";
 let activePaymentModesPromise: Promise<PaymentModeMaster[]> | null = null;
 
 type PaymentModeParams = {

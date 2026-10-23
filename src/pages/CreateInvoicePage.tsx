@@ -26,6 +26,9 @@ import { formatCurrency } from "../lib/currency";
 import { formatDate } from "../lib/format";
 import { isManualPricingPolicy } from "../lib/inventorySettings";
 import { blockNumberStepKeys, blurNumberInputOnWheel } from "../lib/numberInputGuards";
+import { CollectOnlineModal } from "../modules/payments/components/CollectOnlineModal";
+import { usePaymentGatewayConfig } from "../modules/payments/hooks/usePaymentGatewayConfig";
+import { findPaymentMode, isOnlineModeMaster, paymentModeOptions, referenceLabelForMode } from "../modules/payments/paymentModeOptions";
 import { InvoiceCalculationService } from "../services/InvoiceCalculationService";
 import { notificationService } from "../services/notificationService";
 import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, PaymentModeMaster, Product, UserProfile } from "../types/api";
@@ -45,6 +48,7 @@ type FormValues = {
   discountAmount: string;
   paidAmount: string;
   paymentMode: string;
+  referenceNo: string;
   items: InvoiceItemForm[];
 };
 
@@ -76,7 +80,8 @@ const isValidMobileNumber = (value: string) => /^\d{10}$/.test(normalizeMobileNu
 const normalizeStateName = (value?: string | null) => value?.trim().toLowerCase() ?? "";
 const defaultPaymentModeCode = (modes: PaymentModeMaster[]) => {
   const cashMode = modes.find((mode) => mode.modeCode === "CASH");
-  return cashMode?.modeCode ?? modes[0]?.modeCode ?? "";
+  // Default kabhi Online nahi: wo user khud chune.
+  return cashMode?.modeCode ?? modes.find((mode) => !isOnlineModeMaster(mode))?.modeCode ?? "";
 };
 
 const todayIso = () => {
@@ -123,6 +128,9 @@ export const CreateInvoicePage = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [purchaseHistory, setPurchaseHistory] = useState<CustomerPurchaseHistory | null>(null);
+  // Online mode: invoice save ke baad gateway se collect (amount = entered paid amount).
+  const [onlineCollect, setOnlineCollect] = useState<{ invoiceId: number; invoiceNo: string; customerName: string; customerMobile: string; balanceAmount: number; amount: number } | null>(null);
+  const { config: gatewayConfig, onlineEnabled } = usePaymentGatewayConfig(can("PAYMENTS", "VIEW"));
   const { clearMessage, setApiError } = useApiMessage();
   const {
     fieldErrors: customerCreateFieldErrors,
@@ -161,6 +169,7 @@ export const CreateInvoicePage = () => {
       discountAmount: "0",
       paidAmount: "0",
       paymentMode: "",
+      referenceNo: "",
       items: [createEmptyItem()]
     }
   });
@@ -410,6 +419,7 @@ export const CreateInvoicePage = () => {
     autoFillPaidAmountRef.current = true;
     setValue("paidAmount", "0", { shouldDirty: true, shouldValidate: true });
     setValue("paymentMode", "", { shouldDirty: true, shouldValidate: true });
+    setValue("referenceNo", "", { shouldDirty: true });
   };
 
   const lookupCustomerByMobile = async () => {
@@ -591,13 +601,17 @@ export const CreateInvoicePage = () => {
       return;
     }
 
+    const selectedMode = findPaymentMode(paymentModes, values.paymentMode);
+    const collectOnline = invoiceSummary.paidAmount > 0 && isOnlineModeMaster(selectedMode);
     const payload: InvoiceRequest = {
       customerId: Number(values.customerId),
       invoiceDate: values.invoiceDate,
       referByUserId: values.referByUserId ? Number(values.referByUserId) : null,
       discountAmount: Number(invoiceSummary.invoiceDiscount.toFixed(2)),
-      paidAmount: Number(invoiceSummary.paidAmount.toFixed(2)),
-      paymentMode: values.paymentMode || undefined,
+      // Online: invoice unpaid save hota hai, payment gateway confirm hone par hi lagti hai.
+      paidAmount: collectOnline ? 0 : Number(invoiceSummary.paidAmount.toFixed(2)),
+      paymentMode: collectOnline ? undefined : values.paymentMode || undefined,
+      referenceNo: !collectOnline && selectedMode?.requiresReference && values.referenceNo.trim() ? values.referenceNo.trim() : undefined,
       items: values.items.map((item) => ({
         productId: Number(item.productId),
         qty: Number(item.qty),
@@ -621,6 +635,17 @@ export const CreateInvoicePage = () => {
     try {
       const invoice = await createInvoice(payload);
       notificationService.showSuccess(CommonSuccessMessageUtil.created("Invoice"));
+      if (collectOnline) {
+        setOnlineCollect({
+          invoiceId: invoice.id,
+          invoiceNo: invoice.invoiceNo,
+          customerName: invoice.customerName,
+          customerMobile: invoice.customerMobile,
+          balanceAmount: Number(invoice.balanceAmount),
+          amount: Number(invoiceSummary.paidAmount.toFixed(2))
+        });
+        return;
+      }
       navigate(`/invoices/${invoice.id}`);
     } catch (err: any) {
       setApiError(err, "Unable to create invoice");
@@ -1147,7 +1172,7 @@ export const CreateInvoicePage = () => {
                       disabled={!canProceedWithInvoice || invoiceSummary.paidAmount <= 0}
                       placeholder="No Mode Selected"
                       error={summaryIssues.find((issue) => issue.toLowerCase().includes("payment mode"))}
-                      options={[{ label: "No Mode Selected", value: "" }, ...paymentModes.map((mode) => ({ label: mode.modeName, value: mode.modeCode }))]}
+                      options={[{ label: "No Mode Selected", value: "" }, ...paymentModeOptions(paymentModes, onlineEnabled, gatewayConfig?.gatewayName)]}
                       name={field.name}
                       value={field.value}
                       onChange={(event) => field.onChange(event.target.value)}
@@ -1156,6 +1181,20 @@ export const CreateInvoicePage = () => {
                     />
                   )}
                 />
+                {invoiceSummary.paidAmount > 0 && findPaymentMode(paymentModes, paymentModeInput)?.requiresReference ? (
+                  <Input
+                    label={referenceLabelForMode(paymentModeInput)}
+                    placeholder="Optional"
+                    maxLength={120}
+                    disabled={!canProceedWithInvoice}
+                    {...register("referenceNo")}
+                  />
+                ) : null}
+                {invoiceSummary.paidAmount > 0 && isOnlineModeMaster(findPaymentMode(paymentModes, paymentModeInput)) ? (
+                  <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 fs-12 text-emerald-800">
+                    Invoice will be saved first, then {formatCurrency(invoiceSummary.paidAmount)} is collected via {gatewayConfig?.gatewayName ?? "the payment gateway"} (Pay Now or payment link).
+                  </p>
+                ) : null}
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -1295,6 +1334,20 @@ export const CreateInvoicePage = () => {
           </div>
         )}
       </Modal>
+
+      {onlineCollect ? (
+        <CollectOnlineModal
+          open
+          invoiceId={onlineCollect.invoiceId}
+          invoiceNo={onlineCollect.invoiceNo}
+          customerName={onlineCollect.customerName}
+          customerMobile={onlineCollect.customerMobile}
+          balanceAmount={onlineCollect.balanceAmount}
+          defaultAmount={onlineCollect.amount}
+          // Paid ho ya baad me (link), invoice save ho chuka — detail page par le jao.
+          onClose={() => navigate(`/invoices/${onlineCollect.invoiceId}`)}
+        />
+      ) : null}
     </div>
   );
 };

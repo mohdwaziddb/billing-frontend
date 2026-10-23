@@ -24,6 +24,7 @@ export const TwoStepVerificationPage = () => {
   const [secretCopied, setSecretCopied] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteDevice, setConfirmDeleteDevice] = useState<MfaDevice | null>(null);
+  const [deleteCode, setDeleteCode] = useState("");
   const { setApiError } = useApiMessage();
 
   const load = useCallback(async () => {
@@ -95,8 +96,9 @@ export const TwoStepVerificationPage = () => {
     const id = confirmDeleteDevice.id;
     try {
       setDeletingId(id);
-      await deleteMfaDevice(id);
+      await deleteMfaDevice(id, deleteCode.trim());
       setConfirmDeleteDevice(null);
+      setDeleteCode("");
       notificationService.showSuccess("MFA device removed successfully.");
       await load();
     } catch (err: any) {
@@ -260,17 +262,39 @@ export const TwoStepVerificationPage = () => {
         title="Remove device?"
         eyebrow="MFA Device"
         maxWidthClass="max-w-md"
-        onClose={() => !deletingId && setConfirmDeleteDevice(null)}
+        onClose={() => {
+          if (!deletingId) {
+            setConfirmDeleteDevice(null);
+            setDeleteCode("");
+          }
+        }}
       >
         <p className="text-sm leading-relaxed text-slate-600">
           <strong>{confirmDeleteDevice?.deviceName}</strong> will be removed and its codes will stop working
           immediately. {status?.devices && status.devices.length <= 1 ? "This is your last device — MFA protection will turn off." : ""} Continue?
         </p>
+        <p className="mt-3 text-sm font-medium text-slate-700">Enter the current 6-digit code from your authenticator app to confirm.</p>
+        <input
+          value={deleteCode}
+          inputMode="numeric"
+          maxLength={6}
+          onChange={(event) => setDeleteCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="6-digit code"
+          className="mt-2 h-12 w-full rounded-xl border border-slate-300 text-center text-xl font-bold tracking-[0.18em] outline-none focus:border-slate-900"
+        />
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button type="button" variant="secondary" disabled={deletingId !== null} onClick={() => setConfirmDeleteDevice(null)}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={deletingId !== null}
+            onClick={() => {
+              setConfirmDeleteDevice(null);
+              setDeleteCode("");
+            }}
+          >
             Cancel
           </Button>
-          <Button type="button" variant="danger" disabled={deletingId !== null} onClick={() => void handleDelete()}>
+          <Button type="button" variant="danger" disabled={deletingId !== null || deleteCode.length !== 6} onClick={() => void handleDelete()}>
             {deletingId !== null ? "Removing…" : "Remove"}
           </Button>
         </div>
