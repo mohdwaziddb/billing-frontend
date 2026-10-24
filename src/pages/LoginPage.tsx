@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiClient } from "../api/apiClient";
 import { PUBLIC_APP_TITLE } from "../config/site";
 import { LoginCard } from "../components/login/LoginCard";
@@ -29,6 +29,19 @@ type CompanyBranding = {
 export const LoginPage = () => {
   const { auth, sessionType, permissions, firstAccessibleRoute, login, completeMfaLogin, platform } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // ProtectedRoute ne jis page se bheja, login ke baad wahin wapas (sirf
+  // app ke andar ka path — "//evil.com" jaisa external redirect nahi).
+  const fromPath = (() => {
+    const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
+    const path = from?.pathname ?? "";
+    if (!path.startsWith("/") || path.startsWith("//") || path === "/" || path === "/login" || path === "/no-menu") {
+      return null;
+    }
+    return path + (from?.search ?? "");
+  })();
+  // Double-click par do login request (dusri pehli ka refresh token mita deti thi).
+  const submittingRef = useRef(false);
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   // MFA second step: password OK hua par TOTP pending hai. mfaToken sirf
@@ -68,9 +81,11 @@ export const LoginPage = () => {
       return;
     }
     if (sessionType === "user" && permissions) {
-      navigate(firstAccessibleRoute() ?? "/dashboard", { replace: true });
+      // submit() jaisa hi target: menu na ho to /no-menu (pehle /dashboard par
+      // jaakar "permission denied" toast aata tha).
+      navigate(fromPath ?? firstAccessibleRoute() ?? "/no-menu", { replace: true });
     }
-  }, [auth?.accessToken, firstAccessibleRoute, navigate, permissions, sessionType]);
+  }, [auth?.accessToken, firstAccessibleRoute, fromPath, navigate, permissions, sessionType]);
 
   useEffect(() => {
     document.title = `Login | ${company?.name || platform.platformName || PUBLIC_APP_TITLE}`;
@@ -147,9 +162,10 @@ export const LoginPage = () => {
   const submit = async () => {
     // Defense in depth: even if the button is forced, never attempt login
     // for an unknown workspace (backend would 404 the ghost tenant anyway).
-    if (unknownWorkspace) {
+    if (unknownWorkspace || submittingRef.current) {
       return;
     }
+    submittingRef.current = true;
     try {
       setLoading(true);
       clearMessage();
@@ -160,10 +176,11 @@ export const LoginPage = () => {
         setMfaAccountLabel(result.user?.username ?? result.user?.email ?? null);
         return;
       }
-      navigate(result.route ?? "/no-menu", { replace: true });
+      navigate(result.route ? fromPath ?? result.route : "/no-menu", { replace: true });
     } catch (err: any) {
       setApiError(err, "Unable to sign in. Please check your email and password.");
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -177,7 +194,7 @@ export const LoginPage = () => {
       setMfaLoading(true);
       clearMessage();
       const route = await completeMfaLogin(mfaToken, code);
-      navigate(route ?? "/no-menu", { replace: true });
+      navigate(route ? fromPath ?? route : "/no-menu", { replace: true });
     } catch (err: any) {
       setApiError(err, "Incorrect code. Enter the 6-digit code from your authenticator app.");
     } finally {

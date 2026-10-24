@@ -4,6 +4,7 @@ import { createPurchase, deletePurchase, getPurchase, getPurchasesPage } from ".
 import { getProducts } from "../api/products";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { Button } from "../components/Button";
+import { DataPortLink } from "../components/DataPortLink";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
@@ -199,14 +200,20 @@ export const PurchaseListPage = () => {
       }
       toolbarButtons={
         <>
-          <Button type="button" variant="secondary" disabled={!list.tableData.length} onClick={() => exportToExcel("purchases.xlsx", list.tableData, purchaseExportColumns)}>
-            <Download size={16} />
-            Export Excel
-          </Button>
-          <Button type="button" onClick={() => form.openAddForm(getEmptyForm())}>
-            <Plus size={16} />
-            New Purchase
-          </Button>
+          {/* Permission ke hisaab se (pehle bina check ke dikhte the). */}
+          {can("PURCHASES", "EXPORT") ? (
+            <Button type="button" variant="secondary" disabled={!list.tableData.length} onClick={() => exportToExcel("purchases.xlsx", list.tableData, purchaseExportColumns)}>
+              <Download size={16} />
+              Export Excel
+            </Button>
+          ) : null}
+          <DataPortLink menuCode="STOCK_DATAPORT" moduleKey="opening-stock" />
+          {can("PURCHASES", "ADD") ? (
+            <Button type="button" onClick={() => form.openAddForm(getEmptyForm())}>
+              <Plus size={16} />
+              New Purchase
+            </Button>
+          ) : null}
         </>
       }
       columnSelector={{ tableName: "PURCHASES", columns: purchaseColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["purchaseNo"] }}

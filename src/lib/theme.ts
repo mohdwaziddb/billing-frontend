@@ -80,9 +80,19 @@ export const getContrastTextColor = (backgroundColor: string) => {
   return getRelativeLuminance(hexToRgb(color)) < 0.48 ? "#FFFFFF" : "#111827";
 };
 
-export const applyThemeColor = (themeColor?: string | null) => {
+/**
+ * Contrast ratio of a color against white (1 = invisible, 21 = black).
+ * Theme color is used for links/active text on white surfaces in light mode,
+ * so very light picks need a warning in the settings page.
+ */
+export const contrastAgainstWhite = (value: string) => {
+  const luminance = getRelativeLuminance(hexToRgb(normalizeHexColor(value)));
+  return 1.05 / (luminance + 0.05);
+};
+
+/** Pure palette derivation (no DOM writes) — used by live previews and applyThemeColor. */
+export const buildThemePalette = (themeColor?: string | null) => {
   const { primary: color, accent } = parseThemeValue(themeColor);
-  const root = document.documentElement;
   const light = mix(color, { r: 255, g: 255, b: 255 }, 0.38);
   const dark = mix(color, { r: 2, g: 6, b: 23 }, 0.42);
   const hover = mix(color, { r: 255, g: 255, b: 255 }, 0.22);
@@ -107,6 +117,30 @@ export const applyThemeColor = (themeColor?: string | null) => {
     mix(color, { r: 2, g: 6, b: 23 }, 0.16),
     mix(gradientTo, { r: 2, g: 6, b: 23 }, 0.16)
   );
+  return {
+    color,
+    accent: gradientTo,
+    light,
+    dark,
+    hover,
+    border,
+    contrast,
+    lightContrast,
+    darkContrast,
+    gradient,
+    gradientHover,
+    gradientDeep,
+    sidebarBgTop,
+    sidebarBgDeep,
+    hasGradient: accent !== null
+  };
+};
+
+export const applyThemeColor = (themeColor?: string | null) => {
+  const palette = buildThemePalette(themeColor);
+  const { color, light, dark, hover, border, contrast, lightContrast, darkContrast, gradient, gradientHover, gradientDeep, sidebarBgTop, sidebarBgDeep } = palette;
+  const gradientTo = palette.accent;
+  const root = document.documentElement;
   root.style.setProperty("--theme-color", color);
   root.style.setProperty("--theme-accent", gradientTo);
   root.style.setProperty("--theme-light", light);
@@ -121,22 +155,7 @@ export const applyThemeColor = (themeColor?: string | null) => {
   root.style.setProperty("--theme-gradient-deep", gradientDeep);
   root.style.setProperty("--sidebar-bg", sidebarBgTop);
   root.style.setProperty("--sidebar-bg-deep", sidebarBgDeep);
-  return {
-    color,
-    accent: gradientTo,
-    light,
-    dark,
-    hover,
-    border,
-    contrast,
-    lightContrast,
-    darkContrast,
-    gradient,
-    gradientHover,
-    sidebarBgTop,
-    sidebarBgDeep,
-    hasGradient: accent !== null
-  };
+  return palette;
 };
 
 /**

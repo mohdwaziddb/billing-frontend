@@ -37,7 +37,24 @@ export const MfaChallengeCard = ({
   }, []);
 
   const setDigit = (index: number, value: string) => {
-    const clean = value.replace(/\D/g, "").slice(-1);
+    const allDigits = value.replace(/\D/g, "");
+    // iOS / password manager "one-time-code" autofill poora code ek box me
+    // daalta hai — pehle sirf aakhri digit bachta tha. Ab aage ke boxes me baanto.
+    // Bhare box me ek digit type karna (purana + naya = 2 chars) replace hi rahe.
+    const typedOverExisting = allDigits.length === 2 && digits[index] !== "";
+    if (allDigits.length > 1 && !typedOverExisting) {
+      const chars = allDigits.slice(0, CODE_LENGTH - index).split("");
+      setDigits((current) => {
+        const next = [...current];
+        chars.forEach((char, offset) => {
+          next[index + offset] = char;
+        });
+        return next;
+      });
+      inputsRef.current[Math.min(index + chars.length, CODE_LENGTH - 1)]?.focus();
+      return;
+    }
+    const clean = allDigits.slice(-1);
     setDigits((current) => {
       const next = [...current];
       next[index] = clean;
@@ -94,7 +111,7 @@ export const MfaChallengeCard = ({
               value={digit}
               inputMode="numeric"
               autoComplete={index === 0 ? "one-time-code" : "off"}
-              maxLength={1}
+              maxLength={index === 0 ? CODE_LENGTH : 1}
               disabled={loading}
               onChange={(event) => setDigit(index, event.target.value)}
               onKeyDown={(event) => handleKeyDown(index, event)}

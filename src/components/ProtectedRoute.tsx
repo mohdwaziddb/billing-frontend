@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { isExplicitLogout, useAuth } from "../context/AuthContext";
 import { currentHostname, isLiveHost, isMainHost } from "../lib/hosts";
 import { CommonPageLoader } from "./CommonPageLoader";
 
@@ -11,7 +11,9 @@ export const ProtectedRoute = () => {
     // Live main host has no tenant login — send to landing, not /login.
     const liveMain =
       typeof window !== "undefined" && isLiveHost(currentHostname()) && isMainHost(currentHostname());
-    return <Navigate to={liveMain ? "/" : "/login"} replace state={{ from: location }} />;
+    // Session expire / direct link: login ke baad wahi page. Khud Logout kiya ho to nahi
+    // (pehle Users page se logout karke login karne par phir Users page hi khulta tha).
+    return <Navigate to={liveMain ? "/" : "/login"} replace state={isExplicitLogout() ? undefined : { from: location }} />;
   }
 
   return (

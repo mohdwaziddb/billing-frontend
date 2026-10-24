@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import clsx from "clsx";
 import { getCommunicationHistory, type CommunicationHistoryChannel, type CommunicationHistoryItem } from "../api/communicationHistory";
 import { Button } from "../components/Button";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
@@ -10,6 +11,7 @@ import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { useListPage } from "../hooks/useListPage";
 import { formatDateTime } from "../lib/format";
+import { providerLabel } from "../lib/providerLabel";
 import { sanitizeHtml } from "../lib/sanitizeHtml";
 
 type ChannelMeta = {
@@ -101,48 +103,51 @@ const CommunicationHistoryView = ({ channel }: { channel: CommunicationHistoryCh
       })
   });
 
+  // Compact (Invoices list jaisa): pehle 10 columns the — Provider, From, Status, View
+  // 1366px par screen se bahar chale jaate the. Ab do-line cells, sab bina side-scroll ke.
   const allColumns = useMemo(() => [
     {
       key: "date",
       header: "Date",
-      render: (item: CommunicationHistoryItem) => <span className="whitespace-nowrap text-xs text-slate-600">{formatDateTime(item.createdAt)}</span>
+      render: (item: CommunicationHistoryItem) => (
+        <span className="block whitespace-nowrap">
+          <span className="block text-xs font-medium text-slate-700">{formatDateTime(item.sentAt ?? item.createdAt)}</span>
+          {item.sentBy ? <span className="block max-w-[150px] truncate text-[11px] text-slate-400" title={item.sentBy}>by {item.sentBy}</span> : null}
+        </span>
+      )
     },
     {
       key: "recipient",
-      header: channel === "mail" ? "Email" : "Mobile",
-      render: (item: CommunicationHistoryItem) => <span className="block min-w-[160px] font-semibold text-slate-950">{item.recipient}</span>
+      header: "To / From",
+      render: (item: CommunicationHistoryItem) => (
+        <span className="block min-w-[150px] max-w-[205px]">
+          <span className="block truncate font-semibold text-slate-950" title={item.recipient}>{item.recipient}</span>
+          <span className="block truncate text-[11px] text-slate-400" title={item.sender ?? undefined}>from {item.sender ?? "--"}</span>
+        </span>
+      )
     },
-    ...(meta.showSubject
-      ? [{
-          key: "subject",
-          header: "Subject",
-          render: (item: CommunicationHistoryItem) => <span className="block min-w-[160px]">{item.subject ?? "--"}</span>
-        }]
-      : []),
     {
       key: "message",
-      header: "Message",
-      render: (item: CommunicationHistoryItem) => <span className="block min-w-[220px] max-w-[320px] truncate text-slate-600" title={stripHtml(item.message)}>{snippet(item.message)}</span>
+      header: meta.showSubject ? "Subject" : "Message",
+      render: (item: CommunicationHistoryItem) => (
+        <span className="block min-w-[170px] max-w-[250px]" title={stripHtml(item.message)}>
+          {meta.showSubject ? <span className="block truncate font-medium text-slate-800">{item.subject ?? "--"}</span> : null}
+          <span className={clsx("block truncate text-slate-500", meta.showSubject && "text-xs")}>{snippet(item.message)}</span>
+        </span>
+      )
     },
     {
       key: "provider",
       header: "Provider",
-      render: (item: CommunicationHistoryItem) => <span className="whitespace-nowrap">{item.providerName ?? "--"}</span>
-    },
-    {
-      key: "sender",
-      header: "From",
-      render: (item: CommunicationHistoryItem) => <span className="block min-w-[140px]">{item.sender ?? "--"}</span>
-    },
-    {
-      key: "sentBy",
-      header: "Sent By",
-      render: (item: CommunicationHistoryItem) => <span className="whitespace-nowrap">{item.sentBy ?? "--"}</span>
-    },
-    {
-      key: "sentAt",
-      header: "Sent At",
-      render: (item: CommunicationHistoryItem) => <span className="whitespace-nowrap text-xs text-slate-600">{formatDateTime(item.sentAt ?? item.createdAt)}</span>
+      render: (item: CommunicationHistoryItem) => {
+        const label = providerLabel(item.providerName);
+        const missing = label === "Not recorded" || label === "Not configured";
+        return (
+          <span className={clsx("inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold", missing ? "bg-slate-100 text-slate-400" : "bg-sky-50 text-sky-700")}>
+            {label}
+          </span>
+        );
+      }
     },
     {
       key: "status",
@@ -210,7 +215,7 @@ const CommunicationHistoryView = ({ channel }: { channel: CommunicationHistoryCh
                 {meta.showSubject ? (
                   <p className="text-sm md:col-span-2"><span className="font-bold text-slate-500">Subject: </span><span className="font-semibold text-slate-950">{detail.subject ?? "--"}</span></p>
                 ) : null}
-                <p className="text-sm"><span className="font-bold text-slate-500">Provider: </span>{detail.providerName ?? "--"}</p>
+                <p className="text-sm"><span className="font-bold text-slate-500">Provider: </span>{providerLabel(detail.providerName)}</p>
                 <p className="text-sm"><span className="font-bold text-slate-500">From: </span>{detail.sender ?? "--"}</p>
                 <p className="text-sm"><span className="font-bold text-slate-500">Sent by: </span>{detail.sentBy ?? "--"}</p>
                 <p className="text-sm"><span className="font-bold text-slate-500">Sent at: </span>{formatDateTime(detail.sentAt ?? detail.createdAt)}</p>

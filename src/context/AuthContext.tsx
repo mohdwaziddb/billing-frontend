@@ -50,6 +50,8 @@ type AuthContextValue = {
   completeMfaLogin: (mfaToken: string, code: string) => Promise<string | null>;
   loginPlatformAdmin: (payload: { username: string; password: string }) => Promise<string>;
   logout: () => Promise<void>;
+  bootstrapFailed: boolean;
+  retryBootstrap: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -67,6 +69,12 @@ type AuthBootstrapCache = {
 
 let bootstrapPromise: Promise<AuthBootstrapCache> | null = null;
 let bootstrapPromiseToken: string | null = null;
+// Login ne bootstrap data abhi-abhi la liya: is token ke liye effect dobara fetch na kare.
+let loginBootstrappedToken: string | null = null;
+// User ne khud Logout dabaya: agle login par purane page par wapas nahi, apne default page par jao.
+// (Session expire hone par wahi page khulna sahi hai — wahan ye flag false rehta hai.)
+let explicitLogout = false;
+export const isExplicitLogout = () => explicitLogout;
 
 const clearLocalState = (
   setSession: (value: StoredAuthSession | null) => void,
@@ -97,6 +105,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<CompanyTheme>({ themeColor: cachedThemeState.themeColor });
   const [platform, setPlatform] = useState<PlatformSettings>(defaultPlatformSettings);
   const [preferences, setPreferences] = useState<UserPreference>({ darkModeEnabled: cachedThemeState.darkModeEnabled });
+  // Reload par /me ya menus 500/network se fail: blank screen ki jagah Retry dikhe.
+  const [bootstrapFailed, setBootstrapFailed] = useState(false);
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
 
   const auth = session?.auth ?? null;
   const sessionType = session?.type ?? null;
@@ -160,6 +171,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const accessToken = session.auth.accessToken;
+    if (loginBootstrappedToken === accessToken) {
+      loginBootstrappedToken = null;
+      return;
+    }
     // Reload ALWAYS fetches fresh (no cache-first read): company name, logo
     // and theme must reflect server truth after every reload. The cache below
     // is still WRITTEN (other flows merge into it), just never trusted blindly.
@@ -188,6 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (bootstrap.accessToken !== accessToken) {
           return;
         }
+        setBootstrapFailed(false);
         setUser(bootstrap.user);
         setPermissions(bootstrap.permissions);
         setTheme(bootstrap.theme);
@@ -201,13 +217,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // bhi reload karte hi user logout ho jata tha.
         if (err?.response?.status === 401) {
           clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
+        } else {
+          setBootstrapFailed(true);
         }
       })
       .finally(() => {
         bootstrapPromise = null;
         bootstrapPromiseToken = null;
       });
-  }, [session?.auth.accessToken, session?.type]);
+  }, [session?.auth.accessToken, session?.type, bootstrapAttempt]);
 
   // Password ke baad ka common tail (normal login + MFA verify dono).
   // Session save, permissions/theme/bootstrap — ek jagah, duplicate nahi.
@@ -217,13 +235,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // yahan se nahi guzarta, isliye refresh par banner wapas nahi ayega.)
     resetMfaEnrollBanner(nextAuth.user?.username ?? nextAuth.user?.email ?? null);
     const nextSession: StoredAuthSession = { type: "user", auth: nextAuth };
+    // apiClient token storage se padhta hai, isliye menus se pehle save zaroori.
     authStorage.set(nextSession);
-    const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = await Promise.all([
-      getMyMenus(),
-      getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
-      getPlatformSettings().catch(() => defaultPlatformSettings),
-      getMyPreferences().catch(() => ({ darkModeEnabled: false }))
-    ]);
+    let loaded: [PermissionMatrix, CompanyTheme, PlatformSettings, UserPreference];
+    try {
+      loaded = await Promise.all([
+        getMyMenus(),
+        getCompanyTheme().catch(() => ({ themeColor: DEFAULT_THEME_COLOR })),
+        getPlatformSettings().catch(() => defaultPlatformSettings),
+        getMyPreferences().catch(() => ({ darkModeEnabled: false }))
+      ]);
+    } catch (err) {
+      // Login "fail" dikha to session bhi na bache (pehle reload par user
+      // logged-in mil jata tha aur doosre tab bhi session utha lete the).
+      if (nextAuth.refreshToken) {
+        logoutRequest(nextAuth.refreshToken).catch(() => undefined);
+      }
+      authStorage.clear();
+      throw err;
+    }
+    const [nextPermissions, nextTheme, nextPlatform, nextPreferences] = loaded;
     setPermissions(nextPermissions);
     setTheme(nextTheme);
     setPlatform(nextPlatform);
@@ -236,6 +267,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       platform: nextPlatform,
       preferences: nextPreferences
     });
+    loginBootstrappedToken = nextAuth.accessToken;
+    explicitLogout = false;
+    setBootstrapFailed(false);
     setSession(nextSession);
     setUser(nextAuth.user);
     ThemeBootstrapService.remember(nextTheme, nextPreferences);
@@ -394,10 +428,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         pageLoadingService.reset();
+        explicitLogout = true;
         clearLocalState(setSession, setUser, setPermissions, setTheme, setPlatform, setPreferences);
+      },
+      bootstrapFailed,
+      retryBootstrap() {
+        setBootstrapFailed(false);
+        setBootstrapAttempt((attempt) => attempt + 1);
       }
     }),
-    [auth, sessionType, isPlatformAdmin, platformAdmin, user, permissions, theme, platform, preferences, session]
+    [auth, sessionType, isPlatformAdmin, platformAdmin, user, permissions, theme, platform, preferences, session, bootstrapFailed]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

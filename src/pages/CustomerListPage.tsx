@@ -10,6 +10,7 @@ import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
+import { DataPortLink } from "../components/DataPortLink";
 import { Modal } from "../components/Modal";
 import { Pagination, DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import { Select } from "../components/Select";
@@ -111,15 +112,21 @@ export const CustomerListPage = () => {
     },
     {
       key: "discount",
-      header: "Discount Given",
+      // Chhote headers: 1366px par Actions column bina side-scroll ke dikhe.
+      header: "Discount",
       className: "text-right",
       render: (item: Customer) => <span className="block text-right">{formatCurrency(item.totalDiscountGiven)}</span>
     },
     {
       key: "outstanding",
-      header: "Outstanding Balance",
+      header: "Outstanding",
       className: "text-right",
-      render: (item: Customer) => <span className="block text-right font-semibold text-rose-200">{formatCurrency(item.outstandingBalance)}</span>
+      // Laal sirf jab sach me baaki ho (Invoices list jaisa); ₹0.00 laal nahi.
+      render: (item: Customer) => (
+        <span className={`block text-right font-semibold ${Number(item.outstandingBalance ?? 0) > 0 ? "text-rose-200" : ""}`}>
+          {formatCurrency(item.outstandingBalance)}
+        </span>
+      )
     },
     { key: "lastPurchase", header: "Last Purchase", render: (item: Customer) => formatDate(item.lastPurchaseDate) },
     { key: "status", header: "Status", render: (item: Customer) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
@@ -135,7 +142,7 @@ export const CustomerListPage = () => {
           { label: "Ledger", icon: <BookOpen size={15} />, onClick: () => void loadLedger(item.id, 0) },
           { label: "Edit", icon: <Pencil size={15} />, to: `/customers/${item.id}/edit`, hidden: !can("CUSTOMERS", "EDIT") },
           { label: "Show Logs", icon: <History size={15} />, hidden: !can("CUSTOMERS", "LOGS"), onClick: () => setLogTarget(item) },
-          { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("CUSTOMERS", "DELETE"), onClick: () => setDeleteTarget(item) }
+          { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("CUSTOMERS", "DELETE") || !item.active, onClick: () => setDeleteTarget(item) }
         ]}
       />
     )
@@ -175,14 +182,15 @@ export const CustomerListPage = () => {
         />
       }
       toolbarButtons={
-        can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") ? (
+        can("CUSTOMERS", "EXPORT") || can("CUSTOMERS", "ADD") || can("CUSTOMER_DATAPORT", "VIEW") ? (
           <>
             {can("CUSTOMERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!list.tableData.length} onClick={() => exportToExcel("customers.xlsx", list.tableData, customerExportColumns)}>
               <Download size={16} />
               Export Excel
             </Button> : null}
+            <DataPortLink menuCode="CUSTOMER_DATAPORT" moduleKey="customers" />
             {can("CUSTOMERS", "ADD") ? <Link to="/customers/new">
-              <Button>Add customer</Button>
+              <Button>Add Customer</Button>
             </Link> : null}
           </>
         ) : null

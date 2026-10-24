@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Edit3, Mail, MessageSquare, Plus, Send } from "lucide-react";
+import clsx from "clsx";
+import { Link, useSearchParams } from "react-router-dom";
+import { CheckCircle2, Edit3, History, Mail, MessageCircle, MessageSquare, Plus, Send } from "lucide-react";
 import {
   createEmailSettings,
   createSmsSettings,
@@ -26,7 +27,9 @@ import { Modal } from "../components/Modal";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
+import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
+import { providerLabel } from "../lib/providerLabel";
 import { notificationService } from "../services/notificationService";
 import type { ProviderSettings, ProviderSettingsRequest, SmsProviderMetadata, WhatsAppProviderMetadata } from "../types/api";
 
@@ -68,11 +71,20 @@ const whatsAppDefaults: ProviderSettingsRequest = {
   active: true
 };
 
-const tabMeta: Record<CommunicationTab, { label: string; mode: string; defaults: ProviderSettingsRequest }> = {
-  email: { label: "Email Services", mode: "Email Delivery", defaults: emailDefaults },
-  sms: { label: "SMS Services", mode: "SMS Delivery", defaults: smsDefaults },
-  whatsapp: { label: "WhatsApp Services", mode: "WhatsApp Messaging", defaults: whatsAppDefaults }
+const tabMeta: Record<CommunicationTab, { label: string; providerLabel: string; mode: string; defaults: ProviderSettingsRequest }> = {
+  email: { label: "Email Services", providerLabel: "Email Provider", mode: "Email Delivery", defaults: emailDefaults },
+  sms: { label: "SMS Services", providerLabel: "SMS Provider", mode: "SMS Delivery", defaults: smsDefaults },
+  whatsapp: { label: "WhatsApp Services", providerLabel: "WhatsApp Provider", mode: "WhatsApp Messaging", defaults: whatsAppDefaults }
 };
+
+const CHANNELS: Array<{ value: CommunicationTab; label: string; icon: typeof Mail; historyRoute: string; historyMenu: string }> = [
+  { value: "email", label: "Email", icon: Mail, historyRoute: "/communication-history/mail", historyMenu: "MAIL_HISTORY" },
+  { value: "sms", label: "SMS", icon: MessageSquare, historyRoute: "/communication-history/sms", historyMenu: "SMS_HISTORY" },
+  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle, historyRoute: "/communication-history/whatsapp", historyMenu: "WHATSAPP_HISTORY" }
+];
+
+const loadChannelSettings = (channel: CommunicationTab) =>
+  channel === "email" ? getEmailSettings() : channel === "sms" ? getSmsSettings() : getWhatsAppSettings();
 
 export const CommunicationSettingsPage = () => <CommunicationHubPage />;
 
@@ -80,6 +92,7 @@ const CommunicationHubPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<CommunicationTab>(normalizeTab(searchParams.get("tab")));
   const [records, setRecords] = useState<ProviderSettings[]>([]);
+  const [channelSummary, setChannelSummary] = useState<Partial<Record<CommunicationTab, ProviderSettings[]>>>({});
   const [editing, setEditing] = useState<ProviderSettings | null>(null);
   const [form, setForm] = useState<ProviderSettingsRequest>({ ...tabMeta[tab].defaults });
   const [open, setOpen] = useState(false);
@@ -92,6 +105,10 @@ const CommunicationHubPage = () => {
   const [smsProviders, setSmsProviders] = useState<SmsProviderMetadata[]>([]);
   const [whatsAppProviders, setWhatsAppProviders] = useState<WhatsAppProviderMetadata[]>([]);
   const { setApiError } = useApiMessage();
+  // Backend: provider add = COMMUNICATION:ADD, edit/test = COMMUNICATION:EDIT — bina permission button mat dikhao.
+  const { can } = useAuth();
+  const canAddProvider = can("COMMUNICATION", "ADD");
+  const canEditProvider = can("COMMUNICATION", "EDIT");
 
   useEffect(() => {
     setTab(normalizeTab(searchParams.get("tab")));
@@ -139,19 +156,22 @@ const CommunicationHubPage = () => {
 
   const refresh = async () => {
     try {
-      if (tab === "email") {
-        setRecords(await getEmailSettings());
-        return;
-      }
-      if (tab === "sms") {
-        setRecords(await getSmsSettings());
-        return;
-      }
-      setRecords(await getWhatsAppSettings());
+      const rows = await loadChannelSettings(tab);
+      setRecords(rows);
+      setChannelSummary((current) => ({ ...current, [tab]: rows }));
     } catch (error) {
       setApiError(error, `Unable to load ${tabMeta[tab].label.toLowerCase()}`);
     }
   };
+
+  // Teeno channel cards par "active / not set up" dikhane ke liye ek baar sab load.
+  useEffect(() => {
+    CHANNELS.forEach(({ value }) => {
+      void loadChannelSettings(value)
+        .then((rows) => setChannelSummary((current) => ({ ...current, [value]: rows })))
+        .catch(() => setChannelSummary((current) => ({ ...current, [value]: [] })));
+    });
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -253,137 +273,217 @@ const CommunicationHubPage = () => {
       ? canSaveSmsProvider(form, smsProviders, Boolean(editing))
       : canSaveWhatsAppProvider(form, whatsAppProviders, Boolean(editing));
 
+  const activeRecord = records.find((record) => record.active) ?? null;
+  const channel = CHANNELS.find((item) => item.value === tab) ?? CHANNELS[0];
+  const ChannelIcon = channel.icon;
+  const testLabel = tab === "email" ? "Send test email" : tab === "sms" ? "Send test SMS" : "Send test message";
+
   return (
     <div className="space-y-4 pb-6">
       <Header
         title="Communication Services"
-        subtitle="Manage Email, SMS, and WhatsApp providers for your company from one communication hub."
+        subtitle="Connect the email, SMS and WhatsApp accounts your invoices, reminders and OTPs are sent from."
       />
 
-      <GlassCard className="p-6 md:p-7">
-        <div className="flex flex-col gap-4">
+      <GlassCard className="p-4 md:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CommonBreadcrumb items={[{ label: "Setup" }, { label: "Communication" }]} />
-
-          <div className="flex flex-wrap gap-2">
-            {([
-              ["email", "Email Services"],
-              ["sms", "SMS Services"],
-              ["whatsapp", "WhatsApp Services"]
-            ] as const).map(([value, label]) => {
-              const active = tab === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    active
-                      ? "border-[#2453d8] bg-[#2453d8]/10 text-[#2453d8]"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                  }`}
-                  onClick={() => switchTab(value)}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          {can(channel.historyMenu, "VIEW") ? (
+            <Link to={channel.historyRoute} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--theme-color)] hover:underline">
+              <History size={15} /> View {channel.label} history
+            </Link>
+          ) : null}
         </div>
 
-            <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="grid flex-1 gap-4 md:grid-cols-3">
-                <ProviderMetric label="Total Providers" value={records.length} />
-                <ProviderMetric label="Active Provider" value={records.find((record) => record.active)?.providerName ?? "Not Set"} />
-                <ProviderMetric label="Mode" value={tabMeta[tab].mode} />
+        {/* Channel cards: har channel ka haal ek nazar me (kaun sa provider active hai). */}
+        <div className="mt-4 grid gap-3 md:grid-cols-3" role="tablist" aria-label="Communication channel">
+          {CHANNELS.map((item) => {
+            const Icon = item.icon;
+            const selected = item.value === tab;
+            const summary = channelSummary[item.value];
+            const activeName = summary?.find((record) => record.active)?.providerName;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => switchTab(item.value)}
+                className={clsx(
+                  "flex items-center gap-3 rounded-2xl border p-4 text-left transition",
+                  selected
+                    ? "border-[var(--theme-color)] bg-[color:color-mix(in_srgb,var(--theme-color)_6%,white)] shadow-[0_10px_30px_-14px_color-mix(in_srgb,var(--theme-color)_50%,transparent)]"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                    selected ? "bg-[var(--theme-color)] text-[var(--theme-contrast)]" : "bg-slate-100 text-slate-600"
+                  )}
+                >
+                  <Icon size={20} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-base font-bold text-slate-900">{item.label}</span>
+                  <span className="mt-0.5 flex items-center gap-1.5 text-xs font-medium">
+                    <span className={clsx("h-2 w-2 shrink-0 rounded-full", summary === undefined ? "bg-slate-300" : activeName ? "bg-emerald-500" : "bg-amber-400")} />
+                    <span className={clsx("truncate", activeName ? "text-slate-600" : "text-slate-400")}>
+                      {summary === undefined ? "Checking…" : activeName ? `${providerLabel(activeName)} · active` : "Not set up"}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active provider + test send */}
+        {activeRecord ? (
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[color:color-mix(in_srgb,var(--theme-color)_12%,white)] text-[var(--theme-color)]">
+                    <ChannelIcon size={22} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Active {channel.label} provider</p>
+                    <p className="truncate text-xl font-bold text-slate-950">{providerLabel(activeRecord.providerName)}</p>
+                  </div>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <CheckCircle2 size={14} /> Active
+                </span>
               </div>
-              <Button type="button" onClick={startCreate}>
-                <Plus size={16} /> Add Provider
-              </Button>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                <ProviderFact label={tab === "email" ? "Sends from" : tab === "sms" ? "Sender ID" : "WhatsApp number"} value={senderOf(activeRecord, tab)} />
+                <ProviderFact label={tab === "email" ? "Server" : "API URL"} value={tab === "email" ? emailEndpoint(activeRecord) : activeRecord.apiUrl ?? "--"} />
+                <ProviderFact label={tab === "whatsapp" ? "Account" : "Login / key"} value={tab === "email" ? emailCredential(activeRecord) : tab === "sms" ? resolveSmsCredential(activeRecord) : resolveWhatsAppCredential(activeRecord)} />
+                <ProviderFact label="Used for" value={tab === "email" ? "Invoices, reminders, password OTP" : tab === "sms" ? "Reminders and alerts" : "Invoice and payment messages"} />
+              </dl>
             </div>
 
-            {tab === "email" ? (
-              <div className="mt-5 flex flex-col gap-3 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-end">
-                <Input label="Test Recipient Email" type="email" value={testRecipient} onChange={(event) => setTestRecipient(event.target.value)} placeholder="Defaults to company email" />
-                <div className="text-sm text-slate-500">Use the active email provider to verify delivery. Some servers accept mail and bounce later — check the sender mailbox too.</div>
+            {canEditProvider ? (
+              <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+                <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <Send size={16} className="text-[var(--theme-color)]" /> Send a test
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {tab === "email"
+                    ? "Check that mails really go out. Some servers accept a mail and bounce it later — look in the sender mailbox too."
+                    : "Check that messages really reach the phone."}
+                </p>
+                <div className="mt-3 space-y-3">
+                  {tab === "email" ? (
+                    <Input label="Send to" type="email" value={testRecipient} onChange={(event) => setTestRecipient(event.target.value)} placeholder="Company email (default)" />
+                  ) : (
+                    <Input label="Send to" inputMode="tel" value={testMobileNumber} onChange={(event) => setTestMobileNumber(event.target.value)} placeholder="Company phone (default)" />
+                  )}
+                  {tab === "whatsapp" ? (
+                    <label className="block space-y-2">
+                      <span className="block fs-12 font-semibold text-slate-700">Message</span>
+                      <textarea
+                        className="min-h-[84px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-3.5 py-2.5 fs-13 text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]"
+                        value={testMessage}
+                        onChange={(event) => setTestMessage(event.target.value)}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+                <Button type="button" className="mt-4 w-full" disabled={testingId === activeRecord.id} onClick={() => void testProvider(activeRecord)}>
+                  <Send size={15} /> {testingId === activeRecord.id ? "Sending…" : testLabel}
+                </Button>
               </div>
-            ) : tab === "sms" ? (
-              <div className="mt-5 flex flex-col gap-3 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-end">
-                <Input label="Test Mobile Number" value={testMobileNumber} onChange={(event) => setTestMobileNumber(event.target.value)} placeholder="Defaults to company phone" />
-                <div className="text-sm text-slate-500">Use the active SMS provider to verify delivery.</div>
-              </div>
-            ) : (
-              <div className="mt-5 grid gap-3 rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4 md:grid-cols-2">
-                <Input label="Test Mobile Number" value={testMobileNumber} onChange={(event) => setTestMobileNumber(event.target.value)} placeholder="Defaults to company phone" />
-                <label className="block space-y-2">
-                  <span className="block text-sm font-semibold text-slate-700">Test Message</span>
-                  <textarea
-                    className="min-h-[112px] w-full rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]"
-                    value={testMessage}
-                    onChange={(event) => setTestMessage(event.target.value)}
-                  />
-                </label>
-              </div>
-            )}
+            ) : null}
+          </div>
+        ) : (
+          <div className="mt-5 flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[var(--theme-color)] shadow-sm ring-1 ring-slate-200">
+              <ChannelIcon size={26} />
+            </span>
+            <div>
+              <p className="text-base font-bold text-slate-900">
+                {records.length ? `No ${channel.label} provider is active` : `Connect your ${channel.label} provider`}
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+                {records.length
+                  ? `Activate one of the providers below — until then ${channel.label.toLowerCase()} messages cannot be sent.`
+                  : `Add your ${channel.label.toLowerCase()} account so invoices, reminders and alerts can be sent automatically.`}
+              </p>
+            </div>
+            {canAddProvider && !records.length ? (
+              <Button type="button" onClick={startCreate}>
+                <Plus size={16} /> Add {channel.label} Provider
+              </Button>
+            ) : null}
+          </div>
+        )}
 
-            <div className="mt-5">
-              <Table
-                data={records}
-                emptyText={`No ${tabMeta[tab].label.toLowerCase()} found. Click "Add Provider" to create the first record.`}
-                columns={[
-                  {
-                    key: "provider",
-                    header: "Provider",
-                    render: (record) => (
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#2453d8]/10 text-[#2453d8]">
-                          {tab === "email" ? <Mail size={18} /> : <MessageSquare size={18} />}
-                        </span>
-                        <div>
-                          <p className="font-semibold text-slate-950">{record.providerName}</p>
-                          <p className="text-xs text-slate-500">
-                            {tab === "email"
-                              ? record.senderEmail ?? "--"
-                              : tab === "sms"
-                                ? record.providerType ?? record.senderId ?? "--"
-                                : record.providerType ?? record.whatsappNumber ?? "--"}
-                          </p>
-                        </div>
+        {records.length ? (
+          <div className="mt-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">All {channel.label} providers</h3>
+                <p className="text-xs text-slate-500">Only one provider is active at a time — that one sends every {channel.label.toLowerCase()}.</p>
+              </div>
+              {canAddProvider ? (
+                <Button type="button" variant="secondary" onClick={startCreate}>
+                  <Plus size={16} /> Add Provider
+                </Button>
+              ) : null}
+            </div>
+            <Table
+              data={records}
+              emptyText={`No ${tabMeta[tab].label.toLowerCase()} found.`}
+              columns={[
+                {
+                  key: "provider",
+                  header: "Provider",
+                  render: (record) => (
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[color:color-mix(in_srgb,var(--theme-color)_10%,white)] text-[var(--theme-color)]">
+                        <ChannelIcon size={18} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-slate-950">{providerLabel(record.providerName)}</p>
+                        <p className="truncate text-xs text-slate-500">{senderOf(record, tab)}</p>
                       </div>
-                    )
-                  },
-                  {
-                    key: "endpoint",
-                    header: tab === "email" ? "Endpoint" : "API URL",
-                    render: (record) => <span className="break-all text-slate-700">{tab === "email" ? emailEndpoint(record) : record.apiUrl ?? "--"}</span>
-                  },
-                  {
-                    key: "credentials",
-                    header: tab === "whatsapp" ? "Sender" : "Credential",
-                    render: (record) => <span className="text-slate-700">{tab === "email" ? emailCredential(record) : tab === "sms" ? resolveSmsCredential(record) : resolveWhatsAppCredential(record)}</span>
-                  },
-                  { key: "status", header: "Status", render: (record) => <StatusBadge label={record.active ? "ACTIVE" : "INACTIVE"} /> },
-                  {
-                    key: "actions",
-                    header: "Actions",
-                    className: "text-right",
-                    render: (record) => (
-                      <div className="flex justify-end gap-2">
-                        {record.active ? (
-                          <Button type="button" variant="secondary" disabled={testingId === record.id} onClick={() => void testProvider(record)}>
-                            <Send size={15} /> {testingId === record.id ? "Sending..." : tab === "email" ? "Test Email" : tab === "sms" ? "Test SMS" : "Test Message"}
-                          </Button>
-                        ) : null}
+                    </div>
+                  )
+                },
+                {
+                  key: "endpoint",
+                  header: tab === "email" ? "Server" : "API URL",
+                  render: (record) => <span className="break-all text-slate-700">{tab === "email" ? emailEndpoint(record) : record.apiUrl ?? "--"}</span>
+                },
+                {
+                  key: "credentials",
+                  header: tab === "whatsapp" ? "Account" : "Login / key",
+                  render: (record) => <span className="text-slate-700">{tab === "email" ? emailCredential(record) : tab === "sms" ? resolveSmsCredential(record) : resolveWhatsAppCredential(record)}</span>
+                },
+                { key: "status", header: "Status", render: (record) => <StatusBadge label={record.active ? "ACTIVE" : "INACTIVE"} /> },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  className: "text-right",
+                  render: (record) => (
+                    <div className="flex justify-end gap-2">
+                      {canEditProvider ? (
                         <Button type="button" variant="secondary" onClick={() => startEdit(record)}>
                           <Edit3 size={15} /> Edit
                         </Button>
-                      </div>
-                    )
-                  }
-                ]}
-              />
-            </div>
+                      ) : null}
+                    </div>
+                  )
+                }
+              ]}
+            />
+          </div>
+        ) : null}
       </GlassCard>
 
-      <Modal open={open} title={editing ? `Edit ${tabMeta[tab].label}` : `Add ${tabMeta[tab].label}`} onClose={() => setOpen(false)}>
+      <Modal open={open} eyebrow={tabMeta[tab].label} title={editing ? `Edit ${tabMeta[tab].providerLabel}` : `Add ${tabMeta[tab].providerLabel}`} onClose={() => setOpen(false)} maxWidthClass="max-w-4xl">
         <div className="grid gap-4 md:grid-cols-2">
           {tab === "email" ? (
             <Select
@@ -501,8 +601,9 @@ const CommunicationHubPage = () => {
             Active provider
           </label>
 
-          <div className="flex justify-end gap-3 md:col-span-2">
-            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+          {/* Phone par 4-5 buttons ek line me screen se bahar jate the — stack karo. */}
+          <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:flex-wrap sm:justify-end md:col-span-2">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="button" variant="secondary" onClick={resetForm}>Reset</Button>
             {tab === "sms" ? (
               <Button
@@ -532,12 +633,16 @@ const CommunicationHubPage = () => {
   );
 };
 
-const ProviderMetric = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="rounded-[var(--radius-card)] border border-slate-200 bg-slate-50 p-4">
-    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-    <p className="mt-2 truncate fs-16 font-bold text-slate-950">{value}</p>
+const ProviderFact = ({ label, value }: { label: string; value: string }) => (
+  <div className="min-w-0 rounded-xl bg-white px-3 py-2.5 ring-1 ring-slate-100">
+    <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{label}</dt>
+    <dd className="mt-0.5 truncate text-sm font-semibold text-slate-800" title={value}>{value}</dd>
   </div>
 );
+
+// Provider kis account / number se bhejta hai.
+const senderOf = (record: ProviderSettings, tab: CommunicationTab) =>
+  (tab === "email" ? record.senderEmail : tab === "sms" ? record.senderId : record.whatsappNumber) || "--";
 
 const normalizeTab = (value: string | null): CommunicationTab => {
   if (value === "sms" || value === "whatsapp") {

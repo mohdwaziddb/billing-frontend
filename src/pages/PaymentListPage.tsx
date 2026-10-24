@@ -8,6 +8,7 @@ import { deletePayment, getPaymentsPage, restorePayment, type PaymentFilterParam
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { DataPortLink } from "../components/DataPortLink";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
@@ -398,7 +399,7 @@ export const PaymentListPage = () => {
         </>
       }
       toolbarButtons={
-        can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") ? (
+        can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") || can("PAYMENT_DATAPORT", "VIEW") ? (
           <>
             {can("PAYMENTS", "EXPORT") ? (
               <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportPayments("payments.xlsx", exportRows)}>
@@ -406,6 +407,7 @@ export const PaymentListPage = () => {
                 Export Excel
               </Button>
             ) : null}
+            <DataPortLink menuCode="PAYMENT_DATAPORT" moduleKey="payments" />
             {can("PAYMENTS", "ADD") ? (
               <Link to="/payments/new">
                 <Button>Add Payment</Button>

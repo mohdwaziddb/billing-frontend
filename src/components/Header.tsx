@@ -325,6 +325,9 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
         initialUsername={user?.email ?? user?.mobileNumber ?? ""}
         identifierLocked={sessionType === "user" && Boolean(user?.email)}
         onClose={() => setForgotPasswordOpen(false)}
+        onPasswordReset={() => {
+          void logout();
+        }}
       />
       <Modal
         open={logoutConfirmOpen}

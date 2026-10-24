@@ -23,6 +23,7 @@ import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
+import { isValidMobileNumber, MOBILE_VALIDATION_MESSAGE, normalizeMobileNumber } from "../lib/customerValidation";
 import { formatDate } from "../lib/format";
 import { isManualPricingPolicy } from "../lib/inventorySettings";
 import { blockNumberStepKeys, blurNumberInputOnWheel } from "../lib/numberInputGuards";
@@ -67,15 +68,6 @@ const numberValue = (value: string | number | undefined) => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
-
-const MOBILE_VALIDATION_MESSAGE = "Enter a 10-digit mobile number.";
-
-const normalizeMobileNumber = (value: string) => {
-  const digits = value.replace(/\D/g, "");
-  return digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
-};
-
-const isValidMobileNumber = (value: string) => /^\d{10}$/.test(normalizeMobileNumber(value));
 
 const normalizeStateName = (value?: string | null) => value?.trim().toLowerCase() ?? "";
 const defaultPaymentModeCode = (modes: PaymentModeMaster[]) => {
@@ -174,7 +166,7 @@ export const CreateInvoicePage = () => {
     }
   });
 
-  const { fields, append, remove, update, replace } = useFieldArray({ control, name: "items" });
+  const { fields, append, remove, update } = useFieldArray({ control, name: "items" });
   const [expandedRows, setExpandedRows] = useState<Set<string>>(() => new Set());
 
   const toggleRowExpanded = (rowId: string) => {
@@ -200,16 +192,46 @@ export const CreateInvoicePage = () => {
     });
   };
 
+  // Boolean deps: `can` ki identity har auth update par badalti hai (setup 3 baar load hota tha).
+  const canViewProducts = can("PRODUCTS", "VIEW");
+  const canViewPaymentModes = can("PAYMENT_MODES", "VIEW");
+
   useEffect(() => {
-    void Promise.all([getProductsPage({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 }), getActiveReferralUsers(), getStates()])
-      .then(([productData, modeData, referralData, stateData]) => {
-        setProducts(productData.records.filter((item) => item.active));
-        setPaymentModes(modeData);
-        setReferralUsers(referralData.filter((item) => item.active));
-        setStates(stateData);
-      })
-      .catch((err: any) => setApiError(err, "Unable to load invoice setup data"));
-  }, [setApiError]);
+    // Har list alag load hoti hai: pehle ek 403 (jaise cashier ke paas PRODUCTS:VIEW
+    // nahi) poora Promise.all gira deta tha aur product list chupchaap khaali rehti thi.
+    let cancelled = false;
+    const missing: string[] = [];
+    const load = <T,>(label: string, allowed: boolean, request: () => Promise<T>, apply: (data: T) => void) => {
+      if (!allowed) {
+        missing.push(label);
+        return Promise.resolve();
+      }
+      return request()
+        .then((data) => {
+          if (!cancelled) {
+            apply(data);
+          }
+        })
+        .catch((err: any) => {
+          if (!cancelled) {
+            setApiError(err, `Unable to load ${label}`);
+          }
+        });
+    };
+    void Promise.all([
+      load("products", canViewProducts, () => getProductsPage({ active: true, size: 1000 }), (data) => setProducts(data.records.filter((item) => item.active))),
+      load("payment modes", canViewPaymentModes, () => getPaymentModes({ active: true, size: 1000 }), setPaymentModes),
+      load("referral users", true, getActiveReferralUsers, (data) => setReferralUsers(data.filter((item) => item.active))),
+      load("states", true, getStates, setStates)
+    ]).then(() => {
+      if (!cancelled && missing.length > 0) {
+        notificationService.showWarning(`You don't have permission to view ${missing.join(" and ")}. Ask an admin to allow it before creating invoices.`);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canViewPaymentModes, canViewProducts, setApiError]);
 
   const watchedItems = useWatch({ control, name: "items" }) ?? [];
   const invoiceDateInput = useWatch({ control, name: "invoiceDate" }) ?? "";
@@ -292,6 +314,9 @@ export const CreateInvoicePage = () => {
     if (watchedItems.filter((row) => row.productId && row.productId === item.productId).length > 1) {
       issues.push({ message: `"${product.name}" is already added in another row.` });
     }
+    if (product.taxable && product.taxMasterId == null) {
+      issues.push({ message: `"${product.name}" has no tax set. Set its tax (or mark it non-taxable) first.` });
+    }
     if (qty < 1) {
       issues.push({ message: "Quantity must be at least 1." });
     }
@@ -352,7 +377,11 @@ export const CreateInvoicePage = () => {
   }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.grandTotal, invoiceSummary.totalBeforeInvoiceDiscount, paidAmountInput, paymentModeInput, productMap, selectedCustomer, user?.company?.state, user?.company?.stateId, watchedItems]);
 
   const hasClientValidationErrors = rowIssues.some((issues) => issues.length > 0) || summaryIssues.length > 0;
-  const validationMessage = rowIssues.flat()[0]?.message ?? summaryIssues[0];
+  // Bill shuru hone ke baad khaali row par Save grey tha bina wajah ke.
+  const emptyRowNumber = watchedItems.findIndex((item) => !item.productId) + 1;
+  const validationMessage = rowIssues.flat()[0]?.message
+    ?? summaryIssues[0]
+    ?? (emptyRowNumber > 0 && watchedItems.some((item) => item.productId) ? `Select a product in row ${emptyRowNumber} or remove that row.` : undefined);
   const totalWithoutDiscount = invoiceSummary.grandTotal + invoiceSummary.productDiscountTotal + invoiceSummary.invoiceDiscount;
   const canProceedWithInvoice = Boolean(selectedCustomer?.active);
   const hasRequiredInvoiceFields = Boolean(
@@ -413,22 +442,9 @@ export const CreateInvoicePage = () => {
     }
   }, [canProceedWithInvoice, paymentModeInput, paymentModes, setValue]);
 
-  const resetInvoiceEntry = () => {
-    replace([createEmptyItem()]);
-    setValue("discountAmount", "0", { shouldDirty: true, shouldValidate: true });
-    autoFillPaidAmountRef.current = true;
-    setValue("paidAmount", "0", { shouldDirty: true, shouldValidate: true });
-    setValue("paymentMode", "", { shouldDirty: true, shouldValidate: true });
-    setValue("referenceNo", "", { shouldDirty: true });
-  };
-
+  // Customer badalne par bill ki lines/discount/payment rehte hain (pehle sab chupchaap mit jaata tha).
   const lookupCustomerByMobile = async () => {
     clearMessage();
-    setSelectedCustomer(null);
-    setPurchaseHistory(null);
-    setValue("customerId", "");
-    resetInvoiceEntry();
-
     const mobile = normalizeMobileNumber(customerMobile.trim());
     if (!mobile) {
       notificationService.showError("Enter customer mobile number to find customer");
@@ -438,6 +454,9 @@ export const CreateInvoicePage = () => {
       notificationService.showError(MOBILE_VALIDATION_MESSAGE);
       return;
     }
+    setSelectedCustomer(null);
+    setPurchaseHistory(null);
+    setValue("customerId", "");
     setCustomerMobile(mobile);
 
     try {
@@ -466,6 +485,11 @@ export const CreateInvoicePage = () => {
         setApiError({ message: "Customer found, but it is inactive. Activate it before invoicing." }, "Customer found, but it is inactive. Activate it before invoicing.");
       }
     } catch (err: any) {
+      if (err?.response?.status !== 404) {
+        setShowNewCustomerForm(false);
+        setApiError(err, "Unable to find customer");
+        return;
+      }
       setShowNewCustomerForm(can("CUSTOMERS", "ADD"));
       setNewCustomer({
         name: "",
@@ -487,13 +511,12 @@ export const CreateInvoicePage = () => {
 
   const handleCreateCustomer = async () => {
     clearCustomerCreateFeedback();
-    setCreatingCustomer(true);
-
-    const mobile = normalizeMobileNumber(customerMobile.trim() || newCustomer.mobile.trim());
+    const mobile = normalizeMobileNumber(newCustomer.mobile.trim() || customerMobile.trim());
     if (!isValidMobileNumber(mobile)) {
       notificationService.showError(MOBILE_VALIDATION_MESSAGE);
       return;
     }
+    setCreatingCustomer(true);
 
     const selectedState = newCustomer.stateId ? states.find((item) => String(item.id) === newCustomer.stateId) : undefined;
     const normalizedGst = newCustomer.gstRegistered === "true" ? newCustomer.gstNo.trim() : "";
@@ -557,7 +580,6 @@ export const CreateInvoicePage = () => {
     setPurchaseHistory(null);
     setShowNewCustomerForm(false);
     setValue("customerId", "", { shouldValidate: true });
-    resetInvoiceEntry();
   };
 
   const syncProductDefaults = (index: number, productId: string) => {
@@ -660,7 +682,17 @@ export const CreateInvoicePage = () => {
     <div className="space-y-4 pb-6 md:space-y-5">
       <Header title="Create Invoice" subtitle="" />
 
-      <form id="create-invoice-form" className="mx-auto grid w-full max-w-[1660px] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]" onSubmit={handleSubmit(onSubmit, onInvalid)}>
+      <form
+        id="create-invoice-form"
+        className="mx-auto grid w-full max-w-[1660px] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]"
+        onSubmit={handleSubmit(onSubmit, onInvalid)}
+        onKeyDown={(event) => {
+          // Enter se implicit submit band: save sirf Save button se.
+          if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+            event.preventDefault();
+          }
+        }}
+      >
         <div className="space-y-4">
           <GlassCard className="p-4 md:p-5">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1199,7 +1231,7 @@ export const CreateInvoicePage = () => {
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="space-y-2 text-sm">
-                  <SummaryRow label="Items" value={String(fields.length)} />
+                  <SummaryRow label="Items" value={String(watchedItems.filter((item) => item.productId).length)} />
                   <SummaryRow label="Subtotal" value={formatCurrency(invoiceSummary.subtotal)} />
                   <SummaryRow label="Total Without Discount" value={formatCurrency(totalWithoutDiscount)} />
                   <SummaryRow label="Product Discount" value={`-${formatCurrency(invoiceSummary.productDiscountTotal)}`} tone="danger" />

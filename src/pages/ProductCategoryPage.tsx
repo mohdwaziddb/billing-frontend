@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, History, Pencil } from "lucide-react";
+import { Download, History, Pencil, Plus } from "lucide-react";
 import { createProductCategory, deleteProductCategory, getProductCategoriesPage, updateProductCategory } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -10,6 +10,7 @@ import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
+import { ModalFormActions } from "../components/ModalFormActions";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
@@ -133,7 +134,7 @@ export const ProductCategoryPage = () => {
               Export Excel
             </Button>
           ) : null}
-          {canAdd ? <Button onClick={() => form.openAddForm()}>Add Category</Button> : null}
+          {canAdd ? <Button type="button" onClick={() => form.openAddForm()}><Plus size={16} />Add Category</Button> : null}
         </>
       }
       columnSelector={{ tableName: "PRODUCT_CATEGORY", columns: categoryColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["category"] }}
@@ -162,7 +163,8 @@ export const ProductCategoryPage = () => {
                   label: "Delete",
                   icon: <CommonDeleteIcon />,
                   danger: true,
-                  hidden: !canDelete,
+                  // Inactive record pehle se "deleted" (soft delete) hai — dobara Delete ka matlab nahi.
+                  hidden: !canDelete || !item.active,
                   onClick: () => form.askDelete(item)
                 }
               ]}
@@ -174,11 +176,12 @@ export const ProductCategoryPage = () => {
       fullHeight
       modals={
         <>
-          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Category" : "Add Category"} onClose={form.closeForm}>
+          <Modal open={form.formOpen} eyebrow="Product Category" title={form.editingEntity ? "Edit Category" : "Add Category"} onClose={form.closeForm} maxWidthClass="max-w-2xl">
             <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label="Category Name"
                 requiredMark
+                maxLength={100}
                 error={form.fieldErrors.categoryName}
                 value={form.formValues.categoryName}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, categoryName: event.target.value }))}
@@ -196,22 +199,16 @@ export const ProductCategoryPage = () => {
               <Input
                 label="Description"
                 className="md:col-span-2"
+                maxLength={1000}
                 error={form.fieldErrors.description}
                 value={form.formValues.description}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))}
               />
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button disabled={form.saving || !canSaveCategory} onClick={() => void form.saveForm()}>
-                {form.saving ? "Saving..." : form.editingEntity ? "Update Category" : "Create Category"}
-              </Button>
-              <Button type="button" variant="ghost" onClick={form.closeForm}>
-                Cancel
-              </Button>
-            </div>
+            <ModalFormActions editing={Boolean(form.editingEntity)} saving={form.saving} disabled={!canSaveCategory} entityLabel="Category" onCancel={form.closeForm} onSave={() => void form.saveForm()} />
           </Modal>
           <AuditLogModal open={Boolean(form.logsTarget)} moduleName="Product Category" entityId={form.logsTarget?.id ?? null} title={form.logsTarget ? `${form.logsTarget.categoryName} Logs` : "Category Logs"} onClose={form.closeLogs} />
-          <CommonDeleteModal open={Boolean(form.deleteTarget)} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
+          <CommonDeleteModal open={Boolean(form.deleteTarget)} itemName={form.deleteTarget?.categoryName} softDelete loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
         </>
       }
     />

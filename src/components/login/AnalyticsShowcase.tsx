@@ -254,7 +254,6 @@ const FLOATING_BADGES: Array<{
   value: string;
   icon: typeof TrendingUp;
   color: string;
-  className: string;
   delay: string;
   duration: string;
 }> = [
@@ -263,7 +262,6 @@ const FLOATING_BADGES: Array<{
     value: "+12.4%",
     icon: TrendingUp,
     color: "#2453d8",
-    className: "-left-5 -top-5",
     delay: "0s",
     duration: "7s"
   },
@@ -272,7 +270,6 @@ const FLOATING_BADGES: Array<{
     value: "78% collected",
     icon: Wallet,
     color: "#16A34A",
-    className: "-right-7 top-1/3",
     delay: "1.4s",
     duration: "8s"
   },
@@ -281,18 +278,21 @@ const FLOATING_BADGES: Array<{
     value: `${IN}19,050`,
     icon: CircleDollarSign,
     color: "#D97706",
-    className: "-left-4 bottom-12",
     delay: "0.8s",
     duration: "7.5s"
   }
 ];
 
+// Pehle ye chips absolute (-left/-top) the aur headline + dashboard ka text dhak dete the
+// ("from one place.", "Bizio Analytics", "…Enterprises" kat jate the). Ab dashboard ke
+// neeche apni row me — koi overlap nahi, halki float animation wahi. Ye upar ke metrics
+// hi dohrate hain, isliye sirf lambi screen par (1366x768 laptop par page scroll na ho).
 const FloatingBadges = () => (
-  <div aria-hidden className="pointer-events-none absolute inset-0 z-20">
-    {FLOATING_BADGES.map(({ title, value, icon: Icon, color, className, delay, duration }) => (
+  <div aria-hidden className="pointer-events-none relative z-20 mt-4 hidden grid-cols-3 gap-3 md:[@media(min-height:880px)]:grid">
+    {FLOATING_BADGES.map(({ title, value, icon: Icon, color, delay, duration }) => (
       <div
         key={title}
-        className={`login-float absolute hidden items-center gap-2.5 rounded-lg border border-slate-200/80 bg-white/95 px-3.5 py-2.5 shadow-[0_16px_32px_rgba(15,23,42,0.10)] md:flex ${className}`}
+        className="login-float flex min-w-0 items-center gap-2.5 rounded-lg border border-slate-200/80 bg-white/95 px-3.5 py-2.5 shadow-[0_16px_32px_rgba(15,23,42,0.10)]"
         style={{ animationDelay: delay, animationDuration: duration }}
       >
         <span
@@ -301,9 +301,9 @@ const FloatingBadges = () => (
         >
           <Icon size={15} />
         </span>
-        <div>
-          <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">{title}</p>
-          <p className="text-[12px] font-extrabold text-slate-900">{value}</p>
+        <div className="min-w-0">
+          <p className="truncate text-[9px] font-bold uppercase tracking-[0.08em] text-slate-400">{title}</p>
+          <p className="truncate text-[12px] font-extrabold text-slate-900">{value}</p>
         </div>
       </div>
     ))}
@@ -335,7 +335,7 @@ export const AnalyticsShowcase = () => (
         </p>
       </div>
 
-      <div className="relative mt-4" style={{ zoom: 0.7 }}>
+      <div className="relative mt-4" style={{ zoom: 0.66 }}>
         <MiniDashboard />
         <FloatingBadges />
       </div>

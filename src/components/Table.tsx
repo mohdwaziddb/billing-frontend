@@ -21,14 +21,12 @@ export const Table = <T,>({
   data,
   columns,
   emptyText = "No records found.",
-  emptyAction,
   rowSelection,
   minHeightClass = "min-h-[360px]"
 }: {
   data: T[];
   columns: Column<T>[];
   emptyText?: string;
-  emptyAction?: ReactNode;
   rowSelection?: TableRowSelection<T>;
   /** Default 360px (list pages). Dashboard jaise chhote widgets "min-h-0" de sakte hain. */
   minHeightClass?: string;
@@ -69,7 +67,7 @@ export const Table = <T,>({
           {rowCount === 0 ? (
             <tr>
               <td className="h-[320px] px-4 py-10 text-center text-slate-500 first:pl-5 last:pr-5" colSpan={columns.length + (rowSelection ? 1 : 0)}>
-                <EmptyState title={emptyText} action={emptyAction ?? undefined} />
+                <EmptyState title={emptyText} />
               </td>
             </tr>
           ) : (

@@ -38,7 +38,6 @@ export function CommonListPage<TRow, TFilters extends FiltersWithSearch>({
   columnSelector,
   tableColumns,
   emptyMessage = "No records found.",
-  emptyAction,
   rowSelection,
   fullHeight = false,
   aboveTable,
@@ -59,7 +58,6 @@ export function CommonListPage<TRow, TFilters extends FiltersWithSearch>({
   columnSelector?: ColumnSelectorConfig<TRow>;
   tableColumns: Column<TRow>[];
   emptyMessage?: string;
-  emptyAction?: ReactNode;
   rowSelection?: TableRowSelection<TRow>;
   fullHeight?: boolean;
   aboveTable?: ReactNode;
@@ -132,7 +130,6 @@ export function CommonListPage<TRow, TFilters extends FiltersWithSearch>({
             data={list.tableData}
             columns={tableColumns}
             emptyText={emptyMessage}
-            emptyAction={emptyAction}
             rowSelection={rowSelection}
           />
         </div>

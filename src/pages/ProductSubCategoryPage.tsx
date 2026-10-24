@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, History, Pencil } from "lucide-react";
+import { Download, History, Pencil, Plus } from "lucide-react";
 import { createProductSubCategory, deleteProductSubCategory, getProductSubCategoriesPage, updateProductSubCategory } from "../api/productSubCategories";
 import { getProductCategories } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
@@ -11,6 +11,7 @@ import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
+import { ModalFormActions } from "../components/ModalFormActions";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
@@ -102,6 +103,14 @@ export const ProductSubCategoryPage = () => {
     onSaved: list.refreshTable
   });
 
+  // Edit me parent category inactive ho to bhi dropdown khaali na dikhe — current value "(Inactive)" ke saath dikhao.
+  const formCategoryOptions = useMemo(() => {
+    const editing = form.editingEntity;
+    if (!editing || categoryOptions.some((option) => option.value === String(editing.categoryId))) {
+      return categoryOptions;
+    }
+    return [...categoryOptions, { label: `${editing.categoryName} (Inactive)`, value: String(editing.categoryId) }];
+  }, [categoryOptions, form.editingEntity]);
   const canSaveSubCategory = Boolean(form.formValues.categoryId && form.formValues.subCategoryName.trim());
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const subCategoryColumns = useMemo(() => [
@@ -169,7 +178,7 @@ export const ProductSubCategoryPage = () => {
               Export Excel
             </Button>
           ) : null}
-          {canAdd ? <Button onClick={() => form.openAddForm()}>Add Sub Category</Button> : null}
+          {canAdd ? <Button type="button" onClick={() => form.openAddForm()}><Plus size={16} />Add Sub Category</Button> : null}
         </>
       }
       columnSelector={{ tableName: "PRODUCT_SUB_CATEGORIES", columns: subCategoryColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["subCategoryName"] }}
@@ -198,7 +207,8 @@ export const ProductSubCategoryPage = () => {
                   label: "Delete",
                   icon: <CommonDeleteIcon />,
                   danger: true,
-                  hidden: !canDelete,
+                  // Inactive record pehle se "deleted" (soft delete) hai — dobara Delete ka matlab nahi.
+                  hidden: !canDelete || !item.active,
                   onClick: () => form.askDelete(item)
                 }
               ]}
@@ -210,15 +220,24 @@ export const ProductSubCategoryPage = () => {
       fullHeight
       modals={
         <>
-          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Sub Category" : "Add Sub Category"} onClose={form.closeForm}>
+          <Modal open={form.formOpen} eyebrow="Product Sub Category" title={form.editingEntity ? "Edit Sub Category" : "Add Sub Category"} onClose={form.closeForm} maxWidthClass="max-w-2xl">
             <div className="grid gap-4 md:grid-cols-2">
               <Select
                 label="Product Category"
                 requiredMark
                 error={form.fieldErrors.categoryId}
                 value={form.formValues.categoryId}
-                options={categoryOptions}
+                options={formCategoryOptions}
+                hint={!categoryOptions.length ? "No active product category yet. Add one in Setup > Product Categories first." : undefined}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, categoryId: event.target.value }))}
+              />
+              <Input
+                label="Sub Category Name"
+                requiredMark
+                maxLength={100}
+                error={form.fieldErrors.subCategoryName}
+                value={form.formValues.subCategoryName}
+                onChange={(event) => form.setFormValues((current) => ({ ...current, subCategoryName: event.target.value }))}
               />
               <Select
                 label="Status"
@@ -231,31 +250,18 @@ export const ProductSubCategoryPage = () => {
                 ]}
               />
               <Input
-                label="Sub Category Name"
-                requiredMark
-                error={form.fieldErrors.subCategoryName}
-                value={form.formValues.subCategoryName}
-                onChange={(event) => form.setFormValues((current) => ({ ...current, subCategoryName: event.target.value }))}
-              />
-              <Input
                 label="Description"
                 className="md:col-span-2"
+                maxLength={1000}
                 error={form.fieldErrors.description}
                 value={form.formValues.description}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))}
               />
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button disabled={form.saving || !canSaveSubCategory} onClick={() => void form.saveForm()}>
-                {form.saving ? "Saving..." : form.editingEntity ? "Update Sub Category" : "Create Sub Category"}
-              </Button>
-              <Button type="button" variant="ghost" onClick={form.closeForm}>
-                Cancel
-              </Button>
-            </div>
+            <ModalFormActions editing={Boolean(form.editingEntity)} saving={form.saving} disabled={!canSaveSubCategory} entityLabel="Sub Category" onCancel={form.closeForm} onSave={() => void form.saveForm()} />
           </Modal>
           <AuditLogModal open={Boolean(form.logsTarget)} moduleName="Product Sub Category" entityId={form.logsTarget?.id ?? null} title={form.logsTarget ? `${form.logsTarget.subCategoryName} Logs` : "Sub Category Logs"} onClose={form.closeLogs} />
-          <CommonDeleteModal open={Boolean(form.deleteTarget)} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
+          <CommonDeleteModal open={Boolean(form.deleteTarget)} itemName={form.deleteTarget?.subCategoryName} softDelete loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
         </>
       }
     />

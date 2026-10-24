@@ -222,8 +222,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       }
     };
 
+    // min-w-0: grid cell me lamba option label (nowrap) column ko phone par screen se bahar na dhakele.
     return (
-      <div className={clsx("block space-y-2", wrapperClassName)}>
+      <div className={clsx("block min-w-0 space-y-2", wrapperClassName)}>
         {label ? (
           <span className="block fs-12 font-semibold text-slate-700">
             {label}

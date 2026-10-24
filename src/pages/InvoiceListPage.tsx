@@ -7,6 +7,7 @@ import { getProductCategories } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { DataPortLink } from "../components/DataPortLink";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
@@ -386,7 +387,8 @@ export const InvoiceListPage = () => {
       render: (item) => (
         <ActionDropdown
           actions={[
-            { label: "View", icon: <Eye size={15} />, to: `/invoices/${item.id}` },
+            // Deleted invoice ka detail API 404 deta hai — View sirf active par.
+            { label: "View", icon: <Eye size={15} />, to: `/invoices/${item.id}`, hidden: item.deleted },
             { label: "Show Logs", icon: <History size={15} />, hidden: !can("INVOICES", "LOGS") || !logCounts[item.id], onClick: () => setLogTarget(item) },
             { label: restoringId === item.id ? "Restoring..." : "Restore", icon: <RotateCcw size={15} />, hidden: !item.deleted || !can("INVOICES", "RESTORE"), onClick: () => setRestoreTarget(item) },
             { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: item.deleted || !canDelete, onClick: () => setDeleteTarget(item) }
@@ -506,7 +508,7 @@ export const InvoiceListPage = () => {
         </>
       }
       toolbarButtons={
-        can("INVOICES", "EXPORT") || can("CREATE_INVOICE", "ADD") ? (
+        can("INVOICES", "EXPORT") || can("CREATE_INVOICE", "ADD") || can("INVOICE_DATAPORT", "VIEW") ? (
           <>
             {can("INVOICES", "EXPORT") ? (
               <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportInvoices("invoices.xlsx", exportRows)}>
@@ -514,6 +516,7 @@ export const InvoiceListPage = () => {
                 Export Excel
               </Button>
             ) : null}
+            <DataPortLink menuCode="INVOICE_DATAPORT" moduleKey="invoices" />
             {can("CREATE_INVOICE", "ADD") ? (
               <Link to="/create-invoice">
                 <Button>Create Invoice</Button>

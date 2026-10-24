@@ -137,7 +137,12 @@ export type ExcelExportOptions = {
   summary?: Array<{ label: string; value: string | number }>;
   /** Amount/number columns ka TOTAL row (default: true, agar data me pehle se Grand Total row na ho). */
   totalRow?: boolean;
+  /** Pehla column "Sr. No." (1, 2, 3...) — har export me apne aap (default: true). */
+  serialNumber?: boolean;
 };
+
+// Sr. No. column ka internal key — kisi asli data field se na takraye.
+const SERIAL_KEY = "__srNo";
 
 // Style ids (styles.xml ke cellXfs order me) — reference "Employee Leave Register" jaisa layout.
 const S = {
@@ -231,15 +236,19 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleShe
   + `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>`
   + `</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 
-export const exportToExcel = <T,>(fileName: string, rows: T[], columns: ExcelColumn<T>[], options: ExcelExportOptions = {}) => {
+export const exportToExcel = <T,>(fileName: string, rows: T[], dataColumns: ExcelColumn<T>[], options: ExcelExportOptions = {}) => {
   try {
+    // Common: har export ke shuru me Sr. No. — har page ko alag se column nahi dena padta.
+    const columns: ExcelColumn<T>[] = (options.serialNumber ?? true)
+      ? [{ key: SERIAL_KEY, header: "Sr. No." }, ...dataColumns]
+      : dataColumns;
     const columnCount = Math.max(1, columns.length);
     const lastCol = columnName(columnCount - 1);
     const title = options.title?.trim() || titleFromFileName(fileName);
     const { userName, company } = exportContext();
     const filters = (Array.isArray(options.filters) ? options.filters : [options.filters]).map((item) => (item ?? "").trim()).filter(Boolean);
     // +6: header me autoFilter ka dropdown arrow naam ke upar na aaye.
-    const widths = columns.map((column) => Math.max(11, Math.min(40, column.header.length + 6)));
+    const widths = columns.map((column) => (column.key === SERIAL_KEY ? 9 : Math.max(11, Math.min(40, column.header.length + 6))));
 
     const sheetRows: string[] = [];
     const merges: string[] = [];
@@ -294,11 +303,19 @@ export const exportToExcel = <T,>(fileName: string, rows: T[], columns: ExcelCol
 
     // 5. Data
     const totals = columns.map(() => 0);
+    let serial = 0;
     const writeRow = (row: T, grandTotal: boolean) => {
       r += 1;
+      if (!grandTotal) {
+        serial += 1;
+      }
       const cells = columns.map((column, columnIndex) => {
-        const rawValue = getValue(row, column);
         const ref = `${columnName(columnIndex)}${r}`;
+        if (column.key === SERIAL_KEY) {
+          // Total / Grand Total row ka Sr. No. khaali.
+          return grandTotal ? inlineCell(ref, S.totalText, "") : `<c r="${ref}" s="${S.center}"><v>${serial}</v></c>`;
+        }
+        const rawValue = getValue(row, column);
         if (rawValue === null || rawValue === undefined || rawValue === "") {
           return inlineCell(ref, grandTotal ? S.totalText : S.center, grandTotal ? "" : "-");
         }

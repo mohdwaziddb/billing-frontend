@@ -1,4 +1,4 @@
-import { Building2, PenTool, Upload } from "lucide-react";
+import { Building2, PenTool, Save, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { deleteCompanyLogo, deleteCompanySignature, getCompanySettings, updateCompanySettings, uploadCompanyLogo, uploadCompanySignature, type CompanySettingsRequest } from "../api/company";
 import { getCompanyMfaSettings, updateCompanyMfaSettings } from "../api/mfa";
@@ -8,11 +8,13 @@ import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { Modal } from "../components/Modal";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
+import { InfoNote } from "../components/InfoNote";
 import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useAuth } from "../context/AuthContext";
 import { useApiMessage } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import { EMAIL_VALIDATION_MESSAGE, GSTIN_VALIDATION_MESSAGE, isValidEmail, isValidGstin, isValidMobileNumber, isValidPincode, MOBILE_VALIDATION_MESSAGE, PINCODE_VALIDATION_MESSAGE } from "../lib/customerValidation";
 import {
   DEFAULT_INVENTORY_CONSUMPTION_METHOD,
   DEFAULT_INVENTORY_PRICING_POLICY,
@@ -60,11 +62,15 @@ const emptyForm: FormState = {
 };
 
 const logoSrc = (url?: string | null) => resolveAssetUrl(url);
+const PAN_PATTERN = /^[A-Z]{5}\d{4}[A-Z]$/;
+const TEN_DIGIT_MOBILE = /^\d{10}$/;
+const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 export const AboutCompanyPage = () => {
   const { can, refreshProfile, user } = useAuth();
-  const canEdit = can("ABOUT_COMPANY", "EDIT");
   const isOwner = user?.role === "OWNER" || Boolean(user?.superAdmin);
+  // Backend company profile/logo save sirf owner ko deta hai — baaki ko form view-only dikhao (403 nahi).
+  const canEdit = can("ABOUT_COMPANY", "EDIT") && isOwner;
   const [form, setForm] = useState<FormState>(emptyForm);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
@@ -79,7 +85,20 @@ export const AboutCompanyPage = () => {
   const [mfaApply, setMfaApply] = useState<boolean | null>(null);
   const [mfaSaving, setMfaSaving] = useState(false);
   const [mfaConfirmOff, setMfaConfirmOff] = useState(false);
-  const canSaveProfile = Boolean(form.name.trim() && form.phone.trim() && form.email.trim() && (!form.gstRegistered || (form.gstin ?? form.taxId ?? "").trim()));
+  // Backend CompanyService.validateSettingsRequest ke saath same rules — field ke neeche hi wajah dikhe.
+  const gstinValue = (form.gstin ?? form.taxId ?? "").trim();
+  const profileErrors: Partial<Record<"name" | "phone" | "alternatePhone" | "email" | "gstin" | "panNumber" | "bankIfscCode" | "pincode", string>> = {
+    name: form.name.trim() ? undefined : "Company name is required.",
+    phone: !form.phone.trim() ? "Mobile number is required." : isValidMobileNumber(form.phone) && TEN_DIGIT_MOBILE.test(form.phone.trim()) ? undefined : MOBILE_VALIDATION_MESSAGE,
+    alternatePhone: !form.alternatePhone?.trim() || TEN_DIGIT_MOBILE.test(form.alternatePhone.trim()) ? undefined : MOBILE_VALIDATION_MESSAGE,
+    email: !form.email.trim() ? "Email address is required." : isValidEmail(form.email) ? undefined : EMAIL_VALIDATION_MESSAGE,
+    gstin: !form.gstRegistered ? undefined : !gstinValue ? "GST number is required when GST Registered is Yes." : isValidGstin(gstinValue) ? undefined : GSTIN_VALIDATION_MESSAGE,
+    panNumber: !form.panNumber?.trim() || PAN_PATTERN.test(form.panNumber.trim().toUpperCase()) ? undefined : "Enter a valid 10-character PAN (e.g. ABCDE1234F).",
+    bankIfscCode: !form.bankIfscCode?.trim() || IFSC_PATTERN.test(form.bankIfscCode.trim().toUpperCase()) ? undefined : "Enter a valid 11-character IFSC code (e.g. SBIN0001234).",
+    pincode: !form.pincode?.trim() || isValidPincode(form.pincode) ? undefined : PINCODE_VALIDATION_MESSAGE
+  };
+  const firstProfileError = Object.values(profileErrors).find(Boolean);
+  const canSaveProfile = !firstProfileError;
 
   const setField = (key: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -321,11 +340,12 @@ export const AboutCompanyPage = () => {
 
             <section className="grid gap-4 md:grid-cols-2">
               <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Basic details</p>
-              <Input disabled={!canEdit} requiredMark label="Company Name" value={form.name} onChange={(event) => setField("name", event.target.value)} />
+              <Input disabled={!canEdit} requiredMark maxLength={150} label="Company Name" error={profileErrors.name} value={form.name} onChange={(event) => setField("name", event.target.value)} />
               <Input disabled={!canEdit} label="Legal Company Name" value={form.legalName} onChange={(event) => setField("legalName", event.target.value)} />
-              <Input disabled={!canEdit || !form.gstRegistered} requiredMark={form.gstRegistered} label="GST Number" value={form.gstin ?? form.taxId} onChange={(event) => {
-                setField("gstin", event.target.value);
-                setField("taxId", event.target.value);
+              <Input disabled={!canEdit || !form.gstRegistered} requiredMark={form.gstRegistered} maxLength={15} label="GST Number" error={profileErrors.gstin} hint={form.gstRegistered ? undefined : "Set GST Registered to Yes to enter a GSTIN."} value={form.gstin ?? form.taxId} onChange={(event) => {
+                const gstin = event.target.value.replace(/\s/g, "").toUpperCase();
+                setField("gstin", gstin);
+                setField("taxId", gstin);
               }} />
               <Select
                 disabled={!canEdit}
@@ -357,15 +377,15 @@ export const AboutCompanyPage = () => {
                   { label: "Yes", value: "true" }
                 ]}
               />
-              <Input disabled={!canEdit} label="PAN Number" value={form.panNumber} onChange={(event) => setField("panNumber", event.target.value)} />
+              <Input disabled={!canEdit} label="PAN Number" maxLength={10} error={profileErrors.panNumber} value={form.panNumber} onChange={(event) => setField("panNumber", event.target.value.toUpperCase())} />
               <Input disabled={!canEdit} label="CIN Number" value={form.cinNumber} onChange={(event) => setField("cinNumber", event.target.value)} />
             </section>
 
             <section className="grid gap-4 md:grid-cols-2">
               <p className="fs-11 uppercase tracking-[0.18em] text-slate-400 md:col-span-2">Contact details</p>
-              <Input disabled={!canEdit} requiredMark label="Mobile Number" value={form.phone} onChange={(event) => setField("phone", event.target.value)} />
-              <Input disabled={!canEdit} label="Alternate Mobile" value={form.alternatePhone} onChange={(event) => setField("alternatePhone", event.target.value)} />
-              <Input disabled={!canEdit} requiredMark type="email" label="Email Address" value={form.email} onChange={(event) => setField("email", event.target.value)} />
+              <Input disabled={!canEdit} requiredMark type="tel" maxLength={10} label="Mobile Number" error={profileErrors.phone} value={form.phone} onChange={(event) => setField("phone", event.target.value)} />
+              <Input disabled={!canEdit} type="tel" maxLength={10} label="Alternate Mobile" error={profileErrors.alternatePhone} value={form.alternatePhone} onChange={(event) => setField("alternatePhone", event.target.value)} />
+              <Input disabled={!canEdit} requiredMark type="email" label="Email Address" error={profileErrors.email} value={form.email} onChange={(event) => setField("email", event.target.value)} />
               <Input disabled={!canEdit} label="Website URL" value={form.websiteUrl} onChange={(event) => setField("websiteUrl", event.target.value)} />
             </section>
 
@@ -374,7 +394,7 @@ export const AboutCompanyPage = () => {
               <Input disabled={!canEdit} label="Bank Name" value={form.bankName ?? ""} onChange={(event) => setField("bankName", event.target.value)} />
               <Input disabled={!canEdit} label="Account Name" value={form.bankAccountName ?? ""} onChange={(event) => setField("bankAccountName", event.target.value)} />
               <Input disabled={!canEdit} label="Account Number" value={form.bankAccountNumber ?? ""} onChange={(event) => setField("bankAccountNumber", event.target.value)} />
-              <Input disabled={!canEdit} label="IFSC Code" value={form.bankIfscCode ?? ""} onChange={(event) => setField("bankIfscCode", event.target.value)} />
+              <Input disabled={!canEdit} label="IFSC Code" maxLength={11} error={profileErrors.bankIfscCode} value={form.bankIfscCode ?? ""} onChange={(event) => setField("bankIfscCode", event.target.value.toUpperCase())} />
               <Input disabled={!canEdit} label="Branch" value={form.bankBranch ?? ""} onChange={(event) => setField("bankBranch", event.target.value)} />
               <Input disabled={!canEdit} label="UPI ID" value={form.upiId ?? ""} onChange={(event) => setField("upiId", event.target.value)} />
               <Input disabled={!canEdit} label="Invoice Notes" value={form.invoiceNotes ?? ""} onChange={(event) => setField("invoiceNotes", event.target.value)} />
@@ -426,12 +446,13 @@ export const AboutCompanyPage = () => {
                 options={[{ label: "Select State", value: "" }, ...states.map((state) => ({ label: state.stateName, value: String(state.id) }))]}
                 hint={statesLoadFailed ? "State list could not be loaded from the server." : undefined}              />
               <Input disabled={!canEdit} label="Country" value={form.country} onChange={(event) => setField("country", event.target.value)} />
-              <Input disabled={!canEdit} label="Pincode" value={form.pincode} onChange={(event) => setField("pincode", event.target.value)} />
+              <Input disabled={!canEdit} label="Pincode" maxLength={6} error={profileErrors.pincode} value={form.pincode} onChange={(event) => setField("pincode", event.target.value)} />
             </section>
 
-            <div className="flex flex-wrap gap-3">
-              {canEdit ? <Button disabled={saving || !canSaveProfile} onClick={() => void saveProfile()}>{saving ? "Saving..." : "Save company profile"}</Button> : null}
-              {!canEdit ? <p className="text-sm text-slate-400">You have view-only access to company profile details.</p> : null}
+            <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
+              {canEdit ? <Button disabled={saving || !canSaveProfile} onClick={() => void saveProfile()}><Save size={16} />{saving ? "Saving..." : "Save Company Profile"}</Button> : null}
+              {canEdit && firstProfileError ? <p className="fs-12 font-medium text-rose-500">Fix the highlighted fields to save: {firstProfileError}</p> : null}
+              {!canEdit ? <InfoNote>You have view-only access to company profile details. Only the owner can change them.</InfoNote> : null}
             </div>
 
             <section className="grid gap-4 md:grid-cols-2">

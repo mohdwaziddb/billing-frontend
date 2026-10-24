@@ -9,7 +9,9 @@ import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
+import { InfoNote } from "../components/InfoNote";
 import { Modal } from "../components/Modal";
+import { ModalFormActions } from "../components/ModalFormActions";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
@@ -94,7 +96,7 @@ export const PaymentModePage = () => {
     { key: "description", header: "Description", render: (item: PaymentModeMaster) => item.description ?? "--" },
     { key: "modeType", header: "Type", render: (item: PaymentModeMaster) => (item.modeType === "ONLINE" ? "Online (Gateway)" : "Offline") },
     { key: "requiresReference", header: "Reference No", render: (item: PaymentModeMaster) => (item.requiresReference ? "Asked" : "--") },
-    { key: "status", header: "Status", render: (item: PaymentModeMaster) => <StatusBadge label={item.active ? "Active" : "Inactive"} /> }
+    { key: "status", header: "Status", render: (item: PaymentModeMaster) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
   ], []);
   const visiblePaymentModeColumns = useMemo(() => applyVisibleColumns(paymentModeColumns, visibleColumns), [paymentModeColumns, visibleColumns]);
 
@@ -108,7 +110,8 @@ export const PaymentModePage = () => {
       activeFilterCount={(filters) => (filters.status !== "true" ? 1 : 0)}
       filterFields={
         <Select
-          label="Status"
+          label="Status Filter"
+          placeholder={null}
           value={list.formFilters.status}
           onChange={(event) => list.updateFormFilters({ status: event.target.value })}
           options={[
@@ -138,7 +141,7 @@ export const PaymentModePage = () => {
               actions={[
                 { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("PAYMENT_MODES", "EDIT"), onClick: () => form.openEditForm(item) },
                 { label: "Show Logs", icon: <History size={15} />, hidden: !can("PAYMENT_MODES", "LOGS"), onClick: () => form.openLogs(item) },
-                { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("PAYMENT_MODES", "DELETE"), onClick: () => form.askDelete(item) }
+                { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("PAYMENT_MODES", "DELETE") || !item.active, onClick: () => form.askDelete(item) }
               ]}
             />
           )
@@ -148,26 +151,28 @@ export const PaymentModePage = () => {
       fullHeight
       modals={
         <>
-          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Payment Mode" : "Add Payment Mode"} onClose={form.closeForm} maxWidthClass="max-w-2xl">
-            <div className="grid gap-4">
+          <Modal open={form.formOpen} eyebrow="Payment Mode" title={form.editingEntity ? "Edit Payment Mode" : "Add Payment Mode"} onClose={form.closeForm} maxWidthClass="max-w-2xl">
+            <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label="Payment Mode"
                 requiredMark
+                maxLength={60}
                 error={form.fieldErrors.modeName}
                 value={form.formValues.modeName}
                 disabled={editingOnlineMode}
                 hint={editingOnlineMode ? "Online mode name is fixed; gateway payments are recorded with it." : undefined}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, modeName: event.target.value }))}
               />
-              <Input label="Description" error={form.fieldErrors.description} value={form.formValues.description} onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))} />
-              <Select label="Status" value={form.formValues.active} options={[{ label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => form.setFormValues((current) => ({ ...current, active: event.target.value }))} />
+              <Select label="Status" placeholder={null} value={form.formValues.active} options={[{ label: "Active", value: "true" }, { label: "Inactive", value: "false" }]} onChange={(event) => form.setFormValues((current) => ({ ...current, active: event.target.value }))} />
+              <Input label="Description" className="md:col-span-2" maxLength={1000} error={form.fieldErrors.description} value={form.formValues.description} onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))} />
               {editingOnlineMode ? (
-                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 fs-12 text-emerald-800">
+                <InfoNote tone="success" className="md:col-span-2">
                   Online (gateway) mode. Payments are collected via Setup → Payment Gateway and recorded automatically with the gateway reference. Set it Inactive to hide online collection.
-                </p>
+                </InfoNote>
               ) : (
                 <Select
                   label="Ask Reference No"
+                  wrapperClassName="md:col-span-2"
                   value={form.formValues.requiresReference}
                   placeholder={null}
                   hint="Shows an optional UTR / approval / cheque no. field while recording payments."
@@ -175,14 +180,11 @@ export const PaymentModePage = () => {
                   onChange={(event) => form.setFormValues((current) => ({ ...current, requiresReference: event.target.value }))}
                 />
               )}
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={form.closeForm}>Cancel</Button>
-                <Button type="button" disabled={form.saving || !canSaveMode} onClick={() => void form.saveForm()}>{form.saving ? "Saving..." : "Save"}</Button>
-              </div>
             </div>
+            <ModalFormActions editing={Boolean(form.editingEntity)} saving={form.saving} disabled={!canSaveMode} entityLabel="Payment Mode" onCancel={form.closeForm} onSave={() => void form.saveForm()} />
           </Modal>
           <AuditLogModal open={Boolean(form.logsTarget)} moduleName="Payment Mode" entityId={form.logsTarget?.id ?? null} title={form.logsTarget ? `${form.logsTarget.modeName} Logs` : "Payment Mode Logs"} onClose={form.closeLogs} />
-          <CommonDeleteModal open={Boolean(form.deleteTarget)} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
+          <CommonDeleteModal open={Boolean(form.deleteTarget)} itemName={form.deleteTarget?.modeName} softDelete loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
         </>
       }
     />

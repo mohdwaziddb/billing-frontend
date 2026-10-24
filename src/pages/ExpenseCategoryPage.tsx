@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { History, Pencil } from "lucide-react";
+import { Download, History, Pencil, Plus } from "lucide-react";
 import { createExpenseCategory, deleteExpenseCategory, getExpenseCategoriesPage, updateExpenseCategory } from "../api/expenseCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -10,11 +10,13 @@ import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
+import { ModalFormActions } from "../components/ModalFormActions";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import { useAddEditForm } from "../hooks/useAddEditForm";
 import { useListPage } from "../hooks/useListPage";
+import { exportToExcel } from "../lib/excelExport";
 import { formatDateTime } from "../lib/format";
 import type { ExpenseCategory, ExpenseCategoryRequest } from "../types/api";
 
@@ -45,6 +47,7 @@ export const ExpenseCategoryPage = () => {
   const canAdd = can("EXPENSE_CATEGORIES", "ADD");
   const canEdit = can("EXPENSE_CATEGORIES", "EDIT");
   const canDelete = can("EXPENSE_CATEGORIES", "DELETE");
+  const canExport = can("EXPENSE_CATEGORIES", "EXPORT");
 
   const list = useListPage<ExpenseCategory, CategoryFilters>({
     initialFilters: emptyFilters,
@@ -108,7 +111,30 @@ export const ExpenseCategoryPage = () => {
           ]}
         />
       }
-      toolbarButtons={canAdd ? <Button onClick={() => form.openAddForm()}>Add Category</Button> : null}
+      toolbarButtons={
+        <>
+          {canExport ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!list.tableData.length}
+              onClick={() =>
+                exportToExcel("expense-categories.xlsx", list.tableData, [
+                  { key: "categoryName", header: "Category Name" },
+                  { key: "description", header: "Description" },
+                  { key: "active", header: "Status", value: (row) => (row.active ? "Active" : "Inactive") },
+                  { key: "createdAt", header: "Created At", type: "date" },
+                  { key: "updatedAt", header: "Updated At", type: "date" }
+                ])
+              }
+            >
+              <Download size={16} />
+              Export Excel
+            </Button>
+          ) : null}
+          {canAdd ? <Button type="button" onClick={() => form.openAddForm()}><Plus size={16} />Add Category</Button> : null}
+        </>
+      }
       columnSelector={{ tableName: "EXPENSE_CATEGORIES", columns: categoryColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["name"] }}
       tableColumns={[
         ...visibleCategoryColumns,
@@ -135,7 +161,8 @@ export const ExpenseCategoryPage = () => {
                   label: "Delete",
                   icon: <CommonDeleteIcon />,
                   danger: true,
-                  hidden: !canDelete,
+                  // Inactive record pehle se "deleted" (soft delete) hai — dobara Delete ka matlab nahi.
+                  hidden: !canDelete || !item.active,
                   onClick: () => form.askDelete(item)
                 }
               ]}
@@ -147,11 +174,12 @@ export const ExpenseCategoryPage = () => {
       fullHeight
       modals={
         <>
-          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Expense Category" : "Add Expense Category"} onClose={form.closeForm}>
+          <Modal open={form.formOpen} eyebrow="Expense Category" title={form.editingEntity ? "Edit Expense Category" : "Add Expense Category"} onClose={form.closeForm} maxWidthClass="max-w-2xl">
             <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label="Category Name"
                 requiredMark
+                maxLength={100}
                 error={form.fieldErrors.categoryName}
                 value={form.formValues.categoryName}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, categoryName: event.target.value }))}
@@ -169,22 +197,16 @@ export const ExpenseCategoryPage = () => {
               <Input
                 label="Description"
                 className="md:col-span-2"
+                maxLength={1000}
                 error={form.fieldErrors.description}
                 value={form.formValues.description}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))}
               />
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button disabled={form.saving || !canSaveCategory} onClick={() => void form.saveForm()}>
-                {form.saving ? "Saving..." : form.editingEntity ? "Update Category" : "Create Category"}
-              </Button>
-              <Button type="button" variant="ghost" onClick={form.closeForm}>
-                Cancel
-              </Button>
-            </div>
+            <ModalFormActions editing={Boolean(form.editingEntity)} saving={form.saving} disabled={!canSaveCategory} entityLabel="Category" onCancel={form.closeForm} onSave={() => void form.saveForm()} />
           </Modal>
           <AuditLogModal open={Boolean(form.logsTarget)} moduleName="Expense Category" entityId={form.logsTarget?.id ?? null} title={form.logsTarget ? `${form.logsTarget.categoryName} Logs` : "Expense Category Logs"} onClose={form.closeLogs} />
-          <CommonDeleteModal open={Boolean(form.deleteTarget)} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
+          <CommonDeleteModal open={Boolean(form.deleteTarget)} itemName={form.deleteTarget?.categoryName} softDelete loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
         </>
       }
     />

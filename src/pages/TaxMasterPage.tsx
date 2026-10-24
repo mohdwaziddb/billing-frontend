@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, History, Pencil } from "lucide-react";
+import { Download, History, Pencil, Plus } from "lucide-react";
 import { createTaxMaster, deleteTaxMaster, getTaxMasterPage, updateTaxMaster } from "../api/taxMaster";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -9,7 +9,9 @@ import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
+import { InfoNote } from "../components/InfoNote";
 import { Modal } from "../components/Modal";
+import { ModalFormActions } from "../components/ModalFormActions";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
@@ -62,6 +64,10 @@ const getRateError = (rate: string) => {
   return null;
 };
 
+// Backend rule ke saath: default tax inactive nahi ho sakta (naye invoice par wahi lagta hai).
+const getDefaultTaxError = (values: FormState) =>
+  values.defaultTax === "true" && values.active === "false" ? "Default tax must be active. Set Status to Active or Default Tax to No." : null;
+
 export const TaxMasterPage = () => {
   const { can } = useAuth();
   const canAdd = can("TAX_MASTER", "ADD");
@@ -87,7 +93,7 @@ export const TaxMasterPage = () => {
     emptyForm,
     entityName: "Tax Master",
     errorMessage: "Unable to save tax master",
-    validate: (values) => getRateError(values.rate),
+    validate: (values) => getRateError(values.rate) ?? getDefaultTaxError(values),
     toFormValues: (tax) => ({
       taxName: tax.taxName,
       taxCode: tax.taxCode,
@@ -113,7 +119,8 @@ export const TaxMasterPage = () => {
   });
 
   const rateError = getRateError(form.formValues.rate);
-  const canSaveTax = Boolean(form.formValues.taxName.trim() && form.formValues.taxCode.trim() && rateError === null);
+  const defaultTaxError = getDefaultTaxError(form.formValues);
+  const canSaveTax = Boolean(form.formValues.taxName.trim() && form.formValues.taxCode.trim() && rateError === null && defaultTaxError === null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const taxColumns = useMemo(() => [
     { key: "taxName", header: "Tax Name", render: (item: TaxMaster) => <span className="font-semibold text-white">{item.taxName}</span> },
@@ -186,7 +193,7 @@ export const TaxMasterPage = () => {
               Export Excel
             </Button>
           ) : null}
-          {canAdd ? <Button onClick={() => form.openAddForm()}>Add Tax</Button> : null}
+          {canAdd ? <Button type="button" onClick={() => form.openAddForm()}><Plus size={16} />Add Tax</Button> : null}
         </>
       }
       columnSelector={{ tableName: "TAX_MASTER", columns: taxColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["taxName"] }}
@@ -201,20 +208,20 @@ export const TaxMasterPage = () => {
               actions={[
                 { label: "Edit", icon: <Pencil size={15} />, hidden: !canEdit, onClick: () => form.openEditForm(item) },
                 { label: "Show Logs", icon: <History size={15} />, hidden: !canViewLogs, onClick: () => form.openLogs(item) },
-                { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !canDelete, onClick: () => form.askDelete(item) }
+                { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !canDelete || !item.active, onClick: () => form.askDelete(item) }
               ]}
             />
           )
         }
       ]}
-      emptyMessage="No tax masters found."
+      emptyMessage="No taxes found."
       fullHeight
       modals={
         <>
-          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Tax" : "Add Tax"} onClose={form.closeForm}>
+          <Modal open={form.formOpen} eyebrow="Tax Master" title={form.editingEntity ? "Edit Tax" : "Add Tax"} onClose={form.closeForm} maxWidthClass="max-w-3xl">
             <div className="grid gap-4 md:grid-cols-2">
-              <Input label="Tax Name" requiredMark error={form.fieldErrors.taxName} value={form.formValues.taxName} onChange={(event) => form.setFormValues((current) => ({ ...current, taxName: event.target.value }))} />
-              <Input label="Tax Code" requiredMark error={form.fieldErrors.taxCode} value={form.formValues.taxCode} onChange={(event) => form.setFormValues((current) => ({ ...current, taxCode: event.target.value.toUpperCase() }))} />
+              <Input label="Tax Name" requiredMark maxLength={100} placeholder="e.g. GST 18%" error={form.fieldErrors.taxName} value={form.formValues.taxName} onChange={(event) => form.setFormValues((current) => ({ ...current, taxName: event.target.value }))} />
+              <Input label="Tax Code" requiredMark maxLength={40} placeholder="e.g. GST_18" error={form.fieldErrors.taxCode} value={form.formValues.taxCode} onChange={(event) => form.setFormValues((current) => ({ ...current, taxCode: event.target.value.toUpperCase() }))} />
               <Select
                 label="Tax Type"
                 placeholder={null}
@@ -230,6 +237,7 @@ export const TaxMasterPage = () => {
               <Select
                 label="Default Tax"
                 placeholder={null}
+                hint="Default tax is pre-selected on new products and invoice lines."
                 value={form.formValues.defaultTax}
                 onChange={(event) => form.setFormValues((current) => ({ ...current, defaultTax: event.target.value }))}
                 options={[
@@ -247,19 +255,13 @@ export const TaxMasterPage = () => {
                   { label: "Inactive", value: "false" }
                 ]}
               />
-              <Input label="Description" className="md:col-span-2" error={form.fieldErrors.description} value={form.formValues.description} onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))} />
+              <Input label="Description" className="md:col-span-2" maxLength={1000} error={form.fieldErrors.description} value={form.formValues.description} onChange={(event) => form.setFormValues((current) => ({ ...current, description: event.target.value }))} />
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button disabled={form.saving || !canSaveTax} onClick={() => void form.saveForm()}>
-                {form.saving ? "Saving..." : form.editingEntity ? "Update Tax" : "Create Tax"}
-              </Button>
-              <Button type="button" variant="ghost" onClick={form.closeForm}>
-                Cancel
-              </Button>
-            </div>
+            {defaultTaxError ? <InfoNote tone="warning" className="mt-4">{defaultTaxError}</InfoNote> : null}
+            <ModalFormActions editing={Boolean(form.editingEntity)} saving={form.saving} disabled={!canSaveTax} entityLabel="Tax" onCancel={form.closeForm} onSave={() => void form.saveForm()} />
           </Modal>
           <AuditLogModal open={Boolean(form.logsTarget)} moduleName="Tax Master" entityId={form.logsTarget?.id ?? null} title={form.logsTarget ? `${form.logsTarget.taxName} Logs` : "Tax Logs"} onClose={form.closeLogs} />
-          <CommonDeleteModal open={Boolean(form.deleteTarget)} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
+          <CommonDeleteModal open={Boolean(form.deleteTarget)} itemName={form.deleteTarget?.taxName} description={form.deleteTarget?.defaultTax ? `"${form.deleteTarget.taxName}" is your default tax. After deleting it, no tax will be pre-selected until you mark another tax as default.` : undefined} loading={form.deleting} onCancel={form.cancelDelete} onConfirm={() => void form.confirmDelete()} />
         </>
       }
     />

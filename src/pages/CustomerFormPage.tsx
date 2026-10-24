@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
-import { createCustomer, getCustomer, getCustomers, updateCustomer } from "../api/customers";
+import { createCustomer, getCustomer, updateCustomer } from "../api/customers";
 import { getStates } from "../api/states";
 import { FormActionBar } from "../components/FormActionBar";
 import { FormSection } from "../components/FormSection";
@@ -10,6 +10,18 @@ import { Input } from "../components/Input";
 import { Select } from "../components/Select";
 import { useApiFormFeedback } from "../hooks/useApiFeedback";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
+import {
+  EMAIL_VALIDATION_MESSAGE,
+  GSTIN_VALIDATION_MESSAGE,
+  isValidEmail,
+  isValidGstin,
+  isValidMobileNumber,
+  isValidPincode,
+  MOBILE_VALIDATION_MESSAGE,
+  normalizeGstin,
+  normalizeMobileNumber,
+  PINCODE_VALIDATION_MESSAGE
+} from "../lib/customerValidation";
 import { firstFormErrorMessage } from "../lib/formValidation";
 import { notificationService } from "../services/notificationService";
 import type { CustomerRequest } from "../types/api";
@@ -45,6 +57,8 @@ export const CustomerFormPage = () => {
     formState,
     formState: { errors, isSubmitting }
   } = useForm<FormValues>({
+    // Field chhodte hi error dikhe (pehle sirf Save button disable rehta tha, wajah nahi dikhti thi).
+    mode: "onTouched",
     defaultValues: {
       name: "",
       mobile: "",
@@ -61,12 +75,9 @@ export const CustomerFormPage = () => {
     }
   });
   const { fieldErrors, setFieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
-  const watchedValues = watch();
-  const canSaveCustomer = Boolean(
-    watchedValues.name.trim() &&
-    watchedValues.mobile.trim() &&
-    (watchedValues.gstRegistered !== "true" || watchedValues.gstNo.trim())
-  );
+  const gstRegistered = watch("gstRegistered") === "true";
+  const stateSelected = Boolean(watch("stateId"));
+  const isIndia = (watch("country") || "India").trim().toLowerCase() === "india";
 
   useEffect(() => {
     void getStates()
@@ -124,10 +135,11 @@ export const CustomerFormPage = () => {
     clearFeedback();
 
     const selectedState = values.stateId ? states.find((item) => String(item.id) === values.stateId) : undefined;
-    const normalizedGst = values.gstRegistered === "true" ? values.gstNo.trim() : "";
+    const normalizedGst = values.gstRegistered === "true" ? normalizeGstin(values.gstNo) : "";
     const payload: CustomerRequest = {
       name: values.name.trim(),
-      mobile: values.mobile.trim(),
+      // "+91 98765-43210" -> "9876543210": duplicate check (DB unique key) bhi isi par chale.
+      mobile: normalizeMobileNumber(values.mobile),
       email: values.email.trim() || undefined,
       address: values.address.trim() || undefined,
       gstNo: normalizedGst || undefined,
@@ -141,29 +153,9 @@ export const CustomerFormPage = () => {
       active: values.active === "true"
     };
 
+    // Duplicate mobile/email backend (aur DB unique key) check karta hai. Pehle yahan
+    // har save par 1000 customers fetch hote the — 1000 ke baad wala duplicate chhoot jata tha.
     try {
-      const existingCustomers = await getCustomers({ size: 1000 });
-      const currentId = editing ? Number(customerId) : null;
-      const mobileExists = existingCustomers.some(
-        (customer) => customer.id !== currentId && customer.mobile.trim().toLowerCase() === payload.mobile.toLowerCase()
-      );
-      const normalizedEmail = payload.email?.toLowerCase();
-      const emailExists = Boolean(normalizedEmail) && existingCustomers.some(
-        (customer) => customer.id !== currentId && (customer.email ?? "").trim().toLowerCase() === normalizedEmail
-      );
-
-      if (mobileExists || emailExists) {
-        const nextErrors: Record<string, string> = {};
-        if (mobileExists) {
-          nextErrors.mobile = "This phone number is already registered.";
-        }
-        if (emailExists) {
-          nextErrors.email = "This email address is already registered.";
-        }
-        setFieldErrors(nextErrors);
-        return;
-      }
-
       if (editing) {
         await updateCustomer(Number(customerId), payload);
         notificationService.showSuccess(CommonSuccessMessageUtil.updated("Customer"));
@@ -174,6 +166,13 @@ export const CustomerFormPage = () => {
       navigate("/customers");
     } catch (err: any) {
       applyApiError(err, "Unable to save customer");
+      // Backend duplicate message ko sahi field ke neeche bhi dikhao (applyApiError ke baad, warna wo reset kar deta).
+      const message: string = err?.response?.data?.message ?? "";
+      if (/phone number is already registered/i.test(message)) {
+        setFieldErrors({ mobile: message });
+      } else if (/email address is already registered/i.test(message)) {
+        setFieldErrors({ email: message });
+      }
     }
   };
 
@@ -185,7 +184,11 @@ export const CustomerFormPage = () => {
     <div className="space-y-4 pb-6 md:space-y-5">
       <Header
         title={editing ? "Edit Customer" : "Add Customer"}
-        subtitle="Create and update customer records with clear validation, balanced spacing, and consistent controls."
+        subtitle={
+          editing
+            ? "Update contact, GST and address details for this customer."
+            : "Add a customer to create invoices, collect payments and track outstanding."
+        }
       />
 
       <div className="space-y-4">
@@ -195,37 +198,69 @@ export const CustomerFormPage = () => {
           formId="customer-form"
           saveLabel="Save Customer"
           saving={isSubmitting}
-          saveDisabled={!canSaveCustomer}
         />
 
-        <form id="customer-form" className="grid gap-4 lg:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
+        <form
+          id="customer-form"
+          className="grid items-start gap-4 lg:grid-cols-2"
+          noValidate
+          onSubmit={handleSubmit(onSubmit, onInvalid)}
+        >
           <FormSection title="Customer Details">
             <div className="grid gap-3 md:grid-cols-2">
               <Input
                 label="Customer Name"
                 requiredMark
+                autoComplete="off"
                 error={fieldErrors.name ?? errors.name?.message}
-                {...register("name", { required: "Name is required" })}
+                {...register("name", {
+                  validate: (value) => Boolean(value.trim()) || "Customer name is required."
+                })}
               />
               <Input
                 label="Mobile Number"
                 requiredMark
+                type="tel"
+                inputMode="tel"
+                maxLength={16}
+                placeholder="10-digit mobile number"
+                autoComplete="off"
                 error={fieldErrors.mobile ?? errors.mobile?.message}
-                {...register("mobile", { required: "Mobile is required" })}
+                {...register("mobile", {
+                  validate: (value) =>
+                    !value.trim() ? "Mobile number is required." : isValidMobileNumber(value) || MOBILE_VALIDATION_MESSAGE
+                })}
               />
               <Input
                 label="Email Address"
                 type="email"
+                autoComplete="off"
                 error={fieldErrors.email ?? errors.email?.message}
-                {...register("email")}
+                {...register("email", {
+                  validate: (value) => !value.trim() || isValidEmail(value) || EMAIL_VALIDATION_MESSAGE
+                })}
               />
-              <Input
-                label="GST Number"
-                disabled={watchedValues.gstRegistered !== "true"}
-                error={fieldErrors.gstNo ?? errors.gstNo?.message}
-                {...register("gstNo")}
+              <Controller
+                name="active"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Status"
+                    placeholder={null}
+                    error={fieldErrors.active}
+                    options={[
+                      { label: "Active", value: "true" },
+                      { label: "Inactive", value: "false" }
+                    ]}
+                    name={field.name}
+                    value={field.value}
+                    onChange={(event) => field.onChange(event.target.value)}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
-              {/* Controlled: shown option always equals submitted value. */}
+              {/* GST Registered pehle, phir GSTIN: pehle disabled GSTIN field toggle se upar aata tha. */}
               <Controller
                 name="gstRegistered"
                 control={control}
@@ -251,37 +286,52 @@ export const CustomerFormPage = () => {
                   />
                 )}
               />
-              <Controller
-                name="active"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    label="Status"
-                    placeholder="Select Status"
-                    error={fieldErrors.active}
-                    options={[
-                      { label: "Active", value: "true" },
-                      { label: "Inactive", value: "false" }
-                    ]}
-                    name={field.name}
-                    value={field.value}
-                    onChange={(event) => field.onChange(event.target.value)}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                  />
-                )}
+              <Input
+                label="GSTIN"
+                requiredMark={gstRegistered}
+                disabled={!gstRegistered}
+                maxLength={15}
+                autoComplete="off"
+                className="uppercase placeholder:normal-case"
+                placeholder={gstRegistered ? "15-character GSTIN" : "Select GST Registered: Yes"}
+                error={fieldErrors.gstNo ?? fieldErrors.gstin ?? errors.gstNo?.message}
+                {...register("gstNo", {
+                  setValueAs: (value: string) => normalizeGstin(value ?? ""),
+                  validate: (value, all) => {
+                    if (all.gstRegistered !== "true") {
+                      return true;
+                    }
+                    if (!value.trim()) {
+                      return "GSTIN is required when GST Registered is Yes.";
+                    }
+                    return isValidGstin(value) || GSTIN_VALIDATION_MESSAGE;
+                  }
+                })}
               />
             </div>
           </FormSection>
 
           <FormSection title="Address Information">
             <div className="grid gap-3 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <Input
+                  label="Address"
+                  placeholder="House / shop no., street, area"
+                  error={fieldErrors.address ?? errors.address?.message}
+                  {...register("address")}
+                />
+              </div>
+              <Input label="City" error={fieldErrors.city} {...register("city")} />
               <Input
-                label="Address"
-                error={fieldErrors.address ?? errors.address?.message}
-                {...register("address")}
+                label="Pincode"
+                inputMode="numeric"
+                maxLength={isIndia ? 6 : 10}
+                autoComplete="off"
+                error={fieldErrors.pincode ?? errors.pincode?.message}
+                {...register("pincode", {
+                  validate: (value) => !value.trim() || !isIndia || isValidPincode(value) || PINCODE_VALIDATION_MESSAGE
+                })}
               />
-              <Input label="City" {...register("city")} />
               <Controller
                 name="stateId"
                 control={control}
@@ -296,9 +346,8 @@ export const CustomerFormPage = () => {
                       const next = event.target.value;
                       field.onChange(next);
                       const selected = states.find((item) => String(item.id) === next);
-                      setValue("stateId", next, { shouldDirty: true });
                       setValue("state", selected?.stateName ?? "", { shouldDirty: true });
-                      setValue("country", selected?.countryName ?? watch().country, { shouldDirty: true });
+                      setValue("country", selected?.countryName ?? getValues("country"), { shouldDirty: true });
                     }}
                     onBlur={field.onBlur}
                     ref={field.ref}
@@ -306,8 +355,14 @@ export const CustomerFormPage = () => {
                 )}
               />
               <input type="hidden" {...register("state")} />
-              <Input label="Country" {...register("country")} />
-              <Input label="Pincode" {...register("pincode")} />
+              {/* State chuna ho to country usi se save hoti hai — field edit karne ka bhram na ho. */}
+              <Input
+                label="Country"
+                readOnly={stateSelected}
+                className={stateSelected ? "bg-slate-50 text-slate-500" : undefined}
+                hint={stateSelected ? "Taken from the selected state." : undefined}
+                {...register("country")}
+              />
             </div>
           </FormSection>
         </form>

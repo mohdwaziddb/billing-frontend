@@ -32,9 +32,12 @@ export const sanitizeHtml = (
     FORBID_TAGS: string[];
     [key: string]: unknown;
   };
+  // WHOLE_DOCUMENT: backend <style> ko <head> me inline karta hai. Iske bina DOMPurify
+  // sirf <body> lautata tha, to print/document.write me invoice bina CSS ke chhapta tha.
   return String(
     DOMPurify.sanitize(dirty, {
       ...rest,
+      WHOLE_DOCUMENT: true,
       FORBID_TAGS: FORBID_TAGS.filter((tag) => tag !== "style")
     } as unknown as Parameters<typeof DOMPurify.sanitize>[1])
   );

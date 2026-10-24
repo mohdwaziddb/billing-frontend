@@ -1,7 +1,8 @@
-import { Download, Edit3, History, KeyRound, Plus, UserX } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import clsx from "clsx";
+import { Crown, Download, Edit3, History, KeyRound, Plus, ShieldCheck, UserCheck, UserRound, Users, UserX } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
-import { createCompanyUser, deactivateCompanyUser, deleteUserPhoto, getCompanyUsersPage, getRoles, updateCompanyUser, uploadUserPhoto } from "../api/users";
+import { createCompanyUser, deactivateCompanyUser, deleteUserPhoto, getCompanyUsersPage, getRoles, updateCompanyUser, uploadUserPhoto, type UserFilterParams } from "../api/users";
 import { resetUserMfa } from "../api/mfa";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -13,12 +14,11 @@ import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
-import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { ModalFormActions } from "../components/ModalFormActions";
 import { PasswordInput } from "../components/PasswordInput";
 import { PhotoUploadField } from "../components/PhotoUploadField";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
-import { Table } from "../components/Table";
 import { UserAvatar } from "../components/UserAvatar";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
@@ -26,10 +26,11 @@ import { useListPage } from "../hooks/useListPage";
 import { CommonErrorMessageUtil } from "../lib/CommonErrorMessageUtil";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { exportToExcel } from "../lib/excelExport";
+import { EMAIL_VALIDATION_MESSAGE, isValidEmail, isValidMobileNumber, MOBILE_VALIDATION_MESSAGE, normalizeMobileNumber } from "../lib/customerValidation";
 import { firstFormErrorMessage } from "../lib/formValidation";
 import { formatDateTime } from "../lib/format";
 import { notificationService } from "../services/notificationService";
-import type { CompanyUserRequest, PageResponse, Role, UserProfile } from "../types/api";
+import type { CompanyUserRequest, Role, UserProfile } from "../types/api";
 
 type FormValues = {
   fullName: string;
@@ -39,6 +40,26 @@ type FormValues = {
   password: string;
   role: Role;
   active: string;
+};
+
+const USERNAME_PATTERN = /^[A-Za-z0-9._@-]{3,50}$/;
+const USERNAME_VALIDATION_MESSAGE = "Use 3-50 letters, numbers, dot, underscore, @ or hyphen (no spaces).";
+// Backend jaisa: min 8, max 72 bytes (BCrypt limit). Login bhi trim karta hai, isliye yahan bhi trim.
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_BYTES = 72;
+
+const validatePassword = (value: string, required: boolean) => {
+  const password = value.trim();
+  if (!password) {
+    return required ? "Password is required" : true;
+  }
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+  }
+  if (new TextEncoder().encode(password).length > PASSWORD_MAX_BYTES) {
+    return `Password must be ${PASSWORD_MAX_BYTES} characters or less`;
+  }
+  return true;
 };
 
 const formatRoleLabel = (role?: string | null) => {
@@ -54,6 +75,24 @@ const toRoleOption = (role?: Role | string | null) => ({
   value: typeof role === "string" ? role.trim().toUpperCase() : ""
 });
 
+// Role chip: status-badge classes reuse (dark mode bhi wahi se aata hai).
+const ROLE_BADGE_CLASS: Record<string, string> = {
+  OWNER: "status-badge-warning",
+  ADMIN: "status-badge-active",
+  USER: "status-badge-muted"
+};
+
+const RoleBadge = ({ role }: { role?: string | null }) => {
+  const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
+  const Icon = normalized === "OWNER" ? Crown : normalized === "ADMIN" ? ShieldCheck : UserRound;
+  return (
+    <span className={clsx("status-badge inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 fs-11 font-semibold tracking-wide", ROLE_BADGE_CLASS[normalized] ?? "status-badge-muted")}>
+      <Icon size={12} />
+      {formatRoleLabel(role)}
+    </span>
+  );
+};
+
 type UserFilters = {
   search: string;
   username: string;
@@ -68,34 +107,44 @@ const emptyFilters: UserFilters = {
   active: "true"
 };
 
-const emptyUserPage: PageResponse<UserProfile> = {
-  records: [],
-  page: 0,
-  size: DEFAULT_PAGE_SIZE,
-  totalRecords: 0,
-  totalPages: 0
-};
+const toQuery = (filters: UserFilters): UserFilterParams => ({
+  search: filters.search.trim() || undefined,
+  username: filters.username.trim() || undefined,
+  role: filters.role || undefined,
+  active: filters.active === "" ? undefined : filters.active === "true"
+});
+
+type RoleKey = "ALL" | "OWNER" | "ADMIN" | "USER";
+type RoleCounts = Record<RoleKey, number | null>;
+
+const ROLE_CHIPS: { key: RoleKey; label: string; icon: typeof Users }[] = [
+  { key: "ALL", label: "All Users", icon: Users },
+  { key: "OWNER", label: "Owners", icon: Crown },
+  { key: "ADMIN", label: "Admins", icon: ShieldCheck },
+  { key: "USER", label: "Users", icon: UserRound }
+];
+
+const statusCaption = (active: UserFilters["active"]) => (active === "true" ? "active" : active === "false" ? "inactive" : "total");
 
 export const UserManagementPage = () => {
   const { can, user: activeUser, refreshProfile } = useAuth();
   const isOwner = activeUser?.role === "OWNER" || Boolean(activeUser?.superAdmin);
+  const canView = can("USERS", "VIEW");
   const [roles, setRoles] = useState<Role[]>(["OWNER", "ADMIN", "USER"]);
-  const [exportRows, setExportRows] = useState<UserProfile[]>([]);
+  const [roleCounts, setRoleCounts] = useState<RoleCounts>({ ALL: null, OWNER: null, ADMIN: null, USER: null });
+  const [exporting, setExporting] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   // Add User: photo save ke baad upload hoti hai (user id tab milti hai). Edit: turant upload.
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [activateTarget, setActivateTarget] = useState<UserProfile | null>(null);
+  const [activating, setActivating] = useState(false);
   const [mfaResetTarget, setMfaResetTarget] = useState<UserProfile | null>(null);
   const [mfaResetting, setMfaResetting] = useState(false);
   const [logTarget, setLogTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [activeUserRole, setActiveUserRole] = useState<Role | "ALL" | null>(null);
-  const [modalSearch, setModalSearch] = useState("");
-  const [modalPage, setModalPage] = useState(0);
-  const [modalUsers, setModalUsers] = useState<UserProfile[]>([]);
-  const [modalUserPage, setModalUserPage] = useState<PageResponse<UserProfile>>(emptyUserPage);
   const { clearMessage, setApiError } = useApiMessage();
   const { fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
   const {
@@ -122,61 +171,40 @@ export const UserManagementPage = () => {
     initialFilters: emptyFilters,
     errorMessage: "Unable to load users",
     fetchPage: ({ page, size, filters }) => {
-      if (!can("USERS", "VIEW")) {
+      if (!canView) {
         return Promise.resolve({ records: [], page: 0, size, totalRecords: 0, totalPages: 0 });
       }
-      return getCompanyUsersPage({
-        page,
-        size,
-        search: filters.search.trim() || undefined,
-        username: filters.username.trim() || undefined,
-        role: filters.role || undefined,
-        active: filters.active === "" ? undefined : filters.active === "true"
-      });
+      return getCompanyUsersPage({ page, size, ...toQuery(filters) });
     }
   });
 
-  const loadExportRows = async (filters: UserFilters) => {
-    const response = await getCompanyUsersPage({
-      page: 0,
-      size: 100,
-      search: filters.search.trim() || undefined,
-      username: filters.username.trim() || undefined,
-      role: filters.role || undefined,
-      active: filters.active === "" ? undefined : filters.active === "true"
-    });
-    setExportRows(response.records);
+  // Role chips ke counts: har role ka sahi total (size=1 query, sirf totalRecords chahiye).
+  // Pehle counts sirf pehle 100 rows (export data) se ginte the — bade team me galat.
+  const loadRoleCounts = useCallback(async (filters: UserFilters) => {
+    const base = toQuery({ ...filters, role: "" });
+    const keys: RoleKey[] = ["ALL", "OWNER", "ADMIN", "USER"];
+    const results = await Promise.all(
+      keys.map((key) => getCompanyUsersPage({ ...base, role: key === "ALL" ? undefined : key, page: 0, size: 1 }).then((response) => response.totalRecords))
+    );
+    setRoleCounts({ ALL: results[0], OWNER: results[1], ADMIN: results[2], USER: results[3] });
+  }, []);
+
+  useEffect(() => {
+    if (canView) {
+      void getRoles().then(setRoles).catch((err: any) => setApiError(err, "Unable to load roles"));
+    }
+  }, [canView, setApiError]);
+
+  useEffect(() => {
+    if (canView) {
+      void loadRoleCounts(list.activeFilters).catch(() => undefined);
+    }
+  }, [canView, list.activeFilters, loadRoleCounts]);
+
+  const refreshAll = () => {
+    list.refreshTable();
+    void loadRoleCounts(list.activeFilters).catch(() => undefined);
   };
-
-  useEffect(() => {
-    if (can("USERS", "VIEW")) {
-      void getRoles().then(setRoles).catch((err: any) => setApiError(err, "Unable to load users"));
-    }
-  }, [can, setApiError]);
-
-  useEffect(() => {
-    if (can("USERS", "VIEW")) {
-      void loadExportRows(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load users"));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [can, list.activeFilters, setApiError]);
-
-  useEffect(() => {
-    if (!activeUserRole) {
-      return;
-    }
-    void getCompanyUsersPage({
-      page: modalPage,
-      size: DEFAULT_PAGE_SIZE,
-      search: modalSearch.trim() || undefined,
-      role: activeUserRole === "ALL" ? undefined : activeUserRole
-    })
-      .then((response) => {
-        setModalUserPage(response);
-        setModalUsers(response.records);
-      })
-      .catch((err: any) => setApiError(err, "Unable to load user details"));
-  }, [activeUserRole, modalPage, modalSearch]);
 
   const canSaveUser = Boolean(
     watchedValues.fullName.trim() &&
@@ -184,25 +212,40 @@ export const UserManagementPage = () => {
     watchedValues.email.trim() &&
     watchedValues.mobileNumber.trim() &&
     watchedValues.role &&
-    (editingUser || watchedValues.password.trim().length >= 8)
+    (editingUser || watchedValues.password.trim().length >= PASSWORD_MIN_LENGTH)
   );
 
-  const roleCounts = useMemo(() => {
-    const source = exportRows.length ? exportRows : list.tableData;
-    return {
-      owners: source.filter((item) => item.role === "OWNER").length,
-      admins: source.filter((item) => item.role === "ADMIN").length,
-      users: source.filter((item) => item.role === "USER").length
-    };
-  }, [exportRows, list.tableData]);
+  const editingSelf = Boolean(editingUser && activeUser && editingUser.id === activeUser.id);
+  // Owner role sirf owner de sakta hai (backend bhi yahi rule lagata hai).
+  const roleFormOptions = useMemo(
+    () => roles.filter(Boolean).filter((role) => isOwner || role !== "OWNER" || editingUser?.role === "OWNER").map(toRoleOption),
+    [roles, isOwner, editingUser]
+  );
 
-  const openUserSummary = (role: Role | "ALL") => {
-    setActiveUserRole(role);
-    setModalSearch("");
-    setModalPage(0);
+  // Export: poori filtered list (backend page size 100 tak deta hai, isliye pages me).
+  const exportUsers = async () => {
+    setExporting(true);
+    try {
+      const rows: UserProfile[] = [];
+      let page = 0;
+      let totalPages = 1;
+      while (page < totalPages && page < 50) {
+        const response = await getCompanyUsersPage({ ...toQuery(list.activeFilters), page, size: 100 });
+        rows.push(...response.records);
+        totalPages = response.totalPages;
+        page += 1;
+      }
+      if (!rows.length) {
+        notificationService.showError("No users to export.");
+        return;
+      }
+      exportToExcel("users.xlsx", rows, userExportColumns);
+    } catch (err: any) {
+      setApiError(err, "Unable to export users");
+    } finally {
+      setExporting(false);
+    }
   };
-
-  const exportUsers = (fileName: string, rows: UserProfile[]) => exportToExcel(fileName, rows, userExportColumns);
 
   const openCreateModal = () => {
     clearFeedback();
@@ -225,10 +268,10 @@ export const UserManagementPage = () => {
     setEditingUser(target);
     setPendingPhoto(null);
     reset({
-      fullName: target.fullName,
-      username: target.username,
-      mobileNumber: target.mobileNumber,
-      email: target.email,
+      fullName: target.fullName ?? "",
+      username: target.username ?? "",
+      mobileNumber: target.mobileNumber ?? "",
+      email: target.email ?? "",
       password: "",
       role: target.role,
       active: target.active ? "true" : "false"
@@ -242,20 +285,24 @@ export const UserManagementPage = () => {
     const payload: CompanyUserRequest = {
       fullName: values.fullName.trim(),
       username: values.username.trim(),
-      mobileNumber: values.mobileNumber.trim(),
+      mobileNumber: normalizeMobileNumber(values.mobileNumber),
       email: values.email.trim(),
       role: values.role,
       active: values.active === "true"
     };
 
+    // Password me koi escaping/sanitization nahi (< > & sab allowed) — sirf trim, jaisa login karta hai.
     if (values.password.trim()) {
       payload.password = values.password.trim();
     }
 
     try {
       if (editingUser) {
-        await updateCompanyUser(editingUser.id, payload);
+        const updated = await updateCompanyUser(editingUser.id, payload);
         notificationService.showSuccess(CommonSuccessMessageUtil.updated("User"));
+        if (activeUser?.id === updated.id) {
+          await refreshProfile();
+        }
       } else {
         const created = await createCompanyUser({ ...payload, password: values.password.trim() });
         notificationService.showSuccess(CommonSuccessMessageUtil.created("User"));
@@ -270,8 +317,7 @@ export const UserManagementPage = () => {
       }
       setModalOpen(false);
       clearMessage();
-      list.refreshTable();
-      await loadExportRows(list.activeFilters);
+      refreshAll();
     } catch (err: any) {
       applyApiError(err, editingUser ? "Unable to update user" : "Unable to create user");
     }
@@ -311,14 +357,39 @@ export const UserManagementPage = () => {
     try {
       setDeleting(true);
       await deactivateCompanyUser(deleteTarget.id);
-      list.refreshTable();
-      await loadExportRows(list.activeFilters);
       setDeleteTarget(null);
-      notificationService.showSuccess(CommonSuccessMessageUtil.deleted("User"));
+      refreshAll();
+      notificationService.showSuccess("User disabled successfully");
     } catch (err: any) {
       setApiError(err, CommonErrorMessageUtil.deleteFailed);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Inactive user ko wapas active (pehle sirf Edit modal khol ke status badalna padta tha).
+  const activateUser = async () => {
+    if (!activateTarget) {
+      return;
+    }
+    clearMessage();
+    try {
+      setActivating(true);
+      await updateCompanyUser(activateTarget.id, {
+        fullName: activateTarget.fullName,
+        username: activateTarget.username,
+        mobileNumber: activateTarget.mobileNumber,
+        email: activateTarget.email,
+        role: activateTarget.role,
+        active: true
+      });
+      setActivateTarget(null);
+      refreshAll();
+      notificationService.showSuccess("User activated successfully");
+    } catch (err: any) {
+      setApiError(err, "Unable to activate user");
+    } finally {
+      setActivating(false);
     }
   };
 
@@ -347,16 +418,21 @@ export const UserManagementPage = () => {
       key: "name",
       header: "Name",
       render: (item: UserProfile) => (
-        <span className="flex items-center gap-2.5">
+        <span className="flex min-w-[170px] items-center gap-2.5">
           <UserAvatar name={item.fullName} photoUrl={item.photoUrl} size="sm" />
-          <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="max-w-[200px] truncate font-semibold text-slate-950" title={item.fullName}>{item.fullName || "--"}</span>
+            {activeUser?.id === item.id ? (
+              <span className="shrink-0 rounded-full bg-[color:color-mix(in_srgb,var(--theme-color)_12%,white)] px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-[var(--theme-color)]">You</span>
+            ) : null}
+          </span>
         </span>
       )
     },
     {
       key: "username",
       header: "Username",
-      render: (item: UserProfile) => <span className="whitespace-nowrap font-semibold text-slate-700">{item.username || "--"}</span>
+      render: (item: UserProfile) => <span className="whitespace-nowrap font-medium text-slate-700">{item.username || "--"}</span>
     },
     {
       key: "mobileNumber",
@@ -366,24 +442,28 @@ export const UserManagementPage = () => {
     {
       key: "email",
       header: "Email Address",
-      render: (item: UserProfile) => <span className="break-all text-slate-700">{item.email || "--"}</span>
+      render: (item: UserProfile) => <span className="block max-w-[240px] truncate text-slate-700" title={item.email}>{item.email || "--"}</span>
     },
-    { key: "role", header: "Role", render: (item: UserProfile) => <StatusBadge label={item.role} /> },
+    { key: "role", header: "Role", render: (item: UserProfile) => <RoleBadge role={item.role} /> },
     { key: "status", header: "Status", render: (item: UserProfile) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
-    { key: "createdAt", header: "Created Date", render: (item: UserProfile) => <span className="whitespace-nowrap text-slate-700">{formatDateTime(item.createdAt)}</span> }
-  ], []);
+    { key: "createdAt", header: "Created Date", render: (item: UserProfile) => <span className="whitespace-nowrap text-xs text-slate-600">{formatDateTime(item.createdAt)}</span> }
+  ], [activeUser?.id]);
   const visibleUserColumns = useMemo(() => applyVisibleColumns(userColumns, visibleColumns), [userColumns, visibleColumns]);
 
-  if (!can("USERS", "VIEW")) {
+  if (!canView) {
     return (
       <div className="space-y-4 pb-6">
         <Header title="Users" subtitle="Manage company team access and permission assignments." />
         <GlassCard className="p-6 md:p-7">
-          <p className="text-sm text-slate-300">You do not have permission to manage users.</p>
+          <p className="text-sm text-slate-500">You do not have permission to manage users.</p>
         </GlassCard>
       </div>
     );
   }
+
+  const activeRole: RoleKey = list.activeFilters.role || "ALL";
+  const caption = statusCaption(list.activeFilters.active);
+  const canEditUsers = isOwner && can("USERS", "EDIT");
 
   return (
     <CommonListPage<UserProfile, UserFilters>
@@ -391,34 +471,44 @@ export const UserManagementPage = () => {
       pageSubtitle="Create, update, and deactivate company users."
       list={list}
       liveSearch
-      searchPlaceholder="Search User"
-      activeFilterCount={(filters) => (filters.username ? 1 : 0) + (filters.role ? 1 : 0) + (filters.active !== "true" ? 1 : 0)}
+      searchPlaceholder="Search name, username, mobile or email"
+      activeFilterCount={(filters) => (filters.username ? 1 : 0) + (filters.active !== "true" ? 1 : 0)}
       statCards={
-        <div className="grid gap-4 md:grid-cols-4">
-          <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("ALL")}>
-            <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
-              <p className="text-sm text-slate-400">Total Users</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{list.paginationInfo.totalRecords}</p>
-            </GlassCard>
-          </button>
-          <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("OWNER")}>
-            <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
-              <p className="text-sm text-slate-400">Owners</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{roleCounts.owners}</p>
-            </GlassCard>
-          </button>
-          <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("ADMIN")}>
-            <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
-              <p className="text-sm text-slate-400">Admins</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{roleCounts.admins}</p>
-            </GlassCard>
-          </button>
-          <button type="button" className="block h-full w-full text-left" onClick={() => openUserSummary("USER")}>
-            <GlassCard className="h-full p-5 transition hover:-translate-y-0.5">
-              <p className="text-sm text-slate-400">Users</p>
-              <p className="mt-3 fs-24 font-extrabold text-white">{roleCounts.users}</p>
-            </GlassCard>
-          </button>
+        // Compact role chips (ek line): click = us role ka filter. Bade stat cards + alag modal hata diye.
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+          {ROLE_CHIPS.map(({ key, label, icon: Icon }) => {
+            const selected = activeRole === key;
+            const count = roleCounts[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => list.applyFilterNow({ role: key === "ALL" ? "" : key })}
+                className={clsx(
+                  "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition",
+                  selected
+                    ? "border-[var(--theme-color)] bg-[color:color-mix(in_srgb,var(--theme-color)_6%,white)] shadow-[0_8px_24px_-14px_color-mix(in_srgb,var(--theme-color)_50%,transparent)]"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
+                )}
+              >
+                <span
+                  className={clsx(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                    selected ? "bg-[var(--theme-color)] text-[var(--theme-contrast)]" : "bg-slate-100 text-slate-600"
+                  )}
+                >
+                  <Icon size={17} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-slate-900">{label}</span>
+                  <span className="block text-[11px] font-semibold text-slate-500">
+                    {count === null ? "…" : `${count} ${caption}`}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       }
       filterFields={
@@ -429,22 +519,15 @@ export const UserManagementPage = () => {
             value={list.formFilters.username}
             onChange={(event) => list.updateFormFilters({ username: event.target.value })}
           />
+          {/* Role filter upar ke role chips se hota hai — yahan dobara dropdown nahi. */}
           <Select
-            label="User Role"
-            value={list.formFilters.role}
-            options={[
-              { label: "All Roles", value: "" },
-              ...roles.filter(Boolean).map(toRoleOption)
-            ]}
-            onChange={(event) => list.updateFormFilters({ role: event.target.value as Role | "" })}
-          />
-          <Select
-            label="Status Filter"
+            label="Record Status"
+            placeholder={null}
             value={list.formFilters.active}
             options={[
-              { label: "All", value: "" },
               { label: "Active", value: "true" },
-              { label: "Inactive", value: "false" }
+              { label: "Inactive", value: "false" },
+              { label: "All", value: "" }
             ]}
             onChange={(event) => list.updateFormFilters({ active: event.target.value as UserFilters["active"] })}
           />
@@ -452,13 +535,13 @@ export const UserManagementPage = () => {
       }
       toolbarButtons={
         <>
-          {can("USERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length && !list.tableData.length} onClick={() => exportUsers("users.xlsx", exportRows.length ? exportRows : list.tableData)}>
+          {can("USERS", "EXPORT") ? <Button type="button" variant="secondary" disabled={exporting || !list.paginationInfo.totalRecords} onClick={() => void exportUsers()}>
             <Download size={16} />
-            Export Excel
+            {exporting ? "Exporting…" : "Export Excel"}
           </Button> : null}
           {can("USERS", "ADD") ? <Button type="button" onClick={openCreateModal}>
             <Plus size={16} />
-            Add user
+            Add User
           </Button> : null}
         </>
       }
@@ -469,94 +552,112 @@ export const UserManagementPage = () => {
           key: "actions",
           header: "Actions",
           className: "text-right",
-          render: (item: UserProfile) => (
-            <ActionDropdown
-              actions={[
-                {
-                  label: "Edit",
-                  icon: <Edit3 size={15} />,
-                  hidden: !can("USERS", "EDIT"),
-                  onClick: () => openEditModal(item)
-                },
-                {
-                  label: "Show Logs",
-                  icon: <History size={15} />,
-                  hidden: !can("USERS", "LOGS"),
-                  onClick: () => setLogTarget(item)
-                },
-                {
-                  label: "Reset MFA",
-                  icon: <KeyRound size={15} />,
-                  hidden: !isOwner || !can("USERS", "EDIT"),
-                  onClick: () => setMfaResetTarget(item)
-                },
-                {
-                  label: "Disable",
-                  icon: <UserX size={15} />,
-                  danger: true,
-                  disabled: !item.active,
-                  hidden: !can("USERS", "DELETE"),
-                  onClick: () => setDeleteTarget(item)
-                }
-              ]}
-            />
-          )
+          render: (item: UserProfile) => {
+            const self = item.id === activeUser?.id;
+            return (
+              <ActionDropdown
+                actions={[
+                  {
+                    label: "Edit",
+                    icon: <Edit3 size={15} />,
+                    // Backend user edit/disable sirf owner ko deta hai — baaki ko button dikha ke 403 mat dikhao.
+                    hidden: !canEditUsers,
+                    onClick: () => openEditModal(item)
+                  },
+                  {
+                    label: "Activate",
+                    icon: <UserCheck size={15} />,
+                    hidden: !canEditUsers || item.active,
+                    onClick: () => setActivateTarget(item)
+                  },
+                  {
+                    label: "Show Logs",
+                    icon: <History size={15} />,
+                    hidden: !can("USERS", "LOGS"),
+                    onClick: () => setLogTarget(item)
+                  },
+                  {
+                    label: "Reset MFA",
+                    icon: <KeyRound size={15} />,
+                    hidden: !canEditUsers,
+                    onClick: () => setMfaResetTarget(item)
+                  },
+                  {
+                    // Inactive record par Disable/Delete nahi (baaki pages jaisa pattern).
+                    label: "Disable",
+                    icon: <UserX size={15} />,
+                    danger: true,
+                    hidden: !isOwner || !can("USERS", "DELETE") || self || !item.active,
+                    onClick: () => setDeleteTarget(item)
+                  }
+                ]}
+              />
+            );
+          }
         }
       ]}
-      emptyMessage="No company users found."
+      emptyMessage={list.loading ? "Loading users..." : "No users found for these filters."}
       fullHeight
       modals={
         <>
-          <Modal open={modalOpen} title={editingUser ? "Edit User" : "Add User"} onClose={() => setModalOpen(false)}>
+          <Modal open={modalOpen} eyebrow="Team Member" title={editingUser ? "Edit User" : "Add User"} onClose={() => setModalOpen(false)} maxWidthClass="max-w-3xl">
             <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit(onSubmit, onInvalid)}>
-              <div className="md:col-span-2">
-                <PhotoUploadField
-                  name={watchedValues.fullName || editingUser?.fullName}
-                  photoUrl={editingUser?.photoUrl}
-                  pendingFile={pendingPhoto}
-                  busy={photoBusy}
-                  hint={editingUser ? "JPG, PNG or WEBP, up to 2 MB. Saved immediately." : "JPG, PNG or WEBP, up to 2 MB. Uploaded when you create the user."}
-                  onSelect={(file) => void changeEditingUserPhoto(file)}
-                  onRemove={() => void changeEditingUserPhoto(null)}
-                />
-              </div>
+              {/* Photo API owner-only hai: non-owner (USERS:ADD wala admin) ko field dikha ke upload fail mat karao. */}
+              {isOwner ? (
+                <div className="md:col-span-2">
+                  <PhotoUploadField
+                    name={watchedValues.fullName || editingUser?.fullName}
+                    photoUrl={editingUser?.photoUrl}
+                    pendingFile={pendingPhoto}
+                    busy={photoBusy}
+                    hint={editingUser ? "JPG, PNG or WEBP, up to 2 MB. Saved immediately." : "JPG, PNG or WEBP, up to 2 MB. Uploaded when you create the user."}
+                    onSelect={(file) => void changeEditingUserPhoto(file)}
+                    onRemove={() => void changeEditingUserPhoto(null)}
+                  />
+                </div>
+              ) : null}
               <Input
                 label="Full Name"
                 requiredMark
+                maxLength={100}
                 error={fieldErrors.fullName ?? errors.fullName?.message}
-                {...register("fullName", { required: "Full name is required" })}
+                {...register("fullName", { required: "Full name is required", validate: (value) => Boolean(value.trim()) || "Full name is required" })}
               />
               <Input
                 label="Username"
                 requiredMark
                 autoComplete="off"
+                maxLength={50}
+                hint="Used to sign in. No spaces."
                 error={fieldErrors.username ?? errors.username?.message}
-                {...register("username", { required: "Username is required" })}
+                {...register("username", { required: "Username is required", validate: (value) => USERNAME_PATTERN.test(value.trim()) || USERNAME_VALIDATION_MESSAGE })}
               />
               <Input
                 label="Email Address"
                 requiredMark
                 type="email"
+                maxLength={150}
                 error={fieldErrors.email ?? errors.email?.message}
-                {...register("email", { required: "Email address is required" })}
+                {...register("email", { required: "Email address is required", validate: (value) => isValidEmail(value) || EMAIL_VALIDATION_MESSAGE })}
               />
               <Input
                 label="Mobile Number"
                 requiredMark
                 type="tel"
+                inputMode="numeric"
+                maxLength={15}
+                placeholder="10-digit mobile number"
                 error={fieldErrors.mobileNumber ?? errors.mobileNumber?.message}
-                {...register("mobileNumber", { required: "Mobile number is required" })}
+                {...register("mobileNumber", { required: "Mobile number is required", validate: (value) => isValidMobileNumber(value) || MOBILE_VALIDATION_MESSAGE })}
               />
               <PasswordInput
                 label={editingUser ? "New Password" : "Password"}
                 requiredMark={!editingUser}
-                autoComplete={editingUser ? "off" : "new-password"}
-                hint={editingUser ? "Leave blank to keep the current password." : undefined}
+                autoComplete="new-password"
+                maxLength={PASSWORD_MAX_BYTES}
+                hint={editingUser ? "Leave blank to keep the current password. Changing it signs the user out." : "8-72 characters."}
                 error={fieldErrors.password ?? errors.password?.message}
-                {...register("password", {
-                  required: editingUser ? false : "Password is required",
-                  minLength: { value: 8, message: "Password must be at least 8 characters" }
-                })}
+                {...register("password", { validate: (value) => validatePassword(value, !editingUser) })}
               />
               <Controller
                 name="role"
@@ -567,8 +668,10 @@ export const UserManagementPage = () => {
                     label="Role"
                     requiredMark
                     placeholder={null}
-                    error={fieldErrors.role}
-                    options={roles.filter(Boolean).map(toRoleOption)}
+                    error={fieldErrors.role ?? errors.role?.message}
+                    options={roleFormOptions}
+                    disabled={editingSelf}
+                    hint={editingSelf ? "You cannot change your own role." : undefined}
                     name={field.name}
                     value={field.value}
                     onChange={(event) => field.onChange(event.target.value)}
@@ -584,6 +687,8 @@ export const UserManagementPage = () => {
                   <Select
                     label="Status"
                     placeholder={null}
+                    disabled={editingSelf}
+                    hint={editingSelf ? "You cannot deactivate your own account." : undefined}
                     error={fieldErrors.active}
                     options={[
                       { label: "Active", value: "true" },
@@ -598,73 +703,38 @@ export const UserManagementPage = () => {
                 )}
               />
 
-              <div className="flex flex-col gap-3 pt-2 sm:flex-row md:col-span-2">
-                <Button disabled={isSubmitting || !canSaveUser} type="submit">
-                  {isSubmitting ? "Saving..." : editingUser ? "Update User" : "Create User"}
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>
-                  Cancel
-                </Button>
+              <div className="md:col-span-2">
+                <ModalFormActions submit editing={Boolean(editingUser)} saving={isSubmitting} disabled={!canSaveUser} entityLabel="User" onCancel={() => setModalOpen(false)} />
               </div>
             </form>
           </Modal>
-          <Modal open={Boolean(activeUserRole)} title={userSummaryTitle(activeUserRole)} onClose={() => setActiveUserRole(null)}>
-            <div className="space-y-5">
-              <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                <span className="font-semibold text-slate-950">Role Filter:</span>
-                <span className="min-w-0 flex-1 text-slate-600">{activeUserRole === "ALL" ? "All Users" : toRoleOption(activeUserRole as Role).label}</span>
-                <span className="font-semibold text-slate-950">Records: {modalUserPage.totalRecords}</span>
-              </div>
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <Input
-                  label="Search Modal Users"
-                  placeholder="Search by name, username, mobile number or email"
-                  value={modalSearch}
-                  onChange={(event) => {
-                    setModalPage(0);
-                    setModalSearch(event.target.value);
-                  }}
-                />
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button type="button" variant="secondary" disabled={!modalUsers.length} onClick={() => exportUsers(`${activeUserRole ?? "users"}-users.xlsx`, modalUsers)}>
-                  <Download size={17} />
-                  Export Excel
-                </Button>
-                <div className="flex justify-end"><Pagination page={modalUserPage.page} size={modalUserPage.size} totalRecords={modalUserPage.totalRecords} totalPages={modalUserPage.totalPages} onPageChange={setModalPage} layout="inline" /></div>
-              </div>
-              </div>
-              <Table
-                data={modalUsers}
-                emptyText="No users found for this role."
-                columns={[
-                  {
-                    key: "name",
-                    header: "Name",
-                    render: (item) => <span className="font-semibold text-slate-950">{item.fullName || "--"}</span>
-                  },
-                  {
-                    key: "username",
-                    header: "Username",
-                    render: (item) => <span className="whitespace-nowrap font-semibold text-slate-700">{item.username || "--"}</span>
-                  },
-                  {
-                    key: "mobileNumber",
-                    header: "Mobile Number",
-                    render: (item) => <span className="whitespace-nowrap text-slate-700">{item.mobileNumber || "--"}</span>
-                  },
-                  {
-                    key: "email",
-                    header: "Email Address",
-                    render: (item) => <span className="break-all text-slate-700">{item.email || "--"}</span>
-                  },
-                  { key: "role", header: "Role", render: (item) => <StatusBadge label={item.role} /> },
-                  { key: "status", header: "Status", render: (item) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> }
-                ]}
-              />
+          <AuditLogModal open={Boolean(logTarget)} moduleName="User" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.fullName} Logs` : "User Logs"} onClose={() => setLogTarget(null)} />
+          <CommonDeleteModal
+            open={Boolean(deleteTarget)}
+            title="Disable User"
+            confirmLabel="Disable"
+            description={deleteTarget ? `Disable "${deleteTarget.fullName}" (${deleteTarget.username})? They will be signed out and cannot log in until an owner activates them again.` : undefined}
+            loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void deactivateUser()} />
+          <Modal
+            open={Boolean(activateTarget)}
+            title="Activate User"
+            eyebrow="Team Member"
+            maxWidthClass="max-w-md"
+            onClose={() => setActivateTarget(null)}
+          >
+            <p className="text-sm leading-relaxed text-slate-600">
+              Activate <strong>{activateTarget?.fullName}</strong> ({activateTarget?.username})? They will be able to sign in again with their existing password.
+            </p>
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button type="button" variant="secondary" disabled={activating} onClick={() => setActivateTarget(null)}>
+                Cancel
+              </Button>
+              <Button type="button" disabled={activating} onClick={() => void activateUser()}>
+                <UserCheck size={16} />
+                {activating ? "Activating…" : "Activate"}
+              </Button>
             </div>
           </Modal>
-          <AuditLogModal open={Boolean(logTarget)} moduleName="User" entityId={logTarget?.id ?? null} title={logTarget ? `${logTarget.fullName} Logs` : "User Logs"} onClose={() => setLogTarget(null)} />
-          <CommonDeleteModal open={Boolean(deleteTarget)} loading={deleting} onCancel={() => setDeleteTarget(null)} onConfirm={() => void deactivateUser()} />
           <Modal
             open={Boolean(mfaResetTarget)}
             title="Reset MFA"
@@ -697,12 +767,6 @@ const userExportColumns = [
   { key: "mobileNumber", header: "Mobile Number" },
   { key: "email", header: "Email Address" },
   { key: "role", header: "Role", value: (row: UserProfile) => formatRoleLabel(row.role) },
-  { key: "active", header: "Status", value: (row: UserProfile) => row.active ? "Active" : "Inactive" }
+  { key: "active", header: "Status", value: (row: UserProfile) => row.active ? "Active" : "Inactive" },
+  { key: "createdAt", header: "Created Date", value: (row: UserProfile) => formatDateTime(row.createdAt) }
 ];
-
-const userSummaryTitle = (role: Role | "ALL" | null) => {
-  if (role === "OWNER") return "Owner Users";
-  if (role === "ADMIN") return "Admin Users";
-  if (role === "USER") return "Users";
-  return "All Users";
-};

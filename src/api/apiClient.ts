@@ -234,9 +234,15 @@ const handleResponseError = async (error: any) => {
     flushPendingRequests(null, nextAccessToken);
     originalRequest.headers.Authorization = `Bearer ${nextAccessToken}`;
     return apiClient(originalRequest);
-  } catch (refreshError) {
+  } catch (refreshError: any) {
     flushPendingRequests(refreshError);
-    clearSessionAndRedirect();
+    // Logout sirf tab jab refresh token sach me reject hua (401/403). Network
+    // error / 5xx (deploy, server restart) par session rakho — pehle in par
+    // bhi user logout ho jata tha jabki refresh token valid tha.
+    const refreshStatus = refreshError?.response?.status;
+    if (refreshStatus === 400 || refreshStatus === 401 || refreshStatus === 403 || refreshError === error) {
+      clearSessionAndRedirect();
+    }
     return Promise.reject(refreshError);
   } finally {
     isRefreshing = false;

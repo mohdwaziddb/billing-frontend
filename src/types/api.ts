@@ -699,49 +699,48 @@ export type TaxMasterRequest = {
   active: boolean;
 };
 
-export type ProductDataPortRow = {
+// DataPort: saare modules ek hi shape me (backend DataPortModule ka description).
+export type DataPortFieldType = "TEXT" | "NUMBER" | "DECIMAL" | "DATE" | "BOOLEAN" | "CHOICE";
+
+export type DataPortField = {
+  key: string;
+  header: string;
+  required: boolean;
+  type: DataPortFieldType;
+  options: string[];
+  hint: string | null;
+};
+
+export type DataPortModuleMeta = {
+  key: string;
+  menuCode: string;
+  title: string;
+  description: string;
+  order: number;
+  notes: string[];
+  groupField: string | null;
+  canImport: boolean;
+  fields: DataPortField[];
+};
+
+export type DataPortRow = {
   rowNumber: number;
-  productName: string;
-  productCategory: string;
-  productSubCategory: string;
-  sku: string;
-  active: string;
-  brand: string | null;
-  hsnCode: string | null;
-  minimumStockQty: string;
-  taxPercent: string;
-  productCategoryId: number | null;
-  productSubCategoryId: number | null;
-  activeValue: boolean | null;
+  values: Record<string, string>;
   valid: boolean;
   validationErrors: Record<string, string>;
 };
 
-export type ProductDataPortReferenceData = {
-  categories: Array<{
-    id: number;
-    name: string;
-  }>;
-  subCategories: Array<{
-    id: number;
-    categoryId: number;
-    categoryName: string;
-    name: string;
-  }>;
-  existingSkus: string[];
-};
-
-export type DataPortPreviewResponse<T, R = unknown> = {
-  rows: T[];
+export type DataPortPreviewResponse = {
+  rows: DataPortRow[];
   totalRows: number;
   validRows: number;
   invalidRows: number;
-  referenceData: R;
 };
 
 export type ImportResult = {
   importedRecords: number;
   failedRecords: number;
+  failures: Array<{ rowNumber: number; message: string }>;
 };
 
 export type InvoiceItem = {
@@ -823,6 +822,10 @@ export type InvoiceTemplateMetadata = {
   supportedPaperSizes: string[];
   defaultColors: Record<string, string>;
   defaultTemplate: boolean;
+  /** Gallery order (backend template.json). */
+  sortOrder?: number;
+  /** Short gallery tag, e.g. "GST", "Retail", "Service". */
+  category?: string | null;
 };
 
 export type CompanyInvoiceSettings = {
@@ -1075,6 +1078,7 @@ export type Expense = {
   expenseDate: string;
   description: string | null;
   attachmentUrl: string | null;
+  deleted?: boolean;
   createdAt: string;
   updatedAt: string;
   createdBy: string | null;

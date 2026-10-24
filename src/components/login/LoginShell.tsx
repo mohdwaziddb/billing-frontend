@@ -85,7 +85,8 @@ export const LoginShell = ({ company = null, brandingReady = true, footerNote, c
         style={{ background: "radial-gradient(circle, #e6edfb 0%, transparent 70%)" }}
       />
 
-      <div className="relative z-10 flex w-full flex-1 items-center justify-center px-3 py-4 sm:px-6 sm:py-8 lg:py-6">
+      {/* lg:py-4: 1366x768 laptop par card + footer bina scroll ke ek screen me. */}
+      <div className="relative z-10 flex w-full flex-1 items-center justify-center px-3 py-4 sm:px-6 sm:py-8 lg:py-4">
         <div className="w-full max-w-[1180px] rounded-[26px] bg-white p-2.5 shadow-[0_40px_100px_rgba(15,23,42,0.10)] ring-1 ring-slate-900/5 sm:p-3">
           <div className="grid lg:grid-cols-2">
             <AnalyticsShowcase />

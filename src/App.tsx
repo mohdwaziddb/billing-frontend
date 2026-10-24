@@ -18,7 +18,7 @@ import {
 import { CommonPageLoader } from "./components/CommonPageLoader";
 import { PlatformAdminRoute } from "./components/PlatformAdminRoute";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
-import { PermissionRoute } from "./components/PermissionRoute";
+import { PermissionRoute, RouteMenuPermission } from "./components/PermissionRoute";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { AboutCompanyPage } from "./pages/AboutCompanyPage";
@@ -46,7 +46,8 @@ import { ProfitLossReportPage } from "./pages/ProfitLossReportPage";
 import { ProductFormPage } from "./pages/ProductFormPage";
 import { ProductCategoryPage } from "./pages/ProductCategoryPage";
 import { ProductSubCategoryPage } from "./pages/ProductSubCategoryPage";
-import { ProductDataPortPage } from "./pages/ProductDataPortPage";
+import { DataPortHubPage } from "./pages/DataPortHubPage";
+import { DataPortPage } from "./pages/DataPortPage";
 import { ProductListPage } from "./pages/ProductListPage";
 import { NoMenuPage } from "./pages/NoMenuPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -198,7 +199,8 @@ function App() {
           <Route path="/products/:productId/edit" element={<PermissionRoute menuCode="PRODUCTS" actionCode="EDIT"><ProductFormPage /></PermissionRoute>} />
           <Route path="/purchases" element={<PermissionRoute menuCode="PURCHASES"><PurchaseListPage /></PermissionRoute>} />
           <Route path="/inventory/stock-ledger" element={<PermissionRoute menuCode="STOCK_LEDGER"><StockLedgerPage /></PermissionRoute>} />
-          <Route path="/data-port/products" element={<PermissionRoute menuCode="PRODUCT_DATAPORT"><ProductDataPortPage /></PermissionRoute>} />
+          <Route path="/data-port" element={<PermissionRoute menuCode="DATA_PORT"><DataPortHubPage /></PermissionRoute>} />
+          <Route path="/data-port/:moduleKey" element={<RouteMenuPermission fallbackMenuCode="DATA_PORT"><DataPortPage /></RouteMenuPermission>} />
           <Route path="/setup/product-categories" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/product-category" element={<PermissionRoute menuCode="PRODUCT_CATEGORY"><ProductCategoryPage /></PermissionRoute>} />
           <Route path="/setup/product-sub-categories" element={<PermissionRoute menuCode="PRODUCT_SUB_CATEGORIES"><ProductSubCategoryPage /></PermissionRoute>} />

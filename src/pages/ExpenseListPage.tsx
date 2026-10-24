@@ -7,6 +7,7 @@ import { getInvoices } from "../api/invoices";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
+import { DataPortLink } from "../components/DataPortLink";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDashboardDetailModal, type DashboardDetailModalColumn } from "../components/CommonDashboardDetailModal";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
@@ -17,6 +18,7 @@ import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE } from "../components/Pagination";
 import { Select } from "../components/Select";
 import { StatCard } from "../components/StatCard";
+import { StatusBadge } from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import { useAddEditForm } from "../hooks/useAddEditForm";
 import { useApiMessage } from "../hooks/useApiFeedback";
@@ -49,9 +51,11 @@ type ExpenseFilters = {
   customerId: string;
   invoiceId: string;
   createdByRole: string;
+  // Invoices jaisa: Delete soft hai, deleted kharche "Deleted" filter me dikhte hain.
+  recordStatus: "ACTIVE" | "DELETED" | "ALL";
 };
 
-const emptyExpenseFilters: ExpenseFilters = { search: "", expenseType: "", categoryId: "", datePreset: "", startDate: "", endDate: "", customerId: "", invoiceId: "", createdByRole: "" };
+const emptyExpenseFilters: ExpenseFilters = { search: "", expenseType: "", categoryId: "", datePreset: "", startDate: "", endDate: "", customerId: "", invoiceId: "", createdByRole: "", recordStatus: "ACTIVE" };
 type ExpenseDrilldownKey = "total" | "thisMonth" | "today" | "category";
 
 type ExpenseFormState = {
@@ -110,7 +114,8 @@ const paramsFor = (filters: ExpenseFilters): ExpenseFilterParams => {
     invoiceId: filters.invoiceId || undefined,
     startDate: dateRange.startDate || undefined,
     endDate: dateRange.endDate || undefined,
-    createdByRole: filters.createdByRole || undefined
+    createdByRole: filters.createdByRole || undefined,
+    recordStatus: filters.recordStatus
   };
 };
 
@@ -270,7 +275,17 @@ export const ExpenseListPage = () => {
 
   const expenseColumns = useMemo(() => [
     { key: "type", header: "Expense Type", render: (item: Expense) => typeLabel(item.expenseType) },
-    { key: "category", header: "Category", render: (item: Expense) => item.categoryName },
+    {
+      key: "category",
+      header: "Category",
+      // "Deleted / All" filter me deleted kharcha pehchan me aaye.
+      render: (item: Expense) => (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <span className={item.deleted ? "text-slate-400 line-through" : undefined}>{item.categoryName}</span>
+          {item.deleted ? <StatusBadge label="DELETED" /> : null}
+        </span>
+      )
+    },
     { key: "customer", header: "Customer", render: (item: Expense) => item.customerName ?? "--" },
     { key: "invoice", header: "Invoice", render: (item: Expense) => item.invoiceNo ?? "--" },
     { key: "amount", header: "Amount", className: "text-right", render: (item: Expense) => <span className="block text-right font-semibold text-slate-950">{formatCurrency(item.amount)}</span> },
@@ -283,9 +298,9 @@ export const ExpenseListPage = () => {
     header: "Actions",
     className: "text-right",
     render: (item: Expense) => <ActionDropdown actions={[
-      { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("EXPENSES", "EDIT"), onClick: () => form.openEditForm(item) },
+      { label: "Edit", icon: <Edit3 size={15} />, hidden: !can("EXPENSES", "EDIT") || item.deleted, onClick: () => form.openEditForm(item) },
       { label: "Show Logs", icon: <History size={15} />, hidden: !can("EXPENSES", "LOGS"), onClick: () => form.openLogs(item) },
-      { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("EXPENSES", "DELETE"), onClick: () => form.askDelete(item) }
+      { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("EXPENSES", "DELETE") || item.deleted, onClick: () => form.askDelete(item) }
     ]} />
   }), [can, invoices]);
   const visibleExpenseColumns = useMemo(() => applyVisibleColumns(expenseColumns, visibleColumns), [expenseColumns, visibleColumns]);
@@ -387,11 +402,17 @@ export const ExpenseListPage = () => {
           <Select label="Customer" value={list.formFilters.customerId} options={[{ label: "All", value: "" }, ...customers.map((item) => ({ label: item.name, value: String(item.id) }))]} onChange={(event) => list.updateFormFilters({ customerId: event.target.value })} />
           <Select label="Invoice" value={list.formFilters.invoiceId} options={[{ label: "All", value: "" }, ...invoices.map((item) => ({ label: item.invoiceNo, value: String(item.id) }))]} onChange={(event) => list.updateFormFilters({ invoiceId: event.target.value })} />
           <Select label="Created By" value={list.formFilters.createdByRole} options={[{ label: "All", value: "" }, { label: "Owner", value: "OWNER" }, { label: "Admin", value: "ADMIN" }, { label: "User", value: "USER" }]} onChange={(event) => list.updateFormFilters({ createdByRole: event.target.value })} />
+          <Select label="Record Status" placeholder={null} value={list.formFilters.recordStatus} options={[
+            { label: "Active", value: "ACTIVE" },
+            { label: "Deleted", value: "DELETED" },
+            { label: "All", value: "ALL" }
+          ]} onChange={(event) => list.updateFormFilters({ recordStatus: event.target.value as ExpenseFilters["recordStatus"] })} />
         </>
       }
       toolbarButtons={
         <>
           {can("EXPENSES", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportToExcel("expenses.xlsx", exportRows, visibleExpenseExportColumns)}><Download size={16} />Export</Button> : null}
+          <DataPortLink menuCode="EXPENSE_DATAPORT" moduleKey="expenses" />
           {can("EXPENSES", "ADD") ? <Button type="button" onClick={() => form.openAddForm(getEmptyForm())}><Plus size={16} />Add Expense</Button> : null}
         </>
       }
@@ -486,6 +507,8 @@ const summarizeExpenseFilters = (
   if (filters.customerId) summary.push(`Customer: ${customers.find((item) => String(item.id) === filters.customerId)?.name ?? filters.customerId}`);
   if (filters.invoiceId) summary.push(`Invoice: ${invoices.find((item) => String(item.id) === filters.invoiceId)?.invoiceNo ?? filters.invoiceId}`);
   if (filters.createdByRole) summary.push(`Created By: ${filters.createdByRole}`);
+  if (filters.recordStatus === "DELETED") summary.push("Deleted");
+  if (filters.recordStatus === "ALL") summary.push("Active + Deleted");
   return summary;
 };
 

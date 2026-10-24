@@ -13,6 +13,8 @@ type ForgotPasswordModalProps = {
   onClose: () => void;
   tone?: "theme" | "brand";
   identifierLocked?: boolean;
+  // Logged-in reset ke baad backend saare sessions band kar deta hai — caller logout kare.
+  onPasswordReset?: () => void;
 };
 
 const brandFieldBaseClass =
@@ -108,7 +110,8 @@ export const ForgotPasswordModal = ({
   initialUsername = "",
   onClose,
   tone = "theme",
-  identifierLocked = false
+  identifierLocked = false,
+  onPasswordReset
 }: ForgotPasswordModalProps) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [identifier, setIdentifier] = useState(initialUsername);
@@ -231,6 +234,7 @@ export const ForgotPasswordModal = ({
       await confirmPasswordResetOtp({ challengeId, otp: otp.trim(), newPassword, confirmPassword });
       notificationService.showSuccess("Password updated successfully. Please sign in again.");
       close();
+      onPasswordReset?.();
     } catch (err: any) {
       setApiError(err, "Unable to update password");
     } finally {

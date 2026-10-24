@@ -64,6 +64,8 @@ export const ProductFormPage = () => {
     defaultValues
   });
   const { clearMessage, setApiError } = useApiMessage();
+  // Edit: saved category / tax inactive ho sakti hai — dropdown me "(Inactive)" ke saath dikhe, khaali nahi.
+  const [savedRefs, setSavedRefs] = useState<{ categoryId: string; categoryName: string; taxId: string; taxLabel: string } | null>(null);
 
   useEffect(() => {
     void Promise.all([getProductCategories({ active: true, size: 1000 }), getTaxMasters({ active: true })])
@@ -88,6 +90,12 @@ export const ProductFormPage = () => {
         if (cancelled) {
           return;
         }
+        setSavedRefs({
+          categoryId: product.categoryId ? String(product.categoryId) : "",
+          categoryName: product.categoryName ?? product.category ?? "",
+          taxId: product.taxMasterId ? String(product.taxMasterId) : "",
+          taxLabel: product.taxName ? `${product.taxName} (${product.taxPercent}%)` : ""
+        });
         setSelectedSubCategory(product.subCategoryId
           ? {
               id: product.subCategoryId,
@@ -138,18 +146,24 @@ export const ProductFormPage = () => {
   const watchedCategoryId = watch("categoryId");
   const watchedTaxable = watch("taxable");
 
-  const categoryOptions = useMemo(
-    () => categories.map((category) => ({ label: category.categoryName, value: String(category.id) })),
-    [categories]
-  );
+  const categoryOptions = useMemo(() => {
+    const options = categories.map((category) => ({ label: category.categoryName, value: String(category.id) }));
+    if (savedRefs?.categoryId && !options.some((option) => option.value === savedRefs.categoryId)) {
+      options.push({ label: `${savedRefs.categoryName || "Category"} (Inactive)`, value: savedRefs.categoryId });
+    }
+    return options;
+  }, [categories, savedRefs]);
   const subCategoryOptions = useMemo(
     () => subCategories.map((subCategory) => ({ label: subCategory.subCategoryName, value: String(subCategory.id) })),
     [subCategories]
   );
-  const taxOptions = useMemo(
-    () => taxMasters.map((tax) => ({ label: `${tax.taxName} (${tax.rate}%)`, value: String(tax.id) })),
-    [taxMasters]
-  );
+  const taxOptions = useMemo(() => {
+    const options = taxMasters.map((tax) => ({ label: `${tax.taxName} (${tax.rate}%)`, value: String(tax.id) }));
+    if (savedRefs?.taxId && !options.some((option) => option.value === savedRefs.taxId)) {
+      options.push({ label: `${savedRefs.taxLabel || "Tax"} (Inactive)`, value: savedRefs.taxId });
+    }
+    return options;
+  }, [taxMasters, savedRefs]);
 
   // Request id: rapid category A->B switches must not let late A-responses
   // overwrite B's sub-category list (would save wrong category pairing).

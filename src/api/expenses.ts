@@ -10,6 +10,7 @@ export type ExpenseFilterParams = {
   startDate?: string;
   endDate?: string;
   createdByRole?: string;
+  recordStatus?: "ACTIVE" | "DELETED" | "ALL";
   page?: number;
   size?: number;
 };

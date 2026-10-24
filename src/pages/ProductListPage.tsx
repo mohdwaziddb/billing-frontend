@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Eye, History, Pencil, Upload } from "lucide-react";
+import { Download, Eye, History, Pencil } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getProductCategories } from "../api/productCategories";
 import { getProductSubCategories } from "../api/productSubCategories";
@@ -10,6 +10,7 @@ import { Button } from "../components/Button";
 import { applyVisibleColumns } from "../components/CommonColumnSelector";
 import { CommonDeleteIcon } from "../components/CommonDeleteAction";
 import { CommonDeleteModal } from "../components/CommonDeleteModal";
+import { DataPortLink } from "../components/DataPortLink";
 import { CommonListPage } from "../components/CommonListPage";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
@@ -85,13 +86,18 @@ export const ProductListPage = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (!bulkSelection.selectedIds.length) {
+    // Inactive products pehle se deleted (soft) hain — sirf active wale bhejo.
+    const activeIds = new Set(list.tableData.filter((product) => product.active).map((product) => product.id));
+    const idsToDelete = bulkSelection.selectedIds.filter((id) => activeIds.has(id));
+    if (!idsToDelete.length) {
+      notificationService.showError("Selected products are already inactive.");
+      setBulkDeleteOpen(false);
       return;
     }
     try {
       setDeleting(true);
       clearMessage();
-      const resp = await deleteProductsBulk(bulkSelection.selectedIds);
+      const resp = await deleteProductsBulk(idsToDelete);
       list.refreshTable();
       bulkSelection.clearSelection();
       setBulkDeleteOpen(false);
@@ -180,7 +186,7 @@ export const ProductListPage = () => {
           { label: "View Details", icon: <Eye size={15} />, to: `/products/${item.id}`, hidden: !can("PRODUCTS", "VIEW") },
           { label: "Edit", icon: <Pencil size={15} />, to: `/products/${item.id}/edit`, hidden: !can("PRODUCTS", "EDIT") },
           { label: "Show Logs", icon: <History size={15} />, hidden: !can("PRODUCTS", "LOGS"), onClick: () => setLogTarget(item) },
-          { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("PRODUCTS", "DELETE"), onClick: () => setDeleteTarget(item) }
+          { label: "Delete", icon: <CommonDeleteIcon />, danger: true, hidden: !can("PRODUCTS", "DELETE") || !item.active, onClick: () => setDeleteTarget(item) }
         ]}
       />
     )
@@ -251,12 +257,7 @@ export const ProductListPage = () => {
               <Download size={16} />
               Export Excel
             </Button> : null}
-            {can("PRODUCT_DATAPORT", "VIEW") ? <Link to="/data-port/products">
-              <Button type="button" variant="secondary">
-                <Upload size={16} />
-                Product DataPort
-              </Button>
-            </Link> : null}
+            <DataPortLink menuCode="PRODUCT_DATAPORT" moduleKey="products" />
             {can("PRODUCTS", "ADD") ? <Link to="/products/new">
               <Button>Add product</Button>
             </Link> : null}

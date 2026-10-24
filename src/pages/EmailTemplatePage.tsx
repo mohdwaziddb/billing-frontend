@@ -9,6 +9,8 @@ import { CommonDeleteModal } from "../components/CommonDeleteModal";
 import { CommonListPage } from "../components/CommonListPage";
 import { Input } from "../components/Input";
 import { Modal } from "../components/Modal";
+import { Select } from "../components/Select";
+import { ModalFormActions } from "../components/ModalFormActions";
 import { PreviewSurface } from "../components/PreviewSurface";
 import { StatusBadge } from "../components/StatusBadge";
 import {
@@ -32,6 +34,7 @@ import type { EmailPreview, EmailTemplate, EmailTemplateRequest } from "../types
 
 type EmailFilters = {
   search: string;
+  status: string;
 };
 
 type FormState = {
@@ -59,10 +62,10 @@ export const EmailTemplatePage = () => {
   const editorRef = useRef<HTMLDivElement | null>(null);
 
   const list = useListPage<EmailTemplate, EmailFilters>({
-    initialFilters: { search: "" },
+    initialFilters: { search: "", status: "active" },
     errorMessage: "Unable to load email templates",
-    fetchPage: ({ page, size, search }) =>
-      getEmailTemplatesPage({ search: search.trim() || undefined, page, size })
+    fetchPage: ({ page, size, search, filters }) =>
+      getEmailTemplatesPage({ search: search.trim() || undefined, active: filters.status === "all" ? undefined : filters.status === "active", page, size })
   });
 
   useEffect(() => {
@@ -107,7 +110,9 @@ export const EmailTemplatePage = () => {
     }
   }, [form.formOpen]);
 
-  const canSaveTemplate = Boolean(form.formValues.templateName.trim() && form.formValues.subject.trim() && form.formValues.emailBody.trim());
+  // Editor khaali karne par bhi "<br>" bacha rehta hai — tags hata ke asli text check karo.
+  const emailBodyHasText = form.formValues.emailBody.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+  const canSaveTemplate = Boolean(form.formValues.templateName.trim() && form.formValues.subject.trim() && emailBodyHasText);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const templateColumns = useMemo(() => [
     {
@@ -121,7 +126,7 @@ export const EmailTemplatePage = () => {
       )
     },
     { key: "subject", header: "Subject", render: (item: EmailTemplate) => <span className="text-slate-700">{item.subject}</span> },
-    { key: "status", header: "Status", render: (item: EmailTemplate) => <StatusBadge label={item.active ? "Active" : "Inactive"} /> },
+    { key: "status", header: "Status", render: (item: EmailTemplate) => <StatusBadge label={item.active ? "ACTIVE" : "INACTIVE"} /> },
     { key: "created", header: "Created On", render: (item: EmailTemplate) => formatDate(item.createdAt) }
   ], []);
   const visibleTemplateColumns = useMemo(() => applyVisibleColumns(templateColumns, visibleColumns), [templateColumns, visibleColumns]);
@@ -177,6 +182,21 @@ export const EmailTemplatePage = () => {
       pageSubtitle="Manage reusable reminder and invoice email templates with dynamic variables."
       list={list}
       searchPlaceholder="Search Email Template"
+      // Baaki masters jaisa: default sirf Active (pehle inactive templates bhi mix me aate the).
+      activeFilterCount={(filters) => (filters.status !== "active" ? 1 : 0)}
+      filterFields={
+        <Select
+          label="Status Filter"
+          placeholder={null}
+          value={list.formFilters.status}
+          onChange={(event) => list.updateFormFilters({ status: event.target.value })}
+          options={[
+            { label: "All Templates", value: "all" },
+            { label: "Active Only", value: "active" },
+            { label: "Inactive Only", value: "inactive" }
+          ]}
+        />
+      }
       toolbarButtons={can("EMAIL_TEMPLATES", "ADD") ? <Button onClick={() => form.openAddForm()}><FilePlus2 size={16} /> New Template</Button> : null}
       columnSelector={{ tableName: "EMAIL_TEMPLATES", columns: templateColumns, visible: visibleColumns, onChange: setVisibleColumns, lockedKeys: ["template"] }}
       tableColumns={[
@@ -190,7 +210,7 @@ export const EmailTemplatePage = () => {
               actions={[
                 { label: "Preview", icon: <Eye size={15} />, onClick: () => void openPreview(item) },
                 { label: "Edit", icon: <Pencil size={15} />, hidden: !can("EMAIL_TEMPLATES", "EDIT"), onClick: () => form.openEditForm(item) },
-                { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("EMAIL_TEMPLATES", "DELETE"), danger: true, onClick: () => form.askDelete(item) }
+                { label: "Delete", icon: <CommonDeleteIcon />, hidden: !can("EMAIL_TEMPLATES", "DELETE") || !item.active, danger: true, onClick: () => form.askDelete(item) }
               ]}
             />
           )
@@ -200,12 +220,13 @@ export const EmailTemplatePage = () => {
       fullHeight
       modals={
         <>
-          <Modal open={form.formOpen} title={form.editingEntity ? "Edit Email Template" : "Add Email Template"} onClose={form.closeForm}>
+          <Modal open={form.formOpen} eyebrow="Email Template" title={form.editingEntity ? "Edit Email Template" : "Add Email Template"} onClose={form.closeForm}>
             <div className="grid gap-5 xl:grid-cols-[1fr_280px]">
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <Input
                     label="Template Name"
+                    maxLength={150}
                     value={form.formValues.templateName}
                     onChange={(event) => form.setFormValues((current) => ({ ...current, templateName: event.target.value }))}
                     requiredMark
@@ -213,6 +234,7 @@ export const EmailTemplatePage = () => {
                   <Input
                     ref={subjectInsertion.inputRef}
                     label="Subject"
+                    maxLength={255}
                     value={form.formValues.subject}
                     onChange={(event) => form.setFormValues((current) => ({ ...current, subject: event.target.value }))}
                     onFocus={() => selectVariableTarget("subject")}
@@ -220,7 +242,7 @@ export const EmailTemplatePage = () => {
                   />
                 </div>
                 <label className="block space-y-2">
-                  <span className="block text-sm font-semibold text-slate-700">Email Body <span className="ml-1 text-rose-400">*</span></span>
+                  <span className="block fs-12 font-semibold text-slate-700">Email Body<span className="ml-1 text-rose-400">*</span></span>
                   <div className="rounded-[var(--radius-control)] border border-slate-200 bg-white">
                     <div className="flex flex-wrap gap-2 border-b border-slate-200 p-2">
                       <Button type="button" variant="ghost" className="min-h-9 px-3 py-2" onClick={() => runEditorCommand("bold")}><Type size={15} /> Bold</Button>
@@ -273,10 +295,7 @@ export const EmailTemplatePage = () => {
                   />
                   Active template
                 </label>
-                <div className="flex justify-end gap-3">
-                  <Button type="button" variant="secondary" onClick={form.closeForm}>Cancel</Button>
-                  <Button type="button" disabled={form.saving || !canSaveTemplate} onClick={() => void form.saveForm()}>{form.editingEntity ? "Save Template" : "Create Template"}</Button>
-                </div>
+                <ModalFormActions editing={Boolean(form.editingEntity)} saving={form.saving} disabled={!canSaveTemplate} entityLabel="Template" onCancel={form.closeForm} onSave={() => void form.saveForm()} />
               </div>
 
               <AvailableVariablesPanel
@@ -288,7 +307,7 @@ export const EmailTemplatePage = () => {
             </div>
           </Modal>
 
-          <Modal open={Boolean(preview)} title={previewTitle} onClose={() => setPreview(null)}>
+          <Modal open={Boolean(preview)} eyebrow="Preview with sample data" title={previewTitle} onClose={() => setPreview(null)} maxWidthClass="max-w-3xl">
             {preview ? (
               <div className="space-y-4">
                 <PreviewSurface>

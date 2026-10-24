@@ -16,7 +16,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
     return (
       <label className="block space-y-2">
         {label ? (
-          <span className="block text-sm font-semibold text-slate-700">
+          <span className="block fs-12 font-semibold text-slate-700">
             {label}
             {requiredMark ? <span className="ml-1 text-rose-400">*</span> : null}
           </span>
@@ -25,7 +25,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           <input
             ref={ref}
             className={clsx(
-              "w-full rounded-[var(--radius-control)] border bg-white px-4 py-3 pr-12 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-4 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
+              "w-full rounded-[var(--radius-control)] border bg-white px-3.5 py-2.5 pr-12 fs-13 font-medium text-slate-900 outline-none transition placeholder:text-slate-400 disabled:bg-slate-50 disabled:text-slate-500 focus:border-[var(--theme-color)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--theme-color)_14%,transparent)]",
               error ? "border-rose-400/70" : "border-slate-200",
               className
             )}
@@ -42,7 +42,12 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
             {visible ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
-        {hint ? <span className="block text-xs text-slate-500">{hint}</span> : null}
+        {/* Input jaisa hi: error ho to wajah dikhao, warna hint. */}
+        {error ? (
+          <span className="block text-xs font-medium text-rose-500">{error}</span>
+        ) : hint ? (
+          <span className="block text-xs text-slate-500">{hint}</span>
+        ) : null}
       </label>
     );
   }
