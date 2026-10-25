@@ -1445,3 +1445,19 @@ export type PermissionMatrixRequest = {
     }>;
   }>;
 };
+
+/** Ek login (device). */
+export type UserSession = {
+  id: number;
+  deviceName: string | null;
+  deviceType: "Desktop" | "Mobile" | "Tablet" | string | null;
+  browser: string | null;
+  os: string | null;
+  ipAddress: string | null;
+  loginAt: string;
+  lastActiveAt: string;
+  status: "ACTIVE" | "LOGGED_OUT" | "REVOKED" | "EXPIRED";
+  endedAt: string | null;
+  endedReason: string | null;
+  current: boolean;
+};

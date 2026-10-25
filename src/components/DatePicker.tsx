@@ -30,7 +30,11 @@ const fromIso = (value?: string | number | readonly string[]) => {
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
 };
 
-export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label, error, requiredMark, hint, value, defaultValue, onChange, className, disabled, name, onBlur, id }, ref) => {
+export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label, error, requiredMark, hint, value, defaultValue, onChange, className, disabled, name, onBlur, id, min, max }, ref) => {
+  // min/max (yyyy-mm-dd) ke bahar ki dates calendar me disabled; ISO string compare = date compare.
+  const minIso = typeof min === "string" && min ? min : null;
+  const maxIso = typeof max === "string" && max ? max : null;
+  const outOfRange = (iso: string) => (minIso !== null && iso < minIso) || (maxIso !== null && iso > maxIso);
   const [internalValue, setInternalValue] = useState(typeof defaultValue === "string" && defaultValue ? defaultValue : todayIso());
   const currentValue = typeof value === "string" ? value : internalValue;
   const initialDate = fromIso(currentValue || defaultValue) ?? new Date();
@@ -142,11 +146,13 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label
                   const iso = toIso(day);
                   const selected = iso === currentValue;
                   const muted = day.getMonth() !== viewDate.getMonth();
+                  const blocked = outOfRange(iso);
                   return (
                     <button
                       key={iso}
                       type="button"
-                      className={clsx("h-8 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]", selected ? "bg-[var(--theme-color)] text-white" : muted ? "text-slate-300 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800")}
+                      disabled={blocked}
+                      className={clsx("h-8 rounded-lg text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-[var(--theme-color)]", selected ? "bg-[var(--theme-color)] text-white" : blocked ? "cursor-not-allowed text-slate-300 line-through dark:text-slate-600" : muted ? "text-slate-300 hover:bg-slate-50 dark:text-slate-600 dark:hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800")}
                       onClick={() => chooseDate(day)}
                     >
                       {day.getDate()}
@@ -155,7 +161,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(({ label
                 })}
               </div>
               <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 dark:border-slate-800">
-                <button type="button" className="rounded-lg px-2 py-1 text-xs font-bold text-[var(--theme-color)] transition hover:bg-slate-100 dark:hover:bg-slate-800" onClick={chooseToday}>
+                <button type="button" disabled={outOfRange(todayIso())} className="rounded-lg px-2 py-1 text-xs font-bold text-[var(--theme-color)] transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-800" onClick={chooseToday}>
                   Today
                 </button>
                 <button type="button" className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200" onClick={clearValue}>

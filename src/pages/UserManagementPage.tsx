@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { Crown, Download, Edit3, History, KeyRound, Plus, ShieldCheck, UserCheck, UserRound, Users, UserX } from "lucide-react";
+import { Crown, Download, Edit3, History, KeyRound, MonitorSmartphone, Plus, ShieldCheck, UserCheck, UserRound, Users, UserX } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { createCompanyUser, deactivateCompanyUser, deleteUserPhoto, getCompanyUsersPage, getRoles, updateCompanyUser, uploadUserPhoto, type UserFilterParams } from "../api/users";
@@ -20,6 +20,7 @@ import { PhotoUploadField } from "../components/PhotoUploadField";
 import { Select } from "../components/Select";
 import { StatusBadge } from "../components/StatusBadge";
 import { UserAvatar } from "../components/UserAvatar";
+import { UserDevicesList } from "../components/UserDevicesList";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
 import { useListPage } from "../hooks/useListPage";
@@ -144,6 +145,7 @@ export const UserManagementPage = () => {
   const [mfaResetTarget, setMfaResetTarget] = useState<UserProfile | null>(null);
   const [mfaResetting, setMfaResetting] = useState(false);
   const [logTarget, setLogTarget] = useState<UserProfile | null>(null);
+  const [devicesTarget, setDevicesTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { clearMessage, setApiError } = useApiMessage();
   const { fieldErrors, clearFeedback, applyApiError } = useApiFormFeedback();
@@ -577,6 +579,13 @@ export const UserManagementPage = () => {
                     onClick: () => setLogTarget(item)
                   },
                   {
+                    // Owner ke devices sirf Owner (backend bhi yahi rokta hai).
+                    label: "Devices",
+                    icon: <MonitorSmartphone size={15} />,
+                    hidden: !can("USERS", "EDIT") || (item.role === "OWNER" && !isOwner),
+                    onClick: () => setDevicesTarget(item)
+                  },
+                  {
                     label: "Reset MFA",
                     icon: <KeyRound size={15} />,
                     hidden: !canEditUsers,
@@ -734,6 +743,15 @@ export const UserManagementPage = () => {
                 {activating ? "Activating…" : "Activate"}
               </Button>
             </div>
+          </Modal>
+          <Modal
+            open={Boolean(devicesTarget)}
+            title={`Devices · ${devicesTarget?.fullName ?? ""}`}
+            eyebrow="Security"
+            maxWidthClass="max-w-xl"
+            onClose={() => setDevicesTarget(null)}
+          >
+            {devicesTarget ? <UserDevicesList userId={devicesTarget.id} /> : null}
           </Modal>
           <Modal
             open={Boolean(mfaResetTarget)}

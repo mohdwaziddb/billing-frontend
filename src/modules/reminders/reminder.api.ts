@@ -2,6 +2,7 @@ import { apiClient } from "../../api/apiClient";
 import type { ApiResponse, PageResponse } from "../../types/api";
 import type {
   OverdueCustomer,
+  OverdueSummary,
   ReminderHistoryItem,
   SendReminderRequest
 } from "./reminder.types";
@@ -16,6 +17,11 @@ export const getOverdueCustomers = async (params?: {
   const response = await apiClient.get<ApiResponse<PageResponse<OverdueCustomer>>>("/reminders/overdue-customers", {
     params
   });
+  return response.data.data;
+};
+
+export const getOverdueSummary = async (params?: { search?: string; minBalance?: number; overdueDays?: number }) => {
+  const response = await apiClient.get<ApiResponse<OverdueSummary>>("/reminders/overdue-summary", { params });
   return response.data.data;
 };
 

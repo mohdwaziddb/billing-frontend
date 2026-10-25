@@ -21,10 +21,11 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Table } from "../components/Table";
 import { useAuth } from "../context/AuthContext";
 import { useApiFormFeedback, useApiMessage } from "../hooks/useApiFeedback";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { CommonSuccessMessageUtil } from "../lib/CommonSuccessMessageUtil";
 import { formatCurrency } from "../lib/currency";
 import { isValidMobileNumber, MOBILE_VALIDATION_MESSAGE, normalizeMobileNumber } from "../lib/customerValidation";
-import { formatDate } from "../lib/format";
+import { formatDate, localIsoDate } from "../lib/format";
 import { isManualPricingPolicy } from "../lib/inventorySettings";
 import { blockNumberStepKeys, blurNumberInputOnWheel } from "../lib/numberInputGuards";
 import { CollectOnlineModal } from "../modules/payments/components/CollectOnlineModal";
@@ -79,6 +80,14 @@ const defaultPaymentModeCode = (modes: PaymentModeMaster[]) => {
 const todayIso = () => {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+};
+
+// Backend InvoiceService.BACKDATE_LIMIT_DAYS jaisa: aage ki date band, peeche 30 din.
+const INVOICE_BACKDATE_LIMIT_DAYS = 30;
+const invoiceDateBounds = () => {
+  const earliest = new Date();
+  earliest.setDate(earliest.getDate() - INVOICE_BACKDATE_LIMIT_DAYS);
+  return { min: localIsoDate(earliest), max: todayIso() };
 };
 
 const getInvoiceValidationMessage = (errors: FieldErrors<FormValues>) => {
@@ -258,8 +267,11 @@ export const CreateInvoicePage = () => {
     return Boolean(companyStateName && customerStateName && companyStateName === customerStateName);
   }, [selectedCustomer?.state, selectedCustomer?.stateId, user?.company?.state, user?.company?.stateId]);
 
+  // Composition dealer GST nahi laga sakta: poora bill bina tax (Bill of Supply).
+  const isCompositionDealer = Boolean(user?.company?.compositionScheme);
   const invoiceSummary = useMemo(() => InvoiceCalculationService.calculate({
     sameState,
+    chargeTax: !isCompositionDealer,
     invoiceDiscountType,
     invoiceDiscountValue: invoiceDiscountInput,
     paidAmount: paidAmountInput,
@@ -278,7 +290,7 @@ export const CreateInvoicePage = () => {
         productDiscountValue: item.discountValue
       };
     })
-  }), [invoiceDiscountInput, invoiceDiscountType, paidAmountInput, productMap, sameState, watchedItems]);
+  }), [invoiceDiscountInput, invoiceDiscountType, isCompositionDealer, paidAmountInput, productMap, sameState, watchedItems]);
 
   useEffect(() => {
     if (previousInvoiceDiscountTypeRef.current === null) {
@@ -357,7 +369,7 @@ export const CreateInvoicePage = () => {
     if (numberValue(paidAmountInput) > 0 && !paymentModeInput) {
       issues.push("Select payment mode when paid amount is greater than 0.");
     }
-    const hasTaxableGstLines = watchedItems.some((item) => {
+    const hasTaxableGstLines = !isCompositionDealer && watchedItems.some((item) => {
       const product = productMap.get(item.productId);
       return Boolean(product?.taxable && (product?.taxPercent ?? 0) > 0);
     });
@@ -374,7 +386,7 @@ export const CreateInvoicePage = () => {
       }
     }
     return issues;
-  }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.grandTotal, invoiceSummary.totalBeforeInvoiceDiscount, paidAmountInput, paymentModeInput, productMap, selectedCustomer, user?.company?.state, user?.company?.stateId, watchedItems]);
+  }, [invoiceDiscountInput, invoiceDiscountType, invoiceSummary.grandTotal, invoiceSummary.totalBeforeInvoiceDiscount, isCompositionDealer, paidAmountInput, paymentModeInput, productMap, selectedCustomer, user?.company?.state, user?.company?.stateId, watchedItems]);
 
   const hasClientValidationErrors = rowIssues.some((issues) => issues.length > 0) || summaryIssues.length > 0;
   // Bill shuru hone ke baad khaali row par Save grey tha bina wajah ke.
@@ -393,6 +405,9 @@ export const CreateInvoicePage = () => {
     (invoiceSummary.paidAmount <= 0 || paymentModeInput)
   );
   const canSaveInvoice = hasRequiredInvoiceFields && !hasClientValidationErrors;
+  // Bill me product aa gaya ho to bina save chhodne par confirm (pehle reload/menu click par bill chupchaap kho jaata tha).
+  const [invoiceSaved, setInvoiceSaved] = useState(false);
+  const { confirmLeave } = useUnsavedChangesGuard(!invoiceSaved && watchedItems.some((item) => item.productId));
   const allRowsExpanded = fields.length > 0 && fields.every((item) => expandedRows.has(item.id));
 
   useEffect(() => {
@@ -656,6 +671,7 @@ export const CreateInvoicePage = () => {
 
     try {
       const invoice = await createInvoice(payload);
+      setInvoiceSaved(true);
       notificationService.showSuccess(CommonSuccessMessageUtil.created("Invoice"));
       if (collectOnline) {
         setOnlineCollect({
@@ -699,7 +715,7 @@ export const CreateInvoicePage = () => {
               <CommonBreadcrumb items={[{ label: "Invoices", to: "/invoices" }, { label: "Create Invoice" }]} />
               <div className="flex flex-col items-end gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button type="button" variant="secondary" onClick={() => navigate("/invoices")}>
+                  <Button type="button" variant="secondary" onClick={() => confirmLeave() && navigate("/invoices")}>
                     <ArrowLeft size={16} />
                     Back
                   </Button>
@@ -751,12 +767,23 @@ export const CreateInvoicePage = () => {
               <Controller
                 name="invoiceDate"
                 control={control}
-                rules={{ required: "Invoice date is required" }}
+                rules={{
+                  required: "Invoice date is required",
+                  validate: (value) => {
+                    const { min, max } = invoiceDateBounds();
+                    if (value > max) {
+                      return "Invoice date cannot be in the future.";
+                    }
+                    return value >= min || `Invoice date cannot be more than ${INVOICE_BACKDATE_LIMIT_DAYS} days old.`;
+                  }
+                }}
                 render={({ field }) => (
                   <Input
                     label="Invoice Date"
                     requiredMark
                     type="date"
+                    min={invoiceDateBounds().min}
+                    max={invoiceDateBounds().max}
                     disabled={!canProceedWithInvoice}
                     error={errors.invoiceDate?.message}
                     name={field.name}
@@ -929,11 +956,13 @@ export const CreateInvoicePage = () => {
                   const isExempt = !taxable || taxPercent <= 0;
                   const gstHint = !hasProduct
                     ? "--"
-                    : isExempt
-                      ? "Exempt • Tax ₹0"
-                      : (lineSummary?.igstAmount ?? 0) > 0
-                        ? `IGST ${lineSummary?.igstRate ?? taxPercent}% • Tax ${formatCurrency(lineSummary?.igstAmount ?? 0)}`
-                        : `GST ${taxPercent}% • Tax ${formatCurrency(lineSummary?.taxAmount ?? 0)}`;
+                    : isCompositionDealer
+                      ? "Composition • No tax"
+                      : isExempt
+                        ? "Exempt • Tax ₹0"
+                        : (lineSummary?.igstAmount ?? 0) > 0
+                          ? `IGST ${lineSummary?.igstRate ?? taxPercent}% • Tax ${formatCurrency(lineSummary?.igstAmount ?? 0)}`
+                          : `GST ${taxPercent}% • Tax ${formatCurrency(lineSummary?.taxAmount ?? 0)}`;
                   const otherSelectedIds = new Set(
                     watchedItems
                       .filter((_, rowIndex) => rowIndex !== index)
@@ -1241,6 +1270,9 @@ export const CreateInvoicePage = () => {
                   {invoiceSummary.sgstTotal > 0 ? <SummaryRow label="SGST" value={formatCurrency(invoiceSummary.sgstTotal)} /> : null}
                   {invoiceSummary.igstTotal > 0 ? <SummaryRow label="IGST" value={formatCurrency(invoiceSummary.igstTotal)} /> : null}
                   <SummaryRow label="Total Tax" value={formatCurrency(invoiceSummary.taxAmount)} />
+                  {invoiceSummary.roundOff !== 0 ? (
+                    <SummaryRow label="Round Off" value={`${invoiceSummary.roundOff > 0 ? "+" : "-"}${formatCurrency(Math.abs(invoiceSummary.roundOff))}`} />
+                  ) : null}
                   <div className="border-t border-slate-200 pt-2">
                     <SummaryRow label="Grand Total" value={formatCurrency(invoiceSummary.grandTotal)} strong />
                   </div>

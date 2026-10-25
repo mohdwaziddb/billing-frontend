@@ -4,6 +4,7 @@ export type ReminderStatus = "PENDING" | "SENT" | "FAILED";
 export type OverdueCustomer = {
   customerId: number;
   customerName: string;
+  active: boolean;
   mobile: string;
   email: string | null;
   currentBalance: number;
@@ -13,6 +14,12 @@ export type OverdueCustomer = {
   oldestOutstandingInvoiceTotal: number | null;
   lastReminderAt: string | null;
   lastReminderStatus: ReminderStatus | null;
+};
+
+export type OverdueSummary = {
+  customerCount: number;
+  totalDue: number;
+  maxOverdueDays: number;
 };
 
 export type ReminderHistoryItem = {

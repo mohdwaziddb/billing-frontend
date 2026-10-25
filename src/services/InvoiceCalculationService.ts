@@ -17,6 +17,8 @@ export type InvoiceCalculationRowInput = {
 export type InvoiceCalculationInput = {
   rows: InvoiceCalculationRowInput[];
   sameState?: boolean;
+  /** false = composition dealer (Bill of Supply): koi tax nahi. Backend TaxCalculationService jaisa. */
+  chargeTax?: boolean;
   invoiceDiscountType?: DiscountType;
   invoiceDiscountValue?: string | number;
   paidAmount?: string | number;
@@ -55,6 +57,7 @@ export type InvoiceCalculationResult = {
   sgstTotal: number;
   igstTotal: number;
   taxAmount: number;
+  roundOff: number;
   grandTotal: number;
   paidAmount: number;
   outstandingAmount: number;
@@ -130,12 +133,13 @@ const sum = (values: number[]) => values.reduce((total, value) => total + value,
 export const InvoiceCalculationService = {
   calculate(input: InvoiceCalculationInput): InvoiceCalculationResult {
     const sameState = Boolean(input.sameState);
+    const chargeTax = input.chargeTax ?? true;
     const baseRows = input.rows.map((row) => {
       const qty = Math.max(0, numberValue(row.qty));
       // Backend unit price aur tax rate ko pehle 2 decimal par HALF_UP karta hai.
       const rateCents = toCents(row.rate);
       const taxHundredths = toCents(row.taxPercent);
-      const taxable = row.taxable ?? true;
+      const taxable = chargeTax && (row.taxable ?? true);
       const lineCents = Math.round(rateCents * qty);
       const productDiscountCents = discountCents(lineCents, row.productDiscountType, row.productDiscountValue);
       return {
@@ -197,7 +201,10 @@ export const InvoiceCalculationService = {
       totalAmount: fromCents(row.totalCents)
     }));
 
-    const grandTotalCents = sum(centsRows.map((row) => row.totalCents));
+    // Total poore rupaye tak HALF_UP (backend TaxCalculationService jaisa); farq round-off me.
+    const unroundedTotalCents = sum(centsRows.map((row) => row.totalCents));
+    const grandTotalCents = divideHalfUp(unroundedTotalCents, 100) * 100;
+    const roundOffCents = grandTotalCents - unroundedTotalCents;
     const paidCents = Math.min(toCents(input.paidAmount), grandTotalCents);
     const subtotal = fromCents(subtotalCents);
     const productDiscountTotal = fromCents(productDiscountCentsTotal);
@@ -209,6 +216,7 @@ export const InvoiceCalculationService = {
     const sgstTotal = cgstTotal;
     const igstTotal = fromCents(sum(centsRows.map((row) => row.igstCents)));
     const taxAmount = fromCents(sum(centsRows.map((row) => row.taxCents)));
+    const roundOff = fromCents(roundOffCents);
     const grandTotal = fromCents(grandTotalCents);
     const paidAmount = fromCents(paidCents);
     const outstandingAmount = fromCents(grandTotalCents - paidCents);
@@ -225,6 +233,7 @@ export const InvoiceCalculationService = {
       sgstTotal,
       igstTotal,
       taxAmount,
+      roundOff,
       grandTotal,
       paidAmount,
       outstandingAmount

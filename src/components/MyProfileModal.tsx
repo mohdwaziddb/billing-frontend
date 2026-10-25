@@ -10,6 +10,7 @@ import { Input } from "./Input";
 import { Modal } from "./Modal";
 import { PhotoUploadField } from "./PhotoUploadField";
 import { StatusBadge } from "./StatusBadge";
+import { UserDevicesList } from "./UserDevicesList";
 
 /**
  * Header se khulne wala "My Profile" (har role). Sirf naam + photo badalte hain;
@@ -107,6 +108,13 @@ export const MyProfileModal = ({ open, onClose }: { open: boolean; onClose: () =
           <Input label="Mobile Number" value={user?.mobileNumber ?? ""} disabled />
         </div>
         <p className="fs-11 text-slate-500">Username, email and mobile number can be changed only by the company owner from Users.</p>
+
+        {!readOnly && open ? (
+          <section className="space-y-2 border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-bold text-slate-800">My Devices</h3>
+            <UserDevicesList />
+          </section>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
