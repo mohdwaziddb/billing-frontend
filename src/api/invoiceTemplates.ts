@@ -23,8 +23,13 @@ export const updateInvoiceTemplateSettings = async (payload: CompanyInvoiceSetti
   return response.data.data;
 };
 
+// skipPageLoader: preview POST hai, isliye default me poore page par blocking "Please wait" aata tha —
+// Invoice Templates page ke 10 thumbnails + live preview tak page atka dikhta tha. Thumbnail/preview
+// ke apne loading placeholder hain.
 export const previewInvoiceTemplate = async (templateId: string, payload?: InvoiceTemplatePreviewRequest) => {
-  const response = await apiClient.post<ApiResponse<InvoiceRenderResponse>>(`/v1/invoice-templates/${templateId}/preview`, payload ?? {});
+  const response = await apiClient.post<ApiResponse<InvoiceRenderResponse>>(`/v1/invoice-templates/${templateId}/preview`, payload ?? {}, {
+    skipPageLoader: true
+  });
   return response.data.data;
 };
 
