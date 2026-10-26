@@ -1,5 +1,5 @@
 import { Bot, Building2, CheckCircle2, Database, Download, Eye, FileText, KeyRound, LoaderCircle, Power, RefreshCw, RotateCcw, Settings, Square, Trash2, XCircle } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   activatePlatformAdminCompany,
@@ -88,7 +88,9 @@ type CompanyColumn = {
   locked?: boolean;
 };
 
-const emptyCompanyPage: PageResponse<PlatformAdminCompany> = { records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 };
+const SEARCH_DEBOUNCE_MS = 350;
+const DASHBOARD_RECENT_COMPANIES = 5;
+const emptyCompanyPage: PageResponse<PlatformAdminCompany> ={ records: [], page: 0, size: DEFAULT_PAGE_SIZE, totalRecords: 0, totalPages: 0 };
 
 const settingsFormInitial = {
   platformName: "",
@@ -115,6 +117,12 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   const [summaryCompanies, setSummaryCompanies] = useState<PageResponse<PlatformAdminCompany>>(emptyCompanyPage);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summarySearch, setSummarySearch] = useState("");
+  // Search box har keystroke par backend call karta tha — aur har companies call 20 tenant DBs
+  // par switch karke enrich karti hai. Isliye API ko sirf debounced value jaati hai.
+  const [debouncedCompanySearch, setDebouncedCompanySearch] = useState("");
+  const [debouncedSummarySearch, setDebouncedSummarySearch] = useState("");
+  const companiesRequestIdRef = useRef(0);
+  const summaryRequestIdRef = useRef(0);
   const [settings, setSettings] = useState<PlatformAdminSettingsType | null>(null);
   const [settingsForm, setSettingsForm] = useState(settingsFormInitial);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -228,22 +236,32 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   };
 
   const loadCompanies = async (page = companyPage) => {
+    // requestId: der se aaya purana jawab (pichli search) naye result ko overwrite na kare.
+    const requestId = ++companiesRequestIdRef.current;
     setCompaniesLoading(true);
     try {
       const response = await getPlatformAdminCompanies({
         page,
-        size: DEFAULT_PAGE_SIZE,
-        search: companySearch.trim() || undefined,
+        // Dashboard sirf 5 "Recent Companies" dikhata hai — backend har row ke tenant DB par jaata hai,
+        // isliye wahan 20 ki jagah 5 hi mangao.
+        size: mode === "dashboard" ? DASHBOARD_RECENT_COMPANIES : DEFAULT_PAGE_SIZE,
+        search: debouncedCompanySearch.trim() || undefined,
         active: companyActive === "" ? undefined : companyActive === "true"
       });
+      if (requestId !== companiesRequestIdRef.current) {
+        return;
+      }
       setCompanies(response);
       setCompanyPage(response.page);
     } finally {
-      setCompaniesLoading(false);
+      if (requestId === companiesRequestIdRef.current) {
+        setCompaniesLoading(false);
+      }
     }
   };
 
   const loadSummaryCompanies = async (filter: SummaryCardFilter, page = 0) => {
+    const requestId = ++summaryRequestIdRef.current;
     setSummaryLoading(true);
     try {
       const active = filter === "all" ? undefined : filter === "active";
@@ -251,11 +269,16 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
         page,
         size: DEFAULT_PAGE_SIZE,
         active,
-        search: summarySearch.trim() || undefined
+        search: debouncedSummarySearch.trim() || undefined
       });
+      if (requestId !== summaryRequestIdRef.current) {
+        return;
+      }
       setSummaryCompanies(response);
     } finally {
-      setSummaryLoading(false);
+      if (requestId === summaryRequestIdRef.current) {
+        setSummaryLoading(false);
+      }
     }
   };
 
@@ -302,10 +325,20 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
   }, [mode]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedCompanySearch(companySearch), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [companySearch]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSummarySearch(summarySearch), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [summarySearch]);
+
+  useEffect(() => {
     if (mode === "dashboard" || mode === "companies" || mode === "details") {
       void loadCompanies(0).catch((err) => setApiError(err, "Unable to load companies"));
     }
-  }, [companySearch, companyActive, mode]);
+  }, [debouncedCompanySearch, companyActive, mode]);
 
   useEffect(() => {
     if (mode === "details" && detailsCompanyCode) {
@@ -344,11 +377,13 @@ export const PlatformAdminPage = ({ mode }: { mode: Mode }) => {
     if (summaryModal) {
       void loadSummaryCompanies(summaryModal.filter, 0).catch((err) => setApiError(err, "Unable to load companies"));
     }
-  }, [summaryModal, summarySearch]);
+  }, [summaryModal, debouncedSummarySearch]);
 
   const openSummaryModal = (filter: SummaryCardFilter, title: string) => {
     setSummaryCompanies(emptyCompanyPage);
     setSummarySearch("");
+    // Naya modal purani search se na khule (debounce ka wait nahi).
+    setDebouncedSummarySearch("");
     setSummaryModal({ filter, title });
   };
 

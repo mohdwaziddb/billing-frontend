@@ -95,7 +95,7 @@ export function CommonListPage<TRow, TFilters extends FiltersWithSearch>({
             searchPlaceholder={searchPlaceholder}
             onSearchChange={(value) => {
               if (liveSearch) {
-                list.applySearchNow(value);
+                list.applySearchDebounced(value);
               } else {
                 list.updateSearchDraft(value);
               }

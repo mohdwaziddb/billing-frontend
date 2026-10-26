@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Package, ReceiptIndianRupee, Table2, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Bar as ChartBar, BarChart as ChartBarChart, CartesianGrid as ChartGrid, Legend as ChartLegend, ResponsiveContainer as ChartContainer, Tooltip as ChartTooltip, XAxis as ChartXAxis, YAxis as ChartYAxis } from "recharts";
 import { getExpenseCategories } from "../api/expenseCategories";
@@ -153,16 +153,36 @@ export const ProfitLossReportPage = () => {
     { label: "Net profit", value: formatCurrency(report.netProfit), strong: true, negative: netProfitValue < 0 }
   ];
 
-  useEffect(() => {
+  // Perf: filter dropdowns (1000 customers + 1000 invoices) pehle page khulte hi aate the,
+  // report se pehle. Ab sirf pehli baar Filter panel khulne par (ek hi baar).
+  const filterOptionsRequestedRef = useRef(false);
+  const loadFilterOptions = useCallback(() => {
+    if (filterOptionsRequestedRef.current) {
+      return;
+    }
+    filterOptionsRequestedRef.current = true;
     void Promise.all([
       getExpenseCategories({ active: true, size: 1000 }).then(setCategories),
       getCustomers({ active: true, size: 1000 }).then(setCustomers),
       getInvoices({ size: 1000 }).then(setInvoices)
-    ]).catch((err: any) => setApiError(err, "Unable to load report filters"));
+    ]).catch((err: any) => {
+      // Fail hone par agli baar panel kholne par dobara try.
+      filterOptionsRequestedRef.current = false;
+      setApiError(err, "Unable to load report filters");
+    });
   }, [setApiError]);
 
   useEffect(() => {
-    void getProfitLossReport(params).then(setReport).catch((err: any) => setApiError(err, "Unable to load profit and loss report"));
+    let cancelled = false;
+    // Preset jaldi badalne par purana (slow) response naye report ko overwrite na kare.
+    void getProfitLossReport(params)
+      .then((reportData) => {
+        if (!cancelled) setReport(reportData);
+      })
+      .catch((err: any) => setApiError(err, "Unable to load profit and loss report"));
+    return () => {
+      cancelled = true;
+    };
   }, [params, setApiError]);
 
   useEffect(() => {
@@ -236,6 +256,7 @@ export const ProfitLossReportPage = () => {
               filterPanelWidth="max-w-[720px]"
               filtersClassName="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
             >
+              <LoadOnMount onMount={loadFilterOptions} />
               <Select label="Expense Type" value={draftFilters.expenseType} options={[{ label: "All", value: "" }, { label: "General", value: "GENERAL" }, { label: "Customer Related", value: "CUSTOMER_RELATED" }, { label: "Invoice Related", value: "INVOICE_RELATED" }]} onChange={(event) => setDraftFilters((current) => ({ ...current, expenseType: event.target.value }))} />
               <Select label="Category" value={draftFilters.categoryId} options={[{ label: "All", value: "" }, ...categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, categoryId: event.target.value }))} />
               <Select label="Customer" value={draftFilters.customerId} options={[{ label: "All", value: "" }, ...customers.map((item) => ({ label: item.name, value: String(item.id) }))]} onChange={(event) => setDraftFilters((current) => ({ ...current, customerId: event.target.value }))} />
@@ -363,6 +384,14 @@ export const ProfitLossReportPage = () => {
       </Modal>
     </div>
   );
+};
+
+// ListToolbar children sirf panel khulne par mount hote hain — usi waqt dropdown data mangwao.
+const LoadOnMount = ({ onMount }: { onMount: () => void }) => {
+  useEffect(() => {
+    onMount();
+  }, [onMount]);
+  return null;
 };
 
 const summarizeFilters = (filters: ProfitLossFilters, categories: ExpenseCategory[], customers: Customer[], invoices: Invoice[]) => {

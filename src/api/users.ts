@@ -28,6 +28,14 @@ export const getCompanyUsersPage = async (params?: UserFilterParams) => {
   return response.data.data;
 };
 
+// Users page role chips: list wale filters (role ignore) par har role ka total, ek hi call me.
+export type CompanyUserRoleCounts = Record<"ALL" | Role, number>;
+
+export const getCompanyUserRoleCounts = async (params?: Omit<UserFilterParams, "page" | "size" | "role">) => {
+  const response = await apiClient.get<ApiResponse<CompanyUserRoleCounts>>("/v1/users/role-counts", { params });
+  return response.data.data;
+};
+
 export const getCompanyUsers = async (params?: UserFilterParams) => {
   const response = await getCompanyUsersPage(params);
   return response.records;

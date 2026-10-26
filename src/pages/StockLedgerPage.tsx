@@ -64,6 +64,12 @@ export const StockLedgerPage = () => {
       .catch((err: any) => setApiError(err, "Unable to load stock ledger"));
   }, [setApiError]);
 
+  // 1000 products tak ka options array har render par dobara na bane.
+  const productOptions = useMemo(
+    () => [{ label: "All Products", value: "" }, ...products.map((product) => ({ label: `${product.name} (${product.sku})`, value: String(product.id) }))],
+    [products]
+  );
+
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const ledgerColumns = useMemo(() => [
     { key: "date", header: "Entry Date", render: (item: InventoryLedgerEntry) => formatDate(item.entryDate) },
@@ -92,7 +98,7 @@ export const StockLedgerPage = () => {
             placeholder={null}
             value={list.formFilters.productId}
             onChange={(event) => list.updateFormFilters({ productId: event.target.value })}
-            options={[{ label: "All Products", value: "" }, ...products.map((product) => ({ label: `${product.name} (${product.sku})`, value: String(product.id) }))]}
+            options={productOptions}
           />
           <Input label="From Date" type="date" value={list.formFilters.startDate} onChange={(event) => list.updateFormFilters({ startDate: event.target.value })} />
           <Input label="To Date" type="date" value={list.formFilters.endDate} onChange={(event) => list.updateFormFilters({ endDate: event.target.value })} />

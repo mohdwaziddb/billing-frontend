@@ -29,6 +29,10 @@ const headerIconButtonClass =
 const profileMenuItemClass =
   "mt-1 flex min-h-10 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold transition";
 
+// Har page apna Header render karta hai (navigation par remount), isliye component
+// ref me rakha check har page par /mfa/status dobara maarta tha. Module-level: ek token = ek call.
+let mfaMenuVisibilityCache: { token: string; visible: Promise<boolean> } | null = null;
+
 export const Header = ({ title, subtitle }: { title: string; subtitle: string }) => {
   const { auth, user, can, logout, permissions, platform, preferences, setDarkMode, sessionType, platformAdmin } = useAuth();
   const navigate = useNavigate();
@@ -41,7 +45,6 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
   // nahi, aur cached session se button hamesha chhupa rehta. Ek baar per
   // session fetch — fail ho to chup-chaap chhupao, kabhi block mat karo.
   const [mfaMenuVisible, setMfaMenuVisible] = useState(false);
-  const mfaCheckedTokenRef = useRef<string | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
@@ -121,13 +124,26 @@ export const Header = ({ title, subtitle }: { title: string; subtitle: string })
 
   useEffect(() => {
     const token = auth?.accessToken;
-    if (sessionType !== "user" || !token || mfaCheckedTokenRef.current === token) {
+    if (sessionType !== "user" || !token) {
       return;
     }
-    mfaCheckedTokenRef.current = token;
-    void getMfaStatus()
-      .then((status) => setMfaMenuVisible(Boolean(status.applyMfaByCompany)))
-      .catch(() => setMfaMenuVisible(false));
+    if (!mfaMenuVisibilityCache || mfaMenuVisibilityCache.token !== token) {
+      mfaMenuVisibilityCache = {
+        token,
+        visible: getMfaStatus()
+          .then((status) => Boolean(status.applyMfaByCompany))
+          .catch(() => false)
+      };
+    }
+    let cancelled = false;
+    void mfaMenuVisibilityCache.visible.then((visible) => {
+      if (!cancelled) {
+        setMfaMenuVisible(visible);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [auth?.accessToken, sessionType]);
 
   return (

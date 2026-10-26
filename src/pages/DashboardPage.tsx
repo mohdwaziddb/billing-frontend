@@ -36,6 +36,7 @@ type DetailColumn = {
 
 const DASHBOARD_ROW_LIMIT = 7;
 const DASHBOARD_MODAL_PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 350;
 
 const DATE_PRESET_OPTIONS: Array<{ value: DatePreset; label: string }> = [
   { value: "today", label: "Today" },
@@ -502,6 +503,7 @@ export const DashboardPage = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailPage, setDetailPage] = useState(0);
   const [detailSearch, setDetailSearch] = useState("");
+  const [debouncedDetailSearch, setDebouncedDetailSearch] = useState("");
   const [detailSort, setDetailSort] = useState<{ sortBy: string; sortDirection: "asc" | "desc" }>({
     sortBy: "date",
     sortDirection: "desc"
@@ -509,6 +511,7 @@ export const DashboardPage = () => {
   const [activeList, setActiveList] = useState<DashboardListKey | null>(null);
   const [listPage, setListPage] = useState(0);
   const [listSearch, setListSearch] = useState("");
+  const [debouncedListSearch, setDebouncedListSearch] = useState("");
   const [listLoading, setListLoading] = useState(false);
   const [listData, setListData] = useState<PageResponse<Invoice | DashboardDetailRow | TopSellingProduct | SalesByCategory | CustomerDue>>(emptyPage<Invoice | DashboardDetailRow | TopSellingProduct | SalesByCategory | CustomerDue>());
 
@@ -598,30 +601,64 @@ export const DashboardPage = () => {
     [summary]
   );
 
+  // Perf: har widget apna data aate hi dikhata hai. Pehle Promise.all sabse slow call
+  // (owner-overview) tak poora dashboard roke rakhta tha. `cancelled` = purane preset ka
+  // late response naye data ko overwrite na kare.
   useEffect(() => {
-    void Promise.all([
-      getDashboardSummary(activeRange),
-      getInvoicesPage({ ...activeRange, page: 0, size: DASHBOARD_ROW_LIMIT }),
-      getOwnerAnalytics(activeRange).catch(() => null),
-      getTopProducts({ ...activeRange, page: 0, size: DASHBOARD_ROW_LIMIT }).catch(() => emptyPage<TopSellingProduct>()),
-      getSalesByCategoryDetails({ ...activeRange, page: 0, size: DASHBOARD_ROW_LIMIT }).catch(() => emptyPage<SalesByCategory>()),
-      getCustomerDueList({ page: 0, size: DASHBOARD_ROW_LIMIT }).catch(() => emptyPage<CustomerDue>())
-    ]).then(([summaryData, invoicesData, ownerData, productData, categoryPageData, outstandingData]) => {
-      setSummary(summaryData);
-      setOwnerAnalytics(ownerData ?? null);
-      setTopProducts(productData.records);
-      setTopProductsPage(productData);
-      setSalesByCategory(categoryPageData.records);
-      setSalesByCategoryPage(categoryPageData);
-      setOutstandingCustomersPage(outstandingData);
-      setRecentInvoicesPage(invoicesData);
+    let cancelled = false;
+    void getDashboardSummary(activeRange).then((summaryData) => {
+      if (!cancelled) setSummary(summaryData);
     });
+    void getInvoicesPage({ ...activeRange, page: 0, size: DASHBOARD_ROW_LIMIT }).then((invoicesData) => {
+      if (!cancelled) setRecentInvoicesPage(invoicesData);
+    });
+    void getTopProducts({ ...activeRange, page: 0, size: DASHBOARD_ROW_LIMIT })
+      .catch(() => emptyPage<TopSellingProduct>())
+      .then((productData) => {
+        if (cancelled) return;
+        setTopProducts(productData.records);
+        setTopProductsPage(productData);
+      });
+    void getSalesByCategoryDetails({ ...activeRange, page: 0, size: DASHBOARD_ROW_LIMIT })
+      .catch(() => emptyPage<SalesByCategory>())
+      .then((categoryPageData) => {
+        if (cancelled) return;
+        setSalesByCategory(categoryPageData.records);
+        setSalesByCategoryPage(categoryPageData);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [activeRange]);
+
+  // Outstanding customers date range par depend nahi karte: sirf ek baar (pehle har preset change par dobara).
+  useEffect(() => {
+    let cancelled = false;
+    void getCustomerDueList({ page: 0, size: DASHBOARD_ROW_LIMIT })
+      .catch(() => emptyPage<CustomerDue>())
+      .then((outstandingData) => {
+        if (!cancelled) setOutstandingCustomersPage(outstandingData);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setChartLoading(true);
-    void getOwnerAnalytics(chartRange)
+    // Cards ki sparkline (activeRange) aur chart (chartRange) dono owner-overview se aate hain.
+    // Single-day range ke alawa dono same hain — pehle same heavy API do baar chalti thi.
+    const ownerRequest = getOwnerAnalytics(activeRange);
+    const chartRequest = chartRange === activeRange ? ownerRequest : getOwnerAnalytics(chartRange);
+    void ownerRequest
+      .then((data) => {
+        if (!cancelled) setOwnerAnalytics(data);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnerAnalytics(null);
+      });
+    void chartRequest
       .then((data) => {
         if (cancelled) return;
         // Dono series same buckets me same order me aati hain: index se jodo (label se nahi —
@@ -644,12 +681,24 @@ export const DashboardPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [chartRange]);
+  }, [activeRange, chartRange]);
+
+  // Search har keystroke par API na maare (pehle har akshar = ek heavy details call).
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedDetailSearch(detailSearch), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [detailSearch]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedListSearch(listSearch), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [listSearch]);
 
   useEffect(() => {
     if (!activeCard) {
       return;
     }
+    let cancelled = false;
     setDetailsLoading(true);
     void getDashboardDetails({
       card: activeCard,
@@ -658,18 +707,26 @@ export const DashboardPage = () => {
       size: DEFAULT_PAGE_SIZE,
       sortBy: detailSort.sortBy,
       sortDirection: detailSort.sortDirection,
-      search: detailSearch || undefined
+      search: debouncedDetailSearch || undefined
     })
-      .then(setDetails)
-      .finally(() => setDetailsLoading(false));
-  }, [activeCard, activeRange, detailPage, detailSearch, detailSort]);
+      .then((detailData) => {
+        if (!cancelled) setDetails(detailData);
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCard, activeRange, detailPage, debouncedDetailSearch, detailSort]);
 
   useEffect(() => {
     if (!activeList) {
       return;
     }
+    let cancelled = false;
     setListLoading(true);
-    const search = listSearch.trim() || undefined;
+    const search = debouncedListSearch.trim() || undefined;
     const request =
       activeList === "recentInvoices"
         ? getInvoicesPage({ ...activeRange, search, page: listPage, size: DASHBOARD_MODAL_PAGE_SIZE })
@@ -683,6 +740,7 @@ export const DashboardPage = () => {
 
     void request
       .then((response) => {
+        if (cancelled) return;
         if ("totalElements" in response) {
           setListData({
             records: response.rows,
@@ -695,14 +753,21 @@ export const DashboardPage = () => {
         }
         setListData(response);
       })
-      .finally(() => setListLoading(false));
-  }, [activeList, activeRange, listPage, listSearch]);
+      .finally(() => {
+        if (!cancelled) setListLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeList, activeRange, listPage, debouncedListSearch]);
 
+  // Naya card/list kholte waqt search turant khali (debounce ka purana search request me na jaye).
   const openDetails = (card: DashboardCardKey) => {
     setActiveCard(card);
     setDetails(null);
     setDetailPage(0);
     setDetailSearch("");
+    setDebouncedDetailSearch("");
     setDetailSort({ sortBy: detailConfig[card].defaultSort, sortDirection: "desc" });
   };
 
@@ -711,6 +776,7 @@ export const DashboardPage = () => {
     setDetails(null);
     setDetailPage(0);
     setDetailSearch("");
+    setDebouncedDetailSearch("");
     setDetailSort({ sortBy: detailConfig[card].defaultSort, sortDirection: "desc" });
   };
 
@@ -719,6 +785,7 @@ export const DashboardPage = () => {
     setListData(emptyPage<Invoice | DashboardDetailRow | TopSellingProduct | SalesByCategory | CustomerDue>());
     setListPage(0);
     setListSearch("");
+    setDebouncedListSearch("");
   };
 
   const toggleSort = (column: DetailColumn) => {
@@ -935,8 +1002,9 @@ export const DashboardPage = () => {
         </Panel>
       </div>
 
+      {/* Dono panels flex-col: grid stretch par Show More neeche align ho, beech me khaali dabba na dikhe. */}
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <Panel className="p-4 md:p-5">
+        <Panel className="flex flex-col p-4 md:p-5">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Recent invoices</p>
@@ -944,6 +1012,7 @@ export const DashboardPage = () => {
             </div>
             <p className="fs-12 text-slate-400">{recentInvoicesPage.totalRecords} invoice{recentInvoicesPage.totalRecords === 1 ? "" : "s"}</p>
           </div>
+          <div className="flex-1">
           <Table
             data={recentInvoicesPage.records}
             minHeightClass="min-h-0"
@@ -970,6 +1039,7 @@ export const DashboardPage = () => {
               }
             ]}
           />
+          </div>
           {recentInvoicesPage.totalRecords > DASHBOARD_ROW_LIMIT ? (
             <div className="mt-4 border-t border-slate-200 pt-4">
               <Button type="button" variant="secondary" className="w-full" onClick={() => openListDetails("recentInvoices")}>Show More Records</Button>
@@ -977,20 +1047,19 @@ export const DashboardPage = () => {
           ) : null}
         </Panel>
 
-        <Panel className="p-4 md:p-5">
+        <Panel className="flex flex-col p-4 md:p-5">
           <div className="mb-5">
             <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Top customers</p>
             <h2 className="mt-2 fs-18 font-bold text-slate-950">Highest sales contribution</h2>
           </div>
-          <div className="space-y-3">
+          <div className="flex-1 space-y-2">
             {summary?.topCustomers?.length ? (
               summary.topCustomers.slice(0, DASHBOARD_ROW_LIMIT).map((customer) => (
-                <div key={customer.customerId} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div key={customer.customerId} className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-slate-950">{customer.customerName}</p>
-                      <p className="mt-0.5 fs-12 text-slate-400">{customer.mobile}</p>
-                      <p className="mt-0.5 whitespace-nowrap fs-11 text-slate-500">Last purchase {formatDate(customer.lastPurchaseDate)}</p>
+                      <p className="mt-0.5 truncate fs-11 text-slate-500">{customer.mobile} · Last purchase {formatDate(customer.lastPurchaseDate)}</p>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="fs-11 uppercase tracking-[0.14em] text-slate-500">Sales</p>
@@ -1003,7 +1072,7 @@ export const DashboardPage = () => {
                     const base = paid + due;
                     const paidShare = base > 0 ? (paid / base) * 100 : 0;
                     return (
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <div className="flex h-2 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
                           <div className="h-full" style={{ width: `${paidShare}%`, background: seriesColors.collections }} />
                           {/* 2px surface gap between the two fills */}
@@ -1034,7 +1103,7 @@ export const DashboardPage = () => {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-        <Panel className="p-4 md:p-5">
+        <Panel className="flex flex-col p-4 md:p-5">
           <div className="mb-5 flex items-start justify-between gap-4">
             <div>
               <p className="fs-11 uppercase tracking-[0.18em] text-slate-400">Categories</p>
@@ -1077,7 +1146,7 @@ export const DashboardPage = () => {
               </div>
             </div>
           ) : null}
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 flex-1 space-y-2">
             {salesByCategory.length ? salesByCategory.map((category, index) => (
               <button
                 key={category.categoryId}
@@ -1104,8 +1173,8 @@ export const DashboardPage = () => {
             </div>
           ) : null}
         </Panel>
-        <div className="space-y-4">
-          <Panel className="p-4 md:p-5">
+        <div className="flex flex-col">
+          <Panel className="flex flex-1 flex-col p-4 md:p-5">
           <div className="mb-5 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
               <Banknote size={20} />
@@ -1139,12 +1208,12 @@ export const DashboardPage = () => {
               </div>
             )}
           </div>
-          <div className="mt-5">
+          <div className="mt-5 flex flex-1 flex-col">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="fs-14 font-bold text-slate-950">Top Outstanding Customers</p>
               <p className="fs-11 shrink-0 rounded-full bg-slate-100 px-3 py-0.5 font-semibold text-slate-500">Top 7</p>
             </div>
-            <div className="space-y-2">
+            <div className="flex-1 space-y-2">
               {outstandingCustomersPage.records.length ? outstandingCustomersPage.records.map((customer) => (
                 <div key={customer.customerId} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3">
                   <div className="min-w-0">

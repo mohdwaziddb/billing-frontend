@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AiAssistantWidget } from "../components/AiAssistantWidget";
 import { Sidebar } from "../components/Sidebar";
@@ -13,6 +13,13 @@ const readCollapsed = () => {
     return false;
   }
 };
+
+// Lazy page chunk aane tak halka placeholder (sidebar/header layout wahi rehta hai).
+export const RouteChunkFallback = () => (
+  <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-label="Loading page">
+    <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-[var(--theme-color)]" />
+  </div>
+);
 
 export const DashboardLayout = () => {
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -84,7 +91,9 @@ export const DashboardLayout = () => {
       >
         <main className="min-w-0 px-3 py-3 md:px-5 md:py-5">
           <div className="mx-auto max-w-[1680px] space-y-4 md:space-y-5">
-            <Outlet />
+            <Suspense fallback={<RouteChunkFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

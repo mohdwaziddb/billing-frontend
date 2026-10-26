@@ -25,11 +25,14 @@ export type ListPageController<TRow, TFilters extends FiltersWithSearch> = {
   applyFilters: () => void;
   applyFilterNow: (patch: Partial<TFilters>) => void;
   applySearchNow: (value: string) => void;
+  applySearchDebounced: (value: string) => void;
   clearSearchBox: () => void;
   resetAllFilters: () => void;
   goToPage: (nextPage: number) => void;
   refreshTable: () => void;
 };
+
+const SEARCH_DEBOUNCE_MS = 350;
 
 const createEmptyPageData = <TRow,>(): PageResponse<TRow> => ({
   records: [],
@@ -69,6 +72,9 @@ export function useListPage<TRow, TFilters extends FiltersWithSearch>({
   // Har load ka id: tez typing/page change par pehle bheji request ka der se
   // aaya jawab naye result ko overwrite na kare.
   const requestIdRef = useRef(0);
+  // Live search: har keystroke par request nahi — typing rukne ke baad ek hi call.
+  const searchDebounceRef = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(searchDebounceRef.current), []);
 
   const load = useCallback(
     async (nextPage: number, filters: TFilters): Promise<void> => {
@@ -140,6 +146,16 @@ export function useListPage<TRow, TFilters extends FiltersWithSearch>({
     void load(0, nextFilters);
   };
 
+  const applySearchDebounced = (value: string) => {
+    const nextFilters = { ...formFilters, search: value } as TFilters;
+    setFormFilters(nextFilters);
+    window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => {
+      setActiveFilters(nextFilters);
+      void load(0, nextFilters);
+    }, SEARCH_DEBOUNCE_MS);
+  };
+
   const clearSearchBox = () => {
     const nextFilters = { ...activeFilters, search: "" } as TFilters;
     setFormFilters(nextFilters);
@@ -174,6 +190,7 @@ export function useListPage<TRow, TFilters extends FiltersWithSearch>({
     applyFilters,
     applyFilterNow,
     applySearchNow,
+    applySearchDebounced,
     clearSearchBox,
     resetAllFilters,
     goToPage,

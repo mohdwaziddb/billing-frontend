@@ -25,6 +25,30 @@ export const getInvoicesPage = async (params?: InvoiceFilterParams) => {
   return response.data.data;
 };
 
+export type InvoiceSummaryTrendPoint = {
+  invoiceDate: string;
+  paymentStatus: string | null;
+  invoiceCount: number;
+  balanceAmount: number;
+};
+
+export type InvoiceListSummary = {
+  totalInvoices: number;
+  paidInvoices: number;
+  pendingInvoices: number;
+  partialInvoices: number;
+  outstandingAmount: number;
+  trend: InvoiceSummaryTrendPoint[];
+};
+
+// List page KPI cards: backend aggregate (pehle saare invoices browser me la kar gine jaate the).
+export const getInvoiceSummary = async (params?: Omit<InvoiceFilterParams, "page" | "size">) => {
+  const response = await apiClient.get<ApiResponse<InvoiceListSummary>>("/v1/invoices/summary", {
+    params
+  });
+  return response.data.data;
+};
+
 export const getInvoices = async (params?: InvoiceFilterParams) => {
   const response = await getInvoicesPage(params);
   return response.records;

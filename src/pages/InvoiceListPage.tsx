@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle, Clock, Download, Eye, FileText, History, RotateCcw, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getAuditLogs } from "../api/auditLogs";
-import { deleteInvoice, getInvoicesPage, restoreInvoice, type InvoiceFilterParams } from "../api/invoices";
+import { getAuditLogCounts } from "../api/auditLogs";
+import { deleteInvoice, getInvoiceSummary, getInvoicesPage, restoreInvoice, type InvoiceFilterParams, type InvoiceListSummary, type InvoiceSummaryTrendPoint } from "../api/invoices";
 import { getProductCategories } from "../api/productCategories";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -79,9 +79,10 @@ const toIso = (value: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const buildInvoiceDateRange = (rows: Invoice[]) => {
-  const timestamps = rows
-    .map((invoice) => new Date(invoice.invoiceDate).getTime())
+// Backend summary ke (date, status) points par chalta hai (pehle saare invoice rows par).
+const buildInvoiceDateRange = (points: InvoiceSummaryTrendPoint[]) => {
+  const timestamps = points
+    .map((point) => new Date(point.invoiceDate).getTime())
     .filter((time) => !Number.isNaN(time));
 
   if (!timestamps.length) {
@@ -94,12 +95,12 @@ const buildInvoiceDateRange = (rows: Invoice[]) => {
 };
 
 const buildInvoiceTrend = (
-  rows: Invoice[],
+  points: InvoiceSummaryTrendPoint[],
   startDate: string,
   endDate: string,
-  valueAccessor: (invoice: Invoice) => number = () => 1
+  valueAccessor: (point: InvoiceSummaryTrendPoint) => number = (point) => Number(point.invoiceCount ?? 0)
 ) => {
-  if (!rows.length) {
+  if (!points.length) {
     return Array(8).fill(0);
   }
 
@@ -107,7 +108,7 @@ const buildInvoiceTrend = (
   let rangeEnd = new Date(endDate).getTime();
 
   if (Number.isNaN(rangeStart) || Number.isNaN(rangeEnd) || !startDate || !endDate) {
-    const range = buildInvoiceDateRange(rows);
+    const range = buildInvoiceDateRange(points);
     rangeStart = new Date(range.startDate).getTime();
     rangeEnd = new Date(range.endDate).getTime();
   }
@@ -125,8 +126,8 @@ const buildInvoiceTrend = (
   const bucketMs = totalMs > 0 ? totalMs / bucketCount : 0;
   const values = Array(bucketCount).fill(0);
 
-  rows.forEach((invoice) => {
-    const invoiceTime = new Date(invoice.invoiceDate).getTime();
+  points.forEach((point) => {
+    const invoiceTime = new Date(point.invoiceDate).getTime();
     if (Number.isNaN(invoiceTime) || invoiceTime < rangeStart || invoiceTime > rangeEnd) {
       return;
     }
@@ -135,7 +136,7 @@ const buildInvoiceTrend = (
       ? 0
       : Math.min(bucketCount - 1, Math.floor((invoiceTime - rangeStart) / bucketMs));
 
-    values[bucketIndex] += valueAccessor(invoice);
+    values[bucketIndex] += valueAccessor(point);
   });
 
   return values;
@@ -182,7 +183,8 @@ const buildGrandTotal = (rows: Invoice[]) => ({
 
 export const InvoiceListPage = () => {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [exportRows, setExportRows] = useState<Invoice[]>([]);
+  const [invoiceSummary, setInvoiceSummary] = useState<InvoiceListSummary | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<Invoice | null>(null);
   const [logTarget, setLogTarget] = useState<Invoice | null>(null);
@@ -204,14 +206,15 @@ export const InvoiceListPage = () => {
     fetchPage: ({ page, size, filters }) => getInvoicesPage({ ...buildParams(filters), page, size })
   });
 
-  // Saare pages (pehle sirf pehle 1000: KPI cards aur export galat). Request id:
-  // filter jaldi badle to purana jawab naya data overwrite na kare.
-  const exportRequestId = useRef(0);
-  const loadExportRows = async (filters: InvoiceFilters) => {
-    const requestId = ++exportRequestId.current;
-    const rows = await fetchAllPages((page, size) => getInvoicesPage({ ...buildParams(filters), page, size }));
-    if (requestId === exportRequestId.current) {
-      setExportRows(rows);
+  // KPI cards backend aggregate se. Pehle har page load / filter par fetchAllPages se 50k tak
+  // invoices (items samet) aate the sirf ginne ke liye — bade tenant par page minto atakta tha.
+  // Request id: filter jaldi badle to purana jawab naya data overwrite na kare.
+  const summaryRequestId = useRef(0);
+  const loadSummary = async (filters: InvoiceFilters) => {
+    const requestId = ++summaryRequestId.current;
+    const summaryData = await getInvoiceSummary(buildParams(filters));
+    if (requestId === summaryRequestId.current) {
+      setInvoiceSummary(summaryData);
     }
   };
 
@@ -222,9 +225,11 @@ export const InvoiceListPage = () => {
   }, [setApiError]);
 
   useEffect(() => {
-    void loadExportRows(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load invoices"));
+    void loadSummary(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load invoices"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list.activeFilters]);
+
+  const trendPoints = useMemo(() => invoiceSummary?.trend ?? [], [invoiceSummary]);
 
   const baseParams = useMemo(() => buildParams(list.activeFilters), [list.activeFilters]);
   const activeFilterSummary = useMemo(() => summarizeInvoiceFilters(list.activeFilters, categories), [list.activeFilters, categories]);
@@ -238,8 +243,8 @@ export const InvoiceListPage = () => {
       return presetRange;
     }
 
-    return buildInvoiceDateRange(exportRows);
-  }, [list.activeFilters, exportRows]);
+    return buildInvoiceDateRange(trendPoints);
+  }, [list.activeFilters, trendPoints]);
 
   // Sparkline = period me ab tak ka running total. Pehle har din ka alag count tha (beech ke
   // khaali din par "V" gaddha) aur badge aakhri din vs pichhla din compare karta (0 se = "+100%").
@@ -250,60 +255,94 @@ export const InvoiceListPage = () => {
     return total > 0 ? cumulative : undefined;
   };
 
+  const countTrend = (status?: string) => (point: InvoiceSummaryTrendPoint) =>
+    !status || point.paymentStatus === status ? Number(point.invoiceCount ?? 0) : 0;
+
   const totalInvoiceTrend = useMemo(
-    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate),
-    [exportRows, currentTrendRange]
+    () => buildInvoiceTrend(trendPoints, currentTrendRange.startDate, currentTrendRange.endDate, countTrend()),
+    [trendPoints, currentTrendRange]
   );
 
   const paidInvoiceTrend = useMemo(
-    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => invoice.paymentStatus === "PAID" ? 1 : 0),
-    [exportRows, currentTrendRange]
+    () => buildInvoiceTrend(trendPoints, currentTrendRange.startDate, currentTrendRange.endDate, countTrend("PAID")),
+    [trendPoints, currentTrendRange]
   );
 
   const pendingInvoiceTrend = useMemo(
-    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => invoice.paymentStatus === "UNPAID" ? 1 : 0),
-    [exportRows, currentTrendRange]
+    () => buildInvoiceTrend(trendPoints, currentTrendRange.startDate, currentTrendRange.endDate, countTrend("UNPAID")),
+    [trendPoints, currentTrendRange]
   );
 
   const partialInvoiceTrend = useMemo(
-    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => invoice.paymentStatus === "PARTIAL" ? 1 : 0),
-    [exportRows, currentTrendRange]
+    () => buildInvoiceTrend(trendPoints, currentTrendRange.startDate, currentTrendRange.endDate, countTrend("PARTIAL")),
+    [trendPoints, currentTrendRange]
   );
 
   const outstandingTrend = useMemo(
-    () => buildInvoiceTrend(exportRows, currentTrendRange.startDate, currentTrendRange.endDate, (invoice) => Number(invoice.balanceAmount ?? 0)),
-    [exportRows, currentTrendRange]
+    () => buildInvoiceTrend(trendPoints, currentTrendRange.startDate, currentTrendRange.endDate, (point) => Number(point.balanceAmount ?? 0)),
+    [trendPoints, currentTrendRange]
   );
 
   const summary = useMemo(() => ({
-    total: exportRows.length,
-    paid: exportRows.filter((item) => item.paymentStatus === "PAID").length,
-    pending: exportRows.filter((item) => item.paymentStatus === "UNPAID").length,
-    partial: exportRows.filter((item) => item.paymentStatus === "PARTIAL").length,
-    outstandingAmount: exportRows.reduce((sum, item) => sum + Number(item.balanceAmount ?? 0), 0)
-  }), [exportRows]);
+    total: Number(invoiceSummary?.totalInvoices ?? 0),
+    paid: Number(invoiceSummary?.paidInvoices ?? 0),
+    pending: Number(invoiceSummary?.pendingInvoices ?? 0),
+    partial: Number(invoiceSummary?.partialInvoices ?? 0),
+    outstandingAmount: Number(invoiceSummary?.outstandingAmount ?? 0)
+  }), [invoiceSummary]);
 
+  // Boolean dep: `can` ki identity auth update par badalti hai (log counts baar-baar aate the).
+  const canViewLogs = can("INVOICES", "LOGS");
   useEffect(() => {
     const ids = [...new Set([...list.tableData, ...modalInvoices].map((invoice) => invoice.id))];
-    if (!can("INVOICES", "LOGS") || !ids.length) {
+    if (!canViewLogs || !ids.length) {
       setLogCounts({});
       return;
     }
-    void loadLogCounts("Invoice", ids).then(setLogCounts).catch(() => setLogCounts({}));
-  }, [can, list.tableData, modalInvoices]);
+    // Ek call me saare rows (pehle har row ki alag /audit-logs request: 20 rows = 20 calls).
+    void getAuditLogCounts("Invoice", ids).then(setLogCounts).catch(() => setLogCounts({}));
+  }, [canViewLogs, list.tableData, modalInvoices]);
 
   useEffect(() => {
     if (!activeSummary) {
       return;
     }
     const params = summaryParams(baseParams, activeSummary, modalSearch);
-    void getInvoicesPage({ ...params, page: modalPage, size: 20 })
-      .then((response) => {
-        setModalInvoicePage(response);
-        setModalInvoices(response.records);
-      })
-      .catch((err: any) => setApiError(err, "Unable to load invoice details"));
+    let cancelled = false;
+    // Modal search par har keystroke ki request nahi: thoda ruk kar (page badalna bhi isi se).
+    const timeoutId = window.setTimeout(() => {
+      void getInvoicesPage({ ...params, page: modalPage, size: 20 })
+        .then((response) => {
+          if (cancelled) {
+            return;
+          }
+          setModalInvoicePage(response);
+          setModalInvoices(response.records);
+        })
+        .catch((err: any) => {
+          if (!cancelled) {
+            setApiError(err, "Unable to load invoice details");
+          }
+        });
+    }, modalSearch ? 300 : 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [activeSummary, baseParams, modalPage, modalSearch, setApiError]);
+
+  // Excel export: saare rows sirf button dabane par (pehle har page load par hi aa jaate the).
+  const exportAllInvoices = async () => {
+    try {
+      setExporting(true);
+      const rows = await fetchAllPages((page, size) => getInvoicesPage({ ...buildParams(list.activeFilters), page, size }));
+      exportInvoices("invoices.xlsx", rows);
+    } catch (err: any) {
+      setApiError(err, "Unable to export invoices");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteTarget) {
@@ -313,7 +352,7 @@ export const InvoiceListPage = () => {
       setDeleting(true);
       await deleteInvoice(deleteTarget.id);
       list.refreshTable();
-      await loadExportRows(list.activeFilters);
+      await loadSummary(list.activeFilters);
       setDeleteTarget(null);
       notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Invoice"));
     } catch (err: any) {
@@ -332,7 +371,7 @@ export const InvoiceListPage = () => {
       await restoreInvoice(restoreTarget.id);
       setRestoreTarget(null);
       list.refreshTable();
-      await loadExportRows(list.activeFilters);
+      await loadSummary(list.activeFilters);
       notificationService.showSuccess(CommonSuccessMessageUtil.updated("Invoice"));
     } catch (err: any) {
       setApiError(err, "Unable to restore invoice");
@@ -511,9 +550,9 @@ export const InvoiceListPage = () => {
         can("INVOICES", "EXPORT") || can("CREATE_INVOICE", "ADD") || can("INVOICE_DATAPORT", "VIEW") ? (
           <>
             {can("INVOICES", "EXPORT") ? (
-              <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportInvoices("invoices.xlsx", exportRows)}>
+              <Button type="button" variant="secondary" disabled={exporting || !summary.total} onClick={() => void exportAllInvoices()}>
                 <Download size={16} />
-                Export Excel
+                {exporting ? "Exporting..." : "Export Excel"}
               </Button>
             ) : null}
             <DataPortLink menuCode="INVOICE_DATAPORT" moduleKey="invoices" />
@@ -586,14 +625,6 @@ export const InvoiceListPage = () => {
       }
     />
   );
-};
-
-const loadLogCounts = async (moduleName: string, ids: number[]) => {
-  const entries = await Promise.all(ids.map(async (entityId) => {
-    const response = await getAuditLogs({ moduleName, entityId, page: 0, size: 1 });
-    return [entityId, response.totalRecords] as const;
-  }));
-  return Object.fromEntries(entries);
 };
 
 const buildParams = (filters: InvoiceFilters): InvoiceFilterParams => {

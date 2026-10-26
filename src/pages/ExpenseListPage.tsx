@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Download, Edit3, History, Layers3, Plus, ReceiptIndianRupee } from "lucide-react";
 import { getCustomers } from "../api/customers";
 import { getExpenseCategories } from "../api/expenseCategories";
-import { createExpense, deleteExpense, getExpensesPage, updateExpense, type ExpenseFilterParams } from "../api/expenses";
+import { createExpense, deleteExpense, getExpenseSummary, getExpensesPage, updateExpense, type ExpenseFilterParams, type ExpenseSummary } from "../api/expenses";
 import { getInvoices } from "../api/invoices";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -119,6 +119,17 @@ const paramsFor = (filters: ExpenseFilters): ExpenseFilterParams => {
   };
 };
 
+const emptyExpenseSummary: ExpenseSummary = { total: 0, thisMonth: 0, today: 0, category: 0, categoryCount: 0 };
+
+/** Filter panel khulte hi (children tabhi mount hote hain) customers/invoices ka lookup load. */
+const LoadOnMount = ({ onMount }: { onMount: () => void }) => {
+  useEffect(() => {
+    onMount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+};
+
 const getFormWarning = (values: ExpenseFormState, invoices: Invoice[]): string | null => {
   const amount = Number(values.amount);
   if (!values.categoryId) {
@@ -145,10 +156,12 @@ const getFormWarning = (values: ExpenseFormState, invoices: Invoice[]): string |
 export const ExpenseListPage = () => {
   const { can } = useAuth();
   const { setApiError } = useApiMessage();
-  const [exportRows, setExportRows] = useState<Expense[]>([]);
+  const [exporting, setExporting] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [dashboardRows, setDashboardRows] = useState<Expense[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<ExpenseSummary>(emptyExpenseSummary);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  // Customers / invoices (1000-1000 rows) sirf filter panel ya Add/Edit form khulne par — page load par nahi.
+  const lookupsRequestedRef = useRef(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [activeDrilldown, setActiveDrilldown] = useState<ExpenseDrilldownKey | null>(null);
@@ -163,30 +176,50 @@ export const ExpenseListPage = () => {
     fetchPage: ({ page, size, filters }) => getExpensesPage({ ...paramsFor(filters), page, size })
   });
 
-  const loadExportRows = async (filters: ExpenseFilters) => {
-    const response = await getExpensesPage({ ...paramsFor(filters), page: 0, size: 1000 });
-    setExportRows(response.records);
+  // Export ab click par hi rows laata hai (pehle har filter change par 1000 rows background me aati thi).
+  const exportExpenses = async () => {
+    try {
+      setExporting(true);
+      const response = await getExpensesPage({ ...paramsFor(list.activeFilters), page: 0, size: 1000 });
+      exportToExcel("expenses.xlsx", response.records, visibleExpenseExportColumns);
+    } catch (err: any) {
+      setApiError(err, "Unable to export expenses");
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const loadDashboardRows = async () => {
-    const response = await getExpensesPage({ page: 0, size: 1000 });
-    setDashboardRows(response.records);
+  // KPI cards: backend SQL aggregate. today/monthStart browser ke din se (pehle jaisa).
+  const loadDashboardSummary = async (categoryId: string) => {
+    const summary = await getExpenseSummary({ today: todayIso(), monthStart: monthStartIso(), categoryId: categoryId || undefined });
+    setDashboardSummary(summary);
+  };
+
+  const ensureLookups = () => {
+    if (lookupsRequestedRef.current) {
+      return;
+    }
+    lookupsRequestedRef.current = true;
+    void Promise.all([
+      getCustomers({ active: true, size: 1000 }).then(setCustomers),
+      getInvoices({ size: 1000 }).then(setInvoices)
+    ]).catch((err: any) => {
+      lookupsRequestedRef.current = false;
+      setApiError(err, "Unable to load expense setup");
+    });
   };
 
   useEffect(() => {
-    void Promise.all([
-      getExpenseCategories({ active: true, size: 1000 }).then(setCategories),
-      getCustomers({ active: true, size: 1000 }).then(setCustomers),
-      getInvoices({ size: 1000 }).then(setInvoices),
-      loadDashboardRows()
-    ]).catch((err: any) => setApiError(err, "Unable to load expense setup"));
+    void getExpenseCategories({ active: true, size: 1000 })
+      .then(setCategories)
+      .catch((err: any) => setApiError(err, "Unable to load expense setup"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    void loadExportRows(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load expenses"));
+    void loadDashboardSummary(list.activeFilters.categoryId).catch((err: any) => setApiError(err, "Unable to load expense summary"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.activeFilters]);
+  }, [list.activeFilters.categoryId]);
 
   const form = useAddEditForm<Expense, ExpenseFormState, ExpenseRequest>({
     emptyForm: getEmptyForm(),
@@ -220,27 +253,19 @@ export const ExpenseListPage = () => {
     remove: deleteExpense,
     onSaved: () => {
       list.refreshTable();
-      void loadExportRows(list.activeFilters);
-      void loadDashboardRows();
+      void loadDashboardSummary(list.activeFilters.categoryId).catch((err: any) => setApiError(err, "Unable to load expense summary"));
     }
   });
 
+  useEffect(() => {
+    if (form.formOpen) {
+      ensureLookups();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.formOpen]);
+
   const activeFilterSummary = useMemo(() => summarizeExpenseFilters(list.activeFilters, categories, customers, invoices), [list.activeFilters, categories, customers, invoices]);
   const selectedCategory = categories.find((category) => String(category.id) === list.activeFilters.categoryId) ?? null;
-  const dashboardSummary = useMemo(() => {
-    const today = todayIso();
-    const monthStart = monthStartIso();
-    const todayRows = dashboardRows.filter((item) => item.expenseDate === today);
-    const monthRows = dashboardRows.filter((item) => item.expenseDate >= monthStart && item.expenseDate <= today);
-    const categoryRows = selectedCategory ? dashboardRows.filter((item) => item.categoryId === selectedCategory.id) : dashboardRows;
-    return {
-      total: sumExpenses(dashboardRows),
-      today: sumExpenses(todayRows),
-      thisMonth: sumExpenses(monthRows),
-      category: sumExpenses(categoryRows),
-      categoryCount: categoryRows.length
-    };
-  }, [dashboardRows, selectedCategory]);
 
   const openCategoryCard = () => {
     openDrilldown("category");
@@ -382,6 +407,7 @@ export const ExpenseListPage = () => {
       }
       filterFields={
         <>
+          <LoadOnMount onMount={ensureLookups} />
           <Select label="Expense Type" value={list.formFilters.expenseType} options={[{ label: "All", value: "" }, ...expenseTypeOptions]} onChange={(event) => list.updateFormFilters({ expenseType: event.target.value })} />
           <Select label="Category" value={list.formFilters.categoryId} options={[{ label: "All", value: "" }, ...categories.map((item) => ({ label: item.categoryName, value: String(item.id) }))]} onChange={(event) => list.updateFormFilters({ categoryId: event.target.value })} />
           <Select label="Expense Date" value={list.formFilters.datePreset} options={[
@@ -411,7 +437,7 @@ export const ExpenseListPage = () => {
       }
       toolbarButtons={
         <>
-          {can("EXPENSES", "EXPORT") ? <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportToExcel("expenses.xlsx", exportRows, visibleExpenseExportColumns)}><Download size={16} />Export</Button> : null}
+          {can("EXPENSES", "EXPORT") ? <Button type="button" variant="secondary" disabled={!list.paginationInfo.totalRecords || exporting} onClick={() => void exportExpenses()}><Download size={16} />Export</Button> : null}
           <DataPortLink menuCode="EXPENSE_DATAPORT" moduleKey="expenses" />
           {can("EXPENSES", "ADD") ? <Button type="button" onClick={() => form.openAddForm(getEmptyForm())}><Plus size={16} />Add Expense</Button> : null}
         </>
@@ -477,8 +503,6 @@ const expenseTypeOptions = [
 ];
 
 const typeLabel = (value: ExpenseType) => value.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (char) => char.toUpperCase());
-
-const sumExpenses = (rows: Expense[]) => rows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
 
 const summarizeExpenseFilters = (
   filters: ExpenseFilters,

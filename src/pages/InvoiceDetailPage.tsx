@@ -58,20 +58,29 @@ export const InvoiceDetailPage = () => {
     includePdf: true
   });
   const { setApiError } = useApiMessage();
-  const { onlineEnabled } = usePaymentGatewayConfig(can("PAYMENTS", "VIEW"));
+  const canViewPayments = can("PAYMENTS", "VIEW");
+  const canViewExpenses = can("EXPENSES", "VIEW");
+  const canViewInvoiceLogs = can("INVOICES", "LOGS");
+  const { onlineEnabled } = usePaymentGatewayConfig(canViewPayments);
 
+  // Boolean deps: `can` ki identity har auth update par badalti hai — pehle poora page
+  // (invoice + payments + render + logs, 7 calls) mount par 2-3 baar load hota tha.
   useEffect(() => {
     if (!invoiceId) return;
     const id = Number(invoiceId);
     // Invoice badalne par purani requests ka jawab naye page par na likhe.
     let cancelled = false;
+    const templateSettingsRequest = getInvoiceTemplateSettings().catch(() => null);
+    // Render (sabse bhaari call) settings aate hi shuru — pehle baaki sab calls ke baad hi chalta tha.
+    const renderRequest = templateSettingsRequest.then((templateSettings) => renderInvoiceHtml(id, templateSettings?.defaultTemplateId));
+    renderRequest.catch(() => undefined);
     void Promise.all([
       getInvoice(id),
-      getInvoiceTemplateSettings().catch(() => null),
+      templateSettingsRequest,
       getPayments({ invoiceId: id, size: 1000 }),
-      can("PAYMENTS", "VIEW") ? getInvoiceTransactions(id).catch(() => []) : Promise.resolve([]),
-      can("EXPENSES", "VIEW") ? getInvoiceProfitability(id) : Promise.resolve(null),
-      can("INVOICES", "LOGS") ? getAuditLogs({ moduleName: "Invoice", entityId: id, page: 0, size: 20 }).then((response) => response.records) : Promise.resolve([])
+      canViewPayments ? getInvoiceTransactions(id).catch(() => []) : Promise.resolve([]),
+      canViewExpenses ? getInvoiceProfitability(id) : Promise.resolve(null),
+      canViewInvoiceLogs ? getAuditLogs({ moduleName: "Invoice", entityId: id, page: 0, size: 20 }).then((response) => response.records) : Promise.resolve([])
     ]).then(([invoiceData, templateSettings, paymentData, transactionData, profitabilityData, logData]) => {
       if (cancelled) return;
       setInvoice(invoiceData);
@@ -80,7 +89,7 @@ export const InvoiceDetailPage = () => {
       setTransactions(transactionData);
       setProfitability(profitabilityData);
       setLogs(logData);
-      return renderInvoiceHtml(id, templateSettings?.defaultTemplateId).then((render) => {
+      return renderRequest.then((render) => {
         if (!cancelled) setRenderedHtml(render.html);
       });
     }).catch((err: any) => {
@@ -90,7 +99,7 @@ export const InvoiceDetailPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [can, invoiceId, reloadKey, setApiError]);
+  }, [canViewExpenses, canViewInvoiceLogs, canViewPayments, invoiceId, reloadKey, setApiError]);
 
   const resolveRenderedInvoiceHtml = async () => {
     if (!invoice) {

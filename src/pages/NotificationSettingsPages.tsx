@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Edit3, History, Mail, MessageCircle, MessageSquare, Plus, Send } from "lucide-react";
@@ -109,6 +109,24 @@ const CommunicationHubPage = () => {
   const { can } = useAuth();
   const canAddProvider = can("COMMUNICATION", "ADD");
   const canEditProvider = can("COMMUNICATION", "EDIT");
+  // Har channel ki settings ki ek hi in-flight request: mount par summary cards aur current
+  // tab dono ek hi response share karein (pehle current tab ki API page load par 2 baar chalti thi).
+  const channelRequestsRef = useRef<Partial<Record<CommunicationTab, Promise<ProviderSettings[]>>>>({});
+  const fetchChannelSettings = (channel: CommunicationTab, forceReload = false) => {
+    const cachedRequest = channelRequestsRef.current[channel];
+    if (cachedRequest && !forceReload) {
+      return cachedRequest;
+    }
+    const request = loadChannelSettings(channel);
+    channelRequestsRef.current[channel] = request;
+    // Fail hua to cache me na rahe — agli baar dobara try ho.
+    request.catch(() => {
+      if (channelRequestsRef.current[channel] === request) {
+        delete channelRequestsRef.current[channel];
+      }
+    });
+    return request;
+  };
 
   useEffect(() => {
     setTab(normalizeTab(searchParams.get("tab")));
@@ -127,7 +145,8 @@ const CommunicationHubPage = () => {
   }, [smsProviders, tab, whatsAppProviders]);
 
   useEffect(() => {
-    if (tab !== "sms") {
+    // Provider list static metadata hai — ek baar aa gayi to tab badalne par dobara nahi.
+    if (tab !== "sms" || smsProviders.length) {
       return;
     }
     const loadProviders = async () => {
@@ -138,10 +157,10 @@ const CommunicationHubPage = () => {
       }
     };
     void loadProviders();
-  }, [setApiError, tab]);
+  }, [setApiError, smsProviders.length, tab]);
 
   useEffect(() => {
-    if (tab !== "whatsapp") {
+    if (tab !== "whatsapp" || whatsAppProviders.length) {
       return;
     }
     const loadProviders = async () => {
@@ -152,11 +171,12 @@ const CommunicationHubPage = () => {
       }
     };
     void loadProviders();
-  }, [setApiError, tab]);
+  }, [setApiError, tab, whatsAppProviders.length]);
 
-  const refresh = async () => {
+  // forceReload: save ke baad taaza data; tab switch / mount par chal rahi request reuse.
+  const refresh = async (forceReload = true) => {
     try {
-      const rows = await loadChannelSettings(tab);
+      const rows = await fetchChannelSettings(tab, forceReload);
       setRecords(rows);
       setChannelSummary((current) => ({ ...current, [tab]: rows }));
     } catch (error) {
@@ -167,14 +187,14 @@ const CommunicationHubPage = () => {
   // Teeno channel cards par "active / not set up" dikhane ke liye ek baar sab load.
   useEffect(() => {
     CHANNELS.forEach(({ value }) => {
-      void loadChannelSettings(value)
+      void fetchChannelSettings(value)
         .then((rows) => setChannelSummary((current) => ({ ...current, [value]: rows })))
         .catch(() => setChannelSummary((current) => ({ ...current, [value]: [] })));
     });
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void refresh(false);
   }, [tab]);
 
   const switchTab = (nextTab: CommunicationTab) => {

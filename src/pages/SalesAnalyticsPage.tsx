@@ -26,6 +26,8 @@ type DatePreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" 
 type AnalyticsDrilldownKey = "revenue" | "collections" | "outstanding" | "expenses" | "customers";
 type AnalyticsDrilldownRow = Invoice | Payment | Expense | Customer;
 
+const SEARCH_DEBOUNCE_MS = 350;
+
 const emptyDetailPage: PageResponse<AnalyticsDrilldownRow> = {
   records: [],
   page: 0,
@@ -90,21 +92,34 @@ export const SalesAnalyticsPage = () => {
   const [drilldownPage, setDrilldownPage] = useState<PageResponse<AnalyticsDrilldownRow>>(emptyDetailPage);
   const [drilldownPageNumber, setDrilldownPageNumber] = useState(0);
   const [drilldownSearch, setDrilldownSearch] = useState("");
+  const [debouncedDrilldownSearch, setDebouncedDrilldownSearch] = useState("");
   const [drilldownLoading, setDrilldownLoading] = useState(false);
 
   const activeRange = useMemo(() => (preset === "custom" ? customRange : buildRange(preset)), [customRange, preset]);
 
+  // Perf: overview hi date range par chalta hai. Low stock / due customers range-independent
+  // hain — pehle har preset click par teeno dobara aate the, aur Promise.all sabse slow call
+  // tak poora page roke rakhta tha. `cancelled` = purane preset ka late response overwrite na kare.
   useEffect(() => {
-    void Promise.all([
-      getOwnerAnalytics(activeRange),
-      getLowStockProducts({ page: 0, size: DEFAULT_PAGE_SIZE }),
-      getCustomerDueList({ page: 0, size: DEFAULT_PAGE_SIZE })
-    ]).then(([ownerData, lowStockData, dueData]) => {
-      setOverview(ownerData);
-      setLowStockPage(lowStockData);
-      setDueCustomersPage(dueData);
+    let cancelled = false;
+    void getOwnerAnalytics(activeRange).then((ownerData) => {
+      if (!cancelled) setOverview(ownerData);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [activeRange]);
+
+  useEffect(() => {
+    void getLowStockProducts({ page: 0, size: DEFAULT_PAGE_SIZE }).then(setLowStockPage);
+    void getCustomerDueList({ page: 0, size: DEFAULT_PAGE_SIZE }).then(setDueCustomersPage);
+  }, []);
+
+  // Drilldown search: har keystroke par API nahi, thoda rukne par.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedDrilldownSearch(drilldownSearch), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [drilldownSearch]);
 
   const loadLowStockProducts = async (page: number) => {
     setLowStockPage(await getLowStockProducts({ page, size: DEFAULT_PAGE_SIZE }));
@@ -118,6 +133,7 @@ export const SalesAnalyticsPage = () => {
     setActiveDrilldown(key);
     setDrilldownPageNumber(0);
     setDrilldownSearch("");
+    setDebouncedDrilldownSearch("");
   };
 
   // Trend buckets ki asli dates (backend label "15" / "Oct" par nirbhar nahi). Series index se jodo.
@@ -255,14 +271,15 @@ export const SalesAnalyticsPage = () => {
     if (!activeDrilldown) {
       return;
     }
+    let cancelled = false;
     setDrilldownLoading(true);
-    const commonParams = { search: drilldownSearch || undefined, page: drilldownPageNumber, size: DEFAULT_PAGE_SIZE };
+    const commonParams = { search: debouncedDrilldownSearch || undefined, page: drilldownPageNumber, size: DEFAULT_PAGE_SIZE };
     const request = activeDrilldown === "collections"
       ? getPaymentsPage({ ...commonParams, startDate: activeRange.startDate, endDate: activeRange.endDate })
       : activeDrilldown === "expenses"
         ? getExpensesPage({ ...commonParams, startDate: activeRange.startDate, endDate: activeRange.endDate })
         : activeDrilldown === "customers"
-          ? getCustomersPage({ search: drilldownSearch || undefined, page: drilldownPageNumber, size: DEFAULT_PAGE_SIZE })
+          ? getCustomersPage({ search: debouncedDrilldownSearch || undefined, page: drilldownPageNumber, size: DEFAULT_PAGE_SIZE })
           : getInvoicesPage({
             ...commonParams,
             startDate: activeRange.startDate,
@@ -270,9 +287,16 @@ export const SalesAnalyticsPage = () => {
             outstandingFilter: activeDrilldown === "outstanding" ? "OUTSTANDING" : undefined
           });
     void request
-      .then((response) => setDrilldownPage(response as PageResponse<AnalyticsDrilldownRow>))
-      .finally(() => setDrilldownLoading(false));
-  }, [activeDrilldown, activeRange, drilldownPageNumber, drilldownSearch]);
+      .then((response) => {
+        if (!cancelled) setDrilldownPage(response as PageResponse<AnalyticsDrilldownRow>);
+      })
+      .finally(() => {
+        if (!cancelled) setDrilldownLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDrilldown, activeRange, drilldownPageNumber, debouncedDrilldownSearch]);
 
   return (
     <div className="space-y-4 pb-6">

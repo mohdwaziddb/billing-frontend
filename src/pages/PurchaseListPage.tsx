@@ -102,12 +102,6 @@ export const PurchaseListPage = () => {
       })
   });
 
-  useEffect(() => {
-    void getProducts({ active: true, size: 1000 })
-      .then((productRows) => setProducts(productRows))
-      .catch((err: any) => setApiError(err, "Unable to load products"));
-  }, [setApiError]);
-
   const form = useAddEditForm<Purchase, FormState, PurchaseRequest>({
     emptyForm: getEmptyForm(),
     entityName: "Purchase",
@@ -150,6 +144,28 @@ export const PurchaseListPage = () => {
       }
     }
   });
+
+  // Products (size=1000, stock summary ke saath) sirf "New Purchase" form ke dropdown me chahiye —
+  // pehle page mount par hi load hote the aur list ke saath backend par bhaari call chalti thi.
+  // Ab form pehli baar khulne par hi load hote hain.
+  const [productsRequested, setProductsRequested] = useState(false);
+  useEffect(() => {
+    if (!form.formOpen || productsRequested) {
+      return;
+    }
+    setProductsRequested(true);
+    void getProducts({ active: true, size: 1000 })
+      .then((productRows) => setProducts(productRows))
+      .catch((err: any) => {
+        setProductsRequested(false);
+        setApiError(err, "Unable to load products");
+      });
+  }, [form.formOpen, productsRequested, setApiError]);
+
+  const productOptions = useMemo(
+    () => [{ label: "Select Product", value: "" }, ...products.map((product) => ({ label: `${product.name} (${product.sku})`, value: String(product.id) }))],
+    [products]
+  );
 
   const canSubmit = useMemo(() => form.formValues.items.every((item) => item.productId && Number(item.qty) > 0 && Number(item.purchaseRate) >= 0 && Number(item.sellingRate) >= Number(item.purchaseRate)), [form.formValues.items]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
@@ -250,7 +266,7 @@ export const PurchaseListPage = () => {
                       label="Product"
                       requiredMark
                       placeholder="Select Product"
-                      options={[{ label: "Select Product", value: "" }, ...products.map((product) => ({ label: `${product.name} (${product.sku})`, value: String(product.id) }))]}
+                      options={productOptions}
                       value={item.productId}
                       onChange={(event) => form.setFormValues((current) => ({
                         ...current,

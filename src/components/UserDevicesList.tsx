@@ -3,13 +3,15 @@ import { LogOut, Monitor, Smartphone, Tablet } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { getMySessions, getUserSessions, logoutMyOtherSessions, logoutMySession, logoutUserSession } from "../api/sessions";
 import { useApiMessage } from "../hooks/useApiFeedback";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, parseServerDateTime } from "../lib/format";
 import { notificationService } from "../services/notificationService";
 import type { UserSession } from "../types/api";
 import { Button } from "./Button";
 
+// parseServerDateTime: live par backend UTC wall-time bhejta hai; seedha new Date() use
+// IST maan leta tha aur "This device" bhi "Active 5 hr ago" dikhata tha.
 const timeAgo = (value: string) => {
-  const minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60000);
+  const minutes = Math.max(0, Math.floor((Date.now() - parseServerDateTime(value).getTime()) / 60000));
   if (minutes < 1) {
     return "just now";
   }

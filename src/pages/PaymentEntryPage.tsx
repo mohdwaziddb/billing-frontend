@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCustomers } from "../api/customers";
-import { getInvoices } from "../api/invoices";
+import { getInvoice, getInvoices } from "../api/invoices";
 import { getPaymentModes } from "../api/paymentModes";
 import { createPayment } from "../api/payments";
 import { FormActionBar } from "../components/FormActionBar";
@@ -47,7 +47,9 @@ export const PaymentEntryPage = () => {
   // Invoice page se aaye (?invoiceId=): save ke baad wahi invoice dikhao (updated history ke saath).
   const returnInvoiceId = searchParams.get("invoiceId");
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  // Sirf selected customer ke outstanding invoices (pehle page load par company ke 1000 invoices
+  // — paid bhi — aate the; 1000 se purane unpaid invoice dropdown me dikhte hi nahi the).
+  const [customerInvoices, setCustomerInvoices] = useState<Invoice[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentModeMaster[]>([]);
   const [lockedInvoice, setLockedInvoice] = useState<Invoice | null>(null);
   const [onlineCollectInvoice, setOnlineCollectInvoice] = useState<{ invoice: Invoice; amount: number } | null>(null);
@@ -84,25 +86,50 @@ export const PaymentEntryPage = () => {
   const prefilledInvoiceId = useRef<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([getCustomers({ active: true, size: 1000 }), getInvoices({ size: 1000 }), getPaymentModes({ active: true, size: 1000 })]).then(([customerData, invoiceData, modeData]) => {
+    void Promise.all([getCustomers({ active: true, size: 1000 }), getPaymentModes({ active: true, size: 1000 })]).then(([customerData, modeData]) => {
       setCustomers(customerData.filter((customer) => customer.active));
-      setInvoices(invoiceData);
       setPaymentModes(modeData);
       const initialMode = defaultModeCode(modeData);
       if (initialMode && !getValues("mode")) {
         setValue("mode", initialMode, { shouldValidate: true });
       }
-    }).catch((err: any) => setApiError(err, "Unable to load customers, invoices or payment modes"));
+    }).catch((err: any) => setApiError(err, "Unable to load customers or payment modes"));
   }, [setValue, getValues, setApiError]);
 
   const selectedCustomerId = watch("customerId");
+  // Locked (?invoiceId=) invoice hamesha list me rahe, chahe uska balance 0 ho.
+  const invoices = useMemo(
+    () => (lockedInvoice && !customerInvoices.some((invoice) => invoice.id === lockedInvoice.id) ? [lockedInvoice, ...customerInvoices] : customerInvoices),
+    [customerInvoices, lockedInvoice]
+  );
+
+  // Customer badla: usi ke unpaid invoices laao. Request id: purane customer ka der se aaya jawab ignore.
+  const invoiceRequestId = useRef(0);
+  useEffect(() => {
+    const requestId = ++invoiceRequestId.current;
+    if (!selectedCustomerId) {
+      setCustomerInvoices([]);
+      return;
+    }
+    void getInvoices({ customerId: Number(selectedCustomerId), outstandingFilter: "OUTSTANDING", size: 1000 })
+      .then((invoiceData) => {
+        if (requestId === invoiceRequestId.current) {
+          setCustomerInvoices(invoiceData);
+        }
+      })
+      .catch((err: any) => {
+        if (requestId === invoiceRequestId.current) {
+          setApiError(err, "Unable to load invoices");
+        }
+      });
+  }, [selectedCustomerId, setApiError]);
   const selectedInvoiceId = watch("invoiceId");
   const watchedAmount = watch("amount");
   const watchedPaymentDate = watch("paymentDate");
   const watchedMode = watch("mode");
   const invoiceOptions = useMemo(() => {
-    const customerInvoices = invoices.filter((invoice) => String(invoice.customerId) === selectedCustomerId && Number(invoice.balanceAmount) > 0);
-    return customerInvoices.map((invoice) => ({
+    const unpaidInvoices = invoices.filter((invoice) => String(invoice.customerId) === selectedCustomerId && Number(invoice.balanceAmount) > 0);
+    return unpaidInvoices.map((invoice) => ({
       // Status right side summary me dikhta hai; label chhota taaki kate nahi.
       label: `${invoice.invoiceNo} · Due ${formatCurrency(invoice.balanceAmount)}`,
       value: invoice.id
@@ -126,30 +153,29 @@ export const PaymentEntryPage = () => {
 
   useEffect(() => {
     const invoiceId = searchParams.get("invoiceId");
-    if (!invoiceId || invoices.length === 0) {
+    // Run once per invoice: re-runs must not clobber typing.
+    if (!invoiceId || prefilledInvoiceId.current === invoiceId) {
       return;
     }
-    // Run once per invoice: re-runs from invoices refetch must not clobber typing.
-    if (prefilledInvoiceId.current === invoiceId) {
-      return;
-    }
-
-    const invoice = invoices.find((item) => String(item.id) === invoiceId);
-    if (!invoice) {
-      return;
-    }
-
-    prefilledInvoiceId.current = invoiceId;
-    setValue("customerId", String(invoice.customerId), { shouldValidate: true });
-    setValue("invoiceId", String(invoice.id), { shouldValidate: true });
-    if (!getValues("amount")) {
-      const balance = String(invoice.balanceAmount);
-      setValue("amount", balance, { shouldValidate: true });
-      lastAutoAmount.current = balance;
-    }
-    lastInvoiceId.current = String(invoice.id);
-    setLockedInvoice(invoice);
-  }, [invoices, searchParams, setValue, getValues]);
+    // Invoice page se aaye: sirf wahi ek invoice laao (pehle 1000 invoices me dhoondte the).
+    void getInvoice(Number(invoiceId))
+      .then((invoice) => {
+        if (!invoice || invoice.deleted || prefilledInvoiceId.current === invoiceId) {
+          return;
+        }
+        prefilledInvoiceId.current = invoiceId;
+        setValue("customerId", String(invoice.customerId), { shouldValidate: true });
+        setValue("invoiceId", String(invoice.id), { shouldValidate: true });
+        if (!getValues("amount")) {
+          const balance = String(invoice.balanceAmount);
+          setValue("amount", balance, { shouldValidate: true });
+          lastAutoAmount.current = balance;
+        }
+        lastInvoiceId.current = String(invoice.id);
+        setLockedInvoice(invoice);
+      })
+      .catch((err: any) => setApiError(err, "Unable to load invoice"));
+  }, [searchParams, setValue, getValues, setApiError]);
 
   useEffect(() => {
     if (!selectedInvoiceId) {
@@ -198,12 +224,10 @@ export const PaymentEntryPage = () => {
       navigate(`/invoices/${returnInvoiceId}`);
       return;
     }
+    // Form reset se customer khali -> invoices khud saaf; agla customer chunte hi taaze dues aate hain.
     resetForm();
-    void Promise.all([getCustomers({ active: true, size: 1000 }), getInvoices({ size: 1000 })])
-      .then(([customerData, invoiceData]) => {
-        setCustomers(customerData.filter((customer) => customer.active));
-        setInvoices(invoiceData);
-      })
+    void getCustomers({ active: true, size: 1000 })
+      .then((customerData) => setCustomers(customerData.filter((customer) => customer.active)))
       .catch(() => undefined);
   };
 

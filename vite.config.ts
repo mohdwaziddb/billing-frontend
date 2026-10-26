@@ -21,7 +21,9 @@ export default defineConfig({
           if (id.includes("dompurify")) {
             return "sanitizer";
           }
-          if (id.includes("axios") || id.includes("lucide-react") || id.includes("react-hook-form")) {
+          // clsx recharts bhi use karta hai: yahan na ho to Rollup ise charts chunk me daal deta
+          // aur login page par bhi poora charts (~400KB) preload hota tha.
+          if (id.includes("axios") || id.includes("lucide-react") || id.includes("react-hook-form") || id.includes("/clsx/")) {
             return "vendor";
           }
           return undefined;

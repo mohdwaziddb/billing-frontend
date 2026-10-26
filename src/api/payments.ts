@@ -22,6 +22,27 @@ export const getPaymentsPage = async (params?: PaymentFilterParams) => {
   return response.data.data;
 };
 
+export type PaymentSummary = {
+  totalRecords: number;
+  totalAmount: number;
+  byMode: Record<string, number>;
+};
+
+// KPI cards: backend aggregate (same filters). Pehle saare pages laakar browser me jodte the.
+export const getPaymentsSummary = async (params?: Omit<PaymentFilterParams, "page" | "size">) => {
+  const response = await apiClient.get<ApiResponse<PaymentSummary>>("/v1/payments/summary", { params });
+  return response.data.data;
+};
+
+// "Show Logs" action: saari rows ka log count ek call me (pehle har row ki alag call).
+export const getPaymentLogCounts = async (ids: number[]) => {
+  const response = await apiClient.get<ApiResponse<Record<string, number>>>("/v1/audit-logs/counts", {
+    params: { moduleName: "Payment", entityIds: ids.join(",") },
+    skipPageLoader: true
+  });
+  return response.data.data;
+};
+
 export const getPayments = async (params?: PaymentFilterParams) => {
   const response = await getPaymentsPage(params);
   return response.records;

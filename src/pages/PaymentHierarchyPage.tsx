@@ -162,6 +162,8 @@ export const PaymentHierarchyPage = () => {
   // aata hi nahi — isliye "actual payment records" tak pahunch hi nahi paate the.
   const activeRecords = activeNode?.type === "invoice" ? recordsByDay[activeNode.id] ?? null : null;
   const recordsRef = useRef<HTMLElement | null>(null);
+  // Jaldi-jaldi preset badle to purane range ka der se aaya jawab naye ko overwrite na kare.
+  const summaryRequestId = useRef(0);
 
   useEffect(() => {
     setSummary(defaultSummary);
@@ -182,8 +184,12 @@ export const PaymentHierarchyPage = () => {
   }, []);
 
   const loadSummary = async () => {
+    const requestId = ++summaryRequestId.current;
     try {
       const response = await getPaymentHierarchyChildren({ ...activeRange, nodeType: "company" });
+      if (requestId !== summaryRequestId.current) {
+        return;
+      }
       setSummary({
         companyName: response.companyName,
         totalReceivable: response.totalReceivable,
@@ -200,6 +206,12 @@ export const PaymentHierarchyPage = () => {
         totalExpense: response.totalExpense,
         netRevenue: response.netRevenue
       };
+      // Counts ab company response me hi aate hain (pehle har metric card ki alag call =
+      // poora range data 5 baar aur DB se). Purana backend ho to hi alag calls.
+      if (response.metricCounts) {
+        setMetricCounts(response.metricCounts);
+        return;
+      }
       const visibleMetrics = summaryMetricNodes(nextSummary, {});
       const countEntries = await Promise.all(
         visibleMetrics.map(async (metric) => {
@@ -207,7 +219,9 @@ export const PaymentHierarchyPage = () => {
           return [metric.id, metricResponse.nodes.length] as const;
         })
       );
-      setMetricCounts(Object.fromEntries(countEntries));
+      if (requestId === summaryRequestId.current) {
+        setMetricCounts(Object.fromEntries(countEntries));
+      }
     } catch (error) {
       notificationService.showError("Unable to load payment hierarchy summary", error);
     }

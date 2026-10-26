@@ -971,6 +971,8 @@ export type PaymentHierarchyResponse = {
   netRevenue: number;
   nodes: PaymentHierarchyNode[];
   records: PaymentHierarchyRecord[];
+  // Sirf company node par: metric id -> child count.
+  metricCounts?: Record<string, number> | null;
 };
 
 export type SalesReferralInvoice = {

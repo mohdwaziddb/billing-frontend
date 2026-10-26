@@ -1,5 +1,5 @@
 import { ArrowLeft, ChevronDown, Eye, History, Plus, Search } from "lucide-react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { createCustomer, getCustomerByMobile, getCustomerPurchaseHistory } from "../api/customers";
@@ -34,6 +34,7 @@ import { findPaymentMode, isOnlineModeMaster, paymentModeOptions, referenceLabel
 import { InvoiceCalculationService } from "../services/InvoiceCalculationService";
 import { notificationService } from "../services/notificationService";
 import type { Customer, CustomerPurchaseHistory, CustomerRequest, InvoiceRequest, PaymentModeMaster, Product, UserProfile } from "../types/api";
+import type { Option } from "../types/forms";
 
 type InvoiceItemForm = {
   productId: string;
@@ -64,6 +65,42 @@ const createEmptyItem = (): InvoiceItemForm => ({
   rate: "0",
   discountValue: "0"
 });
+
+const EMPTY_PRODUCT_OPTION: Option = { label: "Select Product", value: "" };
+
+/**
+ * Product dropdown ek row ka. Pehle har keystroke (qty/rate/discount) par HAR row ka Select
+ * 1000 products ke options naye bana kar dobara render hota tha (20 rows = 20k options) —
+ * bade bill par typing atakti thi. Ab options memo + ye memo component: props same to skip.
+ */
+type ProductSelectCellProps = {
+  rowIndex: number;
+  rowId: string;
+  name: string;
+  value: string;
+  options: Option[];
+  disabled: boolean;
+  error?: string;
+  onFieldChange: (value: string) => void;
+  onFieldBlur: () => void;
+  fieldRef: (element: HTMLSelectElement | null) => void;
+  onProductSelect: (rowIndex: number, rowId: string, nextId: string, applyValue: (value: string) => void) => void;
+};
+
+const ProductSelectCell = memo(({ rowIndex, rowId, name, value, options, disabled, error, onFieldChange, onFieldBlur, fieldRef, onProductSelect }: ProductSelectCellProps) => (
+  <Select
+    options={options}
+    aria-label="Product"
+    disabled={disabled}
+    error={error}
+    className="h-[46px]"
+    name={name}
+    value={value}
+    onBlur={onFieldBlur}
+    ref={fieldRef}
+    onChange={(event) => onProductSelect(rowIndex, rowId, event.target.value, onFieldChange)}
+  />
+));
 
 const numberValue = (value: string | number | undefined) => {
   const parsed = Number(value ?? 0);
@@ -255,6 +292,20 @@ export const CreateInvoicePage = () => {
     () => new Map(products.map((product) => [String(product.id), product])),
     [products]
   );
+
+  const productOptionList = useMemo<Option[]>(
+    () => products.map((entry) => ({ label: entry.name, value: String(entry.id) })),
+    [products]
+  );
+  // Sirf product chunne/hatane par badalta hai; qty/rate type karne par same rehta hai.
+  const selectedProductKey = watchedItems.map((item) => item.productId ?? "").join("|");
+  const productOptionsByRow = useMemo(() => {
+    const selectedIds = selectedProductKey.split("|");
+    return selectedIds.map((_, rowIndex) => {
+      const otherSelectedIds = new Set(selectedIds.filter((id, index) => index !== rowIndex && id));
+      return [EMPTY_PRODUCT_OPTION, ...productOptionList.filter((option) => !otherSelectedIds.has(String(option.value)))];
+    });
+  }, [productOptionList, selectedProductKey]);
 
   const sameState = useMemo(() => {
     const companyStateId = user?.company?.stateId ?? null;
@@ -618,6 +669,30 @@ export const CreateInvoicePage = () => {
     });
   };
 
+  // Memo ProductSelectCell ke liye stable callback; andar hamesha latest state (ref) use hota hai.
+  const productSelectRef = useRef<(rowIndex: number, rowId: string, nextId: string, applyValue: (value: string) => void) => void>(() => undefined);
+  productSelectRef.current = (rowIndex, rowId, nextId, applyValue) => {
+    const latestItems = getValues("items") ?? [];
+    const otherSelectedIds = new Set(
+      latestItems
+        .filter((_, index) => index !== rowIndex)
+        .map((row) => row.productId)
+        .filter((id) => id)
+    );
+    if (nextId && otherSelectedIds.has(nextId)) {
+      const dupName = productMap.get(nextId)?.name ?? "This product";
+      notificationService.showError(`"${dupName}" is already added in another row.`);
+      return;
+    }
+    applyValue(nextId);
+    syncProductDefaults(rowIndex, nextId);
+    expandRow(rowId);
+  };
+  const handleProductSelect = useCallback(
+    (rowIndex: number, rowId: string, nextId: string, applyValue: (value: string) => void) => productSelectRef.current(rowIndex, rowId, nextId, applyValue),
+    []
+  );
+
   const clearProductLine = (index: number) => {
     update(index, createEmptyItem());
   };
@@ -963,13 +1038,7 @@ export const CreateInvoicePage = () => {
                         : (lineSummary?.igstAmount ?? 0) > 0
                           ? `IGST ${lineSummary?.igstRate ?? taxPercent}% • Tax ${formatCurrency(lineSummary?.igstAmount ?? 0)}`
                           : `GST ${taxPercent}% • Tax ${formatCurrency(lineSummary?.taxAmount ?? 0)}`;
-                  const otherSelectedIds = new Set(
-                    watchedItems
-                      .filter((_, rowIndex) => rowIndex !== index)
-                      .map((row) => row.productId)
-                      .filter((id) => id)
-                  );
-                  const productOptions = products.filter((entry) => !otherSelectedIds.has(String(entry.id)));
+                  const productOptions = productOptionsByRow[index] ?? [EMPTY_PRODUCT_OPTION, ...productOptionList];
                   const exceedsStock = hasProduct && numberValue(item.qty) > (product?.stockQty ?? 0);
                   const rateRegister = register(`items.${index}.rate`, {
                     required: "Rate is required",
@@ -986,33 +1055,18 @@ export const CreateInvoicePage = () => {
                             name={`items.${index}.productId` as const}
                             rules={{ required: "Product is required" }}
                             render={({ field: productField }) => (
-                              <Select
-                                options={[
-                                  { label: "Select Product", value: "" },
-                                  ...productOptions.map((entry) => ({
-                                    label: entry.name,
-                                    value: String(entry.id),
-                                  })),
-                                ]}
-                                aria-label="Product"
-                                disabled={!canProceedWithInvoice}
-                                error={errors.items?.[index]?.productId?.message}
-                                className="h-[46px]"
+                              <ProductSelectCell
+                                rowIndex={index}
+                                rowId={field.id}
                                 name={productField.name}
                                 value={productField.value ?? ""}
-                                onBlur={productField.onBlur}
-                                ref={productField.ref}
-                                onChange={(event) => {
-                                  const nextId = event.target.value;
-                                  if (nextId && otherSelectedIds.has(nextId)) {
-                                    const dupName = productMap.get(nextId)?.name ?? "This product";
-                                    notificationService.showError(`"${dupName}" is already added in another row.`);
-                                    return;
-                                  }
-                                  productField.onChange(nextId);
-                                  syncProductDefaults(index, nextId);
-                                  expandRow(field.id);
-                                }}
+                                options={productOptions}
+                                disabled={!canProceedWithInvoice}
+                                error={errors.items?.[index]?.productId?.message}
+                                onFieldChange={productField.onChange}
+                                onFieldBlur={productField.onBlur}
+                                fieldRef={productField.ref}
+                                onProductSelect={handleProductSelect}
                               />
                             )}
                           />

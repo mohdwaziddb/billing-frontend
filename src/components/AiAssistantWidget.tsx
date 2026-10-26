@@ -1,14 +1,14 @@
 import { Bot, Check, Copy, Send, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { sendAiMessage, type AiChartData, type AiTableData } from "../api/ai";
 import { apiClient } from "../api/apiClient";
 import type { ApiResponse } from "../types/api";
 import { useAuth } from "../context/AuthContext";
-import { useIsDarkMode } from "../hooks/useIsDarkMode";
-import { getChartTheme } from "../lib/chartTheme";
 import { sanitizeHtml, sanitizeTableHtml } from "../lib/sanitizeHtml";
 import { gradientSurfaceClass } from "../lib/theme";
+
+// recharts sirf tab load ho jab AI reply me chart ho (har page ke layout me nahi).
+const AiAssistantChart = lazy(() => import("./AiAssistantChart"));
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -16,8 +16,6 @@ type ChatMessage = {
   chart?: AiChartData | null;
   table?: AiTableData | null;
 };
-
-const formatChartAmount = (value: number) => `₹${Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 
 const buildCopyText = (item: ChatMessage) => {
   let text = item.content;
@@ -40,7 +38,6 @@ const buildCopyText = (item: ChatMessage) => {
 
 export const AiAssistantWidget = () => {
   const { auth, sessionType, user, refreshProfile } = useAuth();
-  const chart = getChartTheme(useIsDarkMode());
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -206,16 +203,9 @@ export const AiAssistantWidget = () => {
                         <div className="mt-2">
                           <p className="mb-1 text-xs font-bold text-[var(--text-primary)]">{item.chart.title}</p>
                           <div className="h-44 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={item.chart.data} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chart.grid} />
-                                <XAxis dataKey="label" tick={{ fontSize: 9, fill: chart.text }} axisLine={false} tickLine={false} />
-                                <YAxis tick={{ fontSize: 9, fill: chart.text }} axisLine={false} tickLine={false} tickFormatter={(value: number) => formatChartAmount(value)} />
-                                <Tooltip contentStyle={chart.tooltipContentStyle} itemStyle={chart.tooltipItemStyle} labelStyle={chart.tooltipLabelStyle} cursor={chart.tooltipCursor} formatter={(value: number | string) => [formatChartAmount(Number(value)), ""]} labelFormatter={(label) => `Day ${label}`} />
-                                <Bar dataKey="sales" name="Sales" fill="var(--theme-color)" radius={[3, 3, 0, 0]} />
-                                <Bar dataKey="collection" name="Collection" fill="#10b981" radius={[3, 3, 0, 0]} />
-                              </BarChart>
-                            </ResponsiveContainer>
+                            <Suspense fallback={null}>
+                              <AiAssistantChart data={item.chart.data} />
+                            </Suspense>
                           </div>
                         </div>
                       ) : null}

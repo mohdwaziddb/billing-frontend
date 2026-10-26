@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CreditCard, Download, History, RotateCcw, Send, Wallet } from "lucide-react";
-import { getAuditLogs } from "../api/auditLogs";
 import { sendEmailNotification, sendSmsNotification, sendWhatsAppNotification } from "../api/notifications";
 import { getPaymentModes } from "../api/paymentModes";
-import { deletePayment, getPaymentsPage, restorePayment, type PaymentFilterParams } from "../api/payments";
+import { deletePayment, getPaymentLogCounts, getPaymentsPage, getPaymentsSummary, restorePayment, type PaymentFilterParams, type PaymentSummary } from "../api/payments";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
 import { Button } from "../components/Button";
@@ -95,6 +94,8 @@ const dateRangeForPreset = (preset: DatePreset) => {
 
 const paymentRef = (payment: Payment) => `PAY-${String(payment.id).padStart(6, "0")}`;
 
+const emptyPaymentSummary: PaymentSummary = { totalRecords: 0, totalAmount: 0, byMode: {} };
+
 const buildGrandTotal = (rows: Payment[]) => ({
   paymentRef: "Grand Total",
   customerName: "",
@@ -109,7 +110,8 @@ const buildGrandTotal = (rows: Payment[]) => ({
 });
 
 export const PaymentListPage = () => {
-  const [exportRows, setExportRows] = useState<Payment[]>([]);
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary>(emptyPaymentSummary);
+  const [exporting, setExporting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<Payment | null>(null);
   const [logTarget, setLogTarget] = useState<Payment | null>(null);
@@ -120,6 +122,8 @@ export const PaymentListPage = () => {
   const [activeSummary, setActiveSummary] = useState<SummaryKey | null>(null);
   const [modalPage, setModalPage] = useState(0);
   const [modalSearch, setModalSearch] = useState("");
+  // Modal search har keystroke par API na maare — thoda ruk kar (debounce).
+  const [debouncedModalSearch, setDebouncedModalSearch] = useState("");
   const [modalPayments, setModalPayments] = useState<Payment[]>([]);
   const [modalPaymentPage, setModalPaymentPage] = useState<PageResponse<Payment>>(emptyPaymentPage);
   const [logCounts, setLogCounts] = useState<Record<number, number>>({});
@@ -140,20 +144,26 @@ export const PaymentListPage = () => {
     fetchPage: ({ page, size, filters }) => getPaymentsPage({ ...buildParams(filters), page, size })
   });
 
-  // Saare pages (pehle sirf pehle 1000: collection totals aur export galat).
-  const exportRequestId = useRef(0);
-  const loadExportRows = async (filters: PaymentFilters) => {
-    const requestId = ++exportRequestId.current;
-    const rows = await fetchAllPages((page, size) => getPaymentsPage({ ...buildParams(filters), page, size }));
-    if (requestId === exportRequestId.current) {
-      setExportRows(rows);
+  // KPI cards: backend aggregate (count + sum, mode-wise). Pehle page load par hi saare pages
+  // (1000 x 50 tak) laaye jaate the sirf cards ke totals ke liye — page bahut der se khulta tha.
+  const summaryRequestId = useRef(0);
+  const loadSummary = async (filters: PaymentFilters) => {
+    const requestId = ++summaryRequestId.current;
+    const nextSummary = await getPaymentsSummary(buildParams(filters));
+    if (requestId === summaryRequestId.current) {
+      setPaymentSummary(nextSummary);
     }
   };
 
   useEffect(() => {
-    void loadExportRows(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load payments"));
+    void loadSummary(list.activeFilters).catch((err: any) => setApiError(err, "Unable to load payments"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list.activeFilters]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedModalSearch(modalSearch), 300);
+    return () => window.clearTimeout(timer);
+  }, [modalSearch]);
 
   useEffect(() => {
     void getPaymentModes({ active: true, size: 1000 }).then(setPaymentModes).catch((err: any) => setApiError(err, "Unable to load payment modes"));
@@ -163,13 +173,10 @@ export const PaymentListPage = () => {
   const modeLabelMap = useMemo(() => Object.fromEntries(paymentModes.map((mode) => [mode.modeCode, mode.modeName])), [paymentModes]);
   const activeFilterSummary = useMemo(() => summarizePaymentFilters(list.activeFilters, modeLabelMap), [list.activeFilters, modeLabelMap]);
   const summary = useMemo(() => ({
-    total: exportRows.length,
-    collection: exportRows.reduce((sum, item) => sum + Number(item.amount ?? 0), 0),
-    byMode: exportRows.reduce<Record<string, number>>((totals, item) => {
-      totals[item.mode] = (totals[item.mode] ?? 0) + Number(item.amount ?? 0);
-      return totals;
-    }, {}),
-  }), [exportRows]);
+    total: Number(paymentSummary.totalRecords ?? 0),
+    collection: Number(paymentSummary.totalAmount ?? 0),
+    byMode: Object.fromEntries(Object.entries(paymentSummary.byMode ?? {}).map(([modeCode, amount]) => [modeCode, Number(amount ?? 0)])) as Record<string, number>,
+  }), [paymentSummary]);
   // Active modes ke cards + baaki sab (purane / band modes jaise UPI, Card) ek "Other modes" card me —
   // taaki cards ka jod hamesha Total Collection ke barabar rahe (pehle UPI ki payment kahin nahi dikhti thi).
   const modeCards = useMemo(() => paymentModes.slice(0, 2), [paymentModes]);
@@ -191,19 +198,30 @@ export const PaymentListPage = () => {
       setLogCounts({});
       return;
     }
-    void loadLogCounts("Payment", ids).then(setLogCounts).catch(() => setLogCounts({}));
+    void loadLogCounts(ids).then(setLogCounts).catch(() => setLogCounts({}));
   }, [can, list.tableData, modalPayments]);
 
   useEffect(() => {
     if (!activeSummary) return;
-    const params = summaryParams(baseParams, activeSummary, modalSearch);
+    const params = summaryParams(baseParams, activeSummary, debouncedModalSearch);
+    let cancelled = false;
     void getPaymentsPage({ ...params, page: modalPage, size: DEFAULT_PAGE_SIZE })
       .then((response) => {
+        if (cancelled) {
+          return;
+        }
         setModalPaymentPage(response);
         setModalPayments(response.records);
       })
-      .catch((err: any) => setApiError(err, "Unable to load payment details"));
-  }, [activeSummary, baseParams, modalPage, modalSearch, setApiError]);
+      .catch((err: any) => {
+        if (!cancelled) {
+          setApiError(err, "Unable to load payment details");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSummary, baseParams, modalPage, debouncedModalSearch, setApiError]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -211,7 +229,7 @@ export const PaymentListPage = () => {
       setDeleting(true);
       await deletePayment(deleteTarget.id);
       list.refreshTable();
-      await loadExportRows(list.activeFilters);
+      await loadSummary(list.activeFilters);
       setDeleteTarget(null);
       notificationService.showSuccess(CommonSuccessMessageUtil.deleted("Payment"));
     } catch (err: any) {
@@ -230,7 +248,7 @@ export const PaymentListPage = () => {
       await restorePayment(restoreTarget.id);
       setRestoreTarget(null);
       list.refreshTable();
-      await loadExportRows(list.activeFilters);
+      await loadSummary(list.activeFilters);
       notificationService.showSuccess(CommonSuccessMessageUtil.updated("Payment"));
     } catch (err: any) {
       setApiError(err, "Unable to restore payment");
@@ -241,6 +259,20 @@ export const PaymentListPage = () => {
 
   const exportPayments = (fileName: string, rows: Payment[]) => {
     exportToExcel(fileName, rows.length ? [...rows, buildGrandTotal(rows)] : [], visiblePaymentExportColumns);
+  };
+
+  // Export ke liye hi saare pages laao (sirf button click par, page load par nahi).
+  const exportAllPayments = async () => {
+    try {
+      setExporting(true);
+      const filters = list.activeFilters;
+      const rows = await fetchAllPages((page, size) => getPaymentsPage({ ...buildParams(filters), page, size }));
+      exportPayments("payments.xlsx", rows);
+    } catch (err: any) {
+      setApiError(err, "Unable to export payments");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const openReminder = (payment: Payment) => {
@@ -303,6 +335,7 @@ export const PaymentListPage = () => {
     setActiveSummary(key);
     setModalPage(0);
     setModalSearch("");
+    setDebouncedModalSearch("");
   };
 
   const buildTableColumns = (canDelete: boolean): Column<Payment>[] => [
@@ -402,9 +435,9 @@ export const PaymentListPage = () => {
         can("PAYMENTS", "EXPORT") || can("PAYMENTS", "ADD") || can("PAYMENT_DATAPORT", "VIEW") ? (
           <>
             {can("PAYMENTS", "EXPORT") ? (
-              <Button type="button" variant="secondary" disabled={!exportRows.length} onClick={() => exportPayments("payments.xlsx", exportRows)}>
+              <Button type="button" variant="secondary" disabled={!summary.total || exporting} onClick={() => void exportAllPayments()}>
                 <Download size={16} />
-                Export Excel
+                {exporting ? "Exporting..." : "Export Excel"}
               </Button>
             ) : null}
             <DataPortLink menuCode="PAYMENT_DATAPORT" moduleKey="payments" />
@@ -554,12 +587,10 @@ const basePaymentColumns = () => [
   { key: "amount", header: "Amount", className: "text-right", render: (item: Payment) => <span className="block text-right font-semibold text-white">{formatCurrency(item.amount)}</span> }
 ];
 
-const loadLogCounts = async (moduleName: string, ids: number[]) => {
-  const entries = await Promise.all(ids.map(async (entityId) => {
-    const response = await getAuditLogs({ moduleName, entityId, page: 0, size: 1 });
-    return [entityId, response.totalRecords] as const;
-  }));
-  return Object.fromEntries(entries);
+// Saari visible rows ka log count ek hi call me (pehle har row ki alag /audit-logs call).
+const loadLogCounts = async (ids: number[]): Promise<Record<number, number>> => {
+  const counts = await getPaymentLogCounts(ids);
+  return Object.fromEntries(Object.entries(counts ?? {}).map(([entityId, count]) => [Number(entityId), Number(count ?? 0)]));
 };
 
 const buildParams = (filters: PaymentFilters): PaymentFilterParams => {

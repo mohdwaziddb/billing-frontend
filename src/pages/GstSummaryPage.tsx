@@ -5,6 +5,7 @@ import { Button } from "../components/Button";
 import { GlassCard } from "../components/GlassCard";
 import { Header } from "../components/Header";
 import { Input } from "../components/Input";
+import { Pagination } from "../components/Pagination";
 import { StatCard } from "../components/StatCard";
 import { Table } from "../components/Table";
 import { useApiMessage } from "../hooks/useApiFeedback";
@@ -32,7 +33,9 @@ const emptyReport: GstReport = {
   hsnSummary: []
 };
 
-type GstPreset = "today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
+const GST_TABLE_PAGE_SIZE = 50;
+
+type GstPreset ="today" | "yesterday" | "thisWeek" | "thisMonth" | "thisYear" | "custom";
 
 // Profit & Loss jaise hi date presets.
 const GST_PRESETS: Array<{ value: GstPreset; label: string }> = [
@@ -83,12 +86,30 @@ export const GstSummaryPage = () => {
   const appliedFilters = useMemo(() => (preset === "custom" ? customRange : gstRange(preset)), [preset, customRange]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     void getGstSummaryReport({ startDate: appliedFilters.startDate || undefined, endDate: appliedFilters.endDate || undefined })
-      .then(setReport)
+      .then((reportData) => {
+        if (!cancelled) setReport(reportData);
+      })
       .catch((err: any) => setApiError(err, "Unable to load GST summary"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [appliedFilters, setApiError]);
+
+  // Perf: "This Year" par invoice-wise me hazaron rows ek saath DOM me render hoti thi.
+  // Ab table client-side page me (export abhi bhi poora data deta hai).
+  const [tablePage, setTablePage] = useState(0);
+  useEffect(() => {
+    setTablePage(0);
+  }, [activeTab, report]);
+  const activeRowCount = report[activeTab].length;
+  const tableTotalPages = Math.max(1, Math.ceil(activeRowCount / GST_TABLE_PAGE_SIZE));
+  const pageSlice = <T,>(rows: T[]) => rows.slice(tablePage * GST_TABLE_PAGE_SIZE, (tablePage + 1) * GST_TABLE_PAGE_SIZE);
 
   const periodText = appliedFilters.startDate || appliedFilters.endDate
     ? `Period: ${formatDate(appliedFilters.startDate) || "Start"} to ${formatDate(appliedFilters.endDate) || "Today"}`
@@ -234,16 +255,28 @@ export const GstSummaryPage = () => {
               </button>
             ))}
           </div>
-          <Button type="button" variant="secondary" onClick={exportCurrent} disabled={loading}>
-            <Download size={16} />
-            Export {activeTabLabel}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            {activeRowCount > GST_TABLE_PAGE_SIZE ? (
+              <Pagination
+                page={tablePage}
+                size={GST_TABLE_PAGE_SIZE}
+                totalRecords={activeRowCount}
+                totalPages={tableTotalPages}
+                onPageChange={setTablePage}
+                layout="inline"
+              />
+            ) : null}
+            <Button type="button" variant="secondary" onClick={exportCurrent} disabled={loading}>
+              <Download size={16} />
+              Export {activeTabLabel}
+            </Button>
+          </div>
         </div>
-        {activeTab === "invoiceWise" ? <InvoiceWiseTable rows={report.invoiceWise} /> : null}
-        {activeTab === "customerWise" ? <CustomerWiseTable rows={report.customerWise} /> : null}
-        {activeTab === "monthWise" ? <MonthWiseTable rows={report.monthWise} /> : null}
-        {activeTab === "taxWise" ? <TaxWiseTable rows={report.taxWise} /> : null}
-        {activeTab === "hsnSummary" ? <HsnSummaryTable rows={report.hsnSummary} /> : null}
+        {activeTab === "invoiceWise" ? <InvoiceWiseTable rows={pageSlice(report.invoiceWise)} /> : null}
+        {activeTab === "customerWise" ? <CustomerWiseTable rows={pageSlice(report.customerWise)} /> : null}
+        {activeTab === "monthWise" ? <MonthWiseTable rows={pageSlice(report.monthWise)} /> : null}
+        {activeTab === "taxWise" ? <TaxWiseTable rows={pageSlice(report.taxWise)} /> : null}
+        {activeTab === "hsnSummary" ? <HsnSummaryTable rows={pageSlice(report.hsnSummary)} /> : null}
         <TotalsStrip report={report} />
       </GlassCard>
     </div>

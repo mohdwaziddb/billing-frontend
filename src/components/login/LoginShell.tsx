@@ -74,14 +74,16 @@ export const LoginShell = ({ company = null, brandingReady = true, footerNote, c
       className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[linear-gradient(140deg,#f7f4f2_0%,#eef0f5_50%,#f5f2f0_100%)]"
       style={{ fontFamily: "Manrope, Inter, system-ui, sans-serif" }}
     >
+      {/* GPU rule (AI_INSTRUCTIONS §7): bade glow circles pe blur-2xl nahi — radial-gradient
+          khud hi soft edge deta hai, filter blur low-end GPU pe paint spike + memory leak karta tha. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-24 -top-28 h-[420px] w-[420px] rounded-full opacity-70 blur-2xl"
+        className="pointer-events-none absolute -right-24 -top-28 h-[420px] w-[420px] rounded-full opacity-70"
         style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--theme-accent) 20%, white) 0%, transparent 70%)" }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -left-28 bottom-[-90px] h-[400px] w-[400px] rounded-full opacity-60 blur-2xl"
+        className="pointer-events-none absolute -left-28 bottom-[-90px] h-[400px] w-[400px] rounded-full opacity-60"
         style={{ background: "radial-gradient(circle, #e6edfb 0%, transparent 70%)" }}
       />
 

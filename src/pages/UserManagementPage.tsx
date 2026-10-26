@@ -1,8 +1,8 @@
 import clsx from "clsx";
 import { Crown, Download, Edit3, History, KeyRound, MonitorSmartphone, Plus, ShieldCheck, UserCheck, UserRound, Users, UserX } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type FieldErrors, useForm, Controller } from "react-hook-form";
-import { createCompanyUser, deactivateCompanyUser, deleteUserPhoto, getCompanyUsersPage, getRoles, updateCompanyUser, uploadUserPhoto, type UserFilterParams } from "../api/users";
+import { createCompanyUser, deactivateCompanyUser, deleteUserPhoto, getCompanyUserRoleCounts, getCompanyUsersPage, getRoles, updateCompanyUser, uploadUserPhoto, type UserFilterParams } from "../api/users";
 import { resetUserMfa } from "../api/mfa";
 import { ActionDropdown } from "../components/ActionDropdown";
 import { AuditLogModal } from "../components/AuditLogModal";
@@ -180,15 +180,18 @@ export const UserManagementPage = () => {
     }
   });
 
-  // Role chips ke counts: har role ka sahi total (size=1 query, sirf totalRecords chahiye).
-  // Pehle counts sirf pehle 100 rows (export data) se ginte the — bade team me galat.
+  // Role chips ke counts: har role ka sahi total, backend ek GROUP BY call (/v1/users/role-counts) me deta hai.
+  // Pehle 4 alag /v1/users?size=1 calls jaati thi (har ek me permission check + page + count query).
+  // requestId: tez typing me purana (der se aaya) jawab naye counts overwrite na kare.
+  const roleCountRequestIdRef = useRef(0);
   const loadRoleCounts = useCallback(async (filters: UserFilters) => {
-    const base = toQuery({ ...filters, role: "" });
-    const keys: RoleKey[] = ["ALL", "OWNER", "ADMIN", "USER"];
-    const results = await Promise.all(
-      keys.map((key) => getCompanyUsersPage({ ...base, role: key === "ALL" ? undefined : key, page: 0, size: 1 }).then((response) => response.totalRecords))
-    );
-    setRoleCounts({ ALL: results[0], OWNER: results[1], ADMIN: results[2], USER: results[3] });
+    const requestId = ++roleCountRequestIdRef.current;
+    const { role: _ignoredRole, ...countQuery } = toQuery(filters);
+    const counts = await getCompanyUserRoleCounts(countQuery);
+    if (requestId !== roleCountRequestIdRef.current) {
+      return;
+    }
+    setRoleCounts({ ALL: counts?.ALL ?? 0, OWNER: counts?.OWNER ?? 0, ADMIN: counts?.ADMIN ?? 0, USER: counts?.USER ?? 0 });
   }, []);
 
   useEffect(() => {
@@ -197,11 +200,23 @@ export const UserManagementPage = () => {
     }
   }, [canView, setApiError]);
 
+  // Counts role filter se independent hain: role chip click par dobara fetch nahi (pehle har click = 4 calls).
+  // Live search har keystroke par activeFilters badalta hai, isliye counts debounce (pehli load turant).
+  const activeFiltersRef = useRef(list.activeFilters);
+  activeFiltersRef.current = list.activeFilters;
+  const roleCountFilterKey = `${list.activeFilters.search}\u0000${list.activeFilters.username}\u0000${list.activeFilters.active}`;
+  const roleCountsLoadedRef = useRef(false);
   useEffect(() => {
-    if (canView) {
-      void loadRoleCounts(list.activeFilters).catch(() => undefined);
+    if (!canView) {
+      return;
     }
-  }, [canView, list.activeFilters, loadRoleCounts]);
+    const delayMs = roleCountsLoadedRef.current ? 300 : 0;
+    roleCountsLoadedRef.current = true;
+    const timer = window.setTimeout(() => {
+      void loadRoleCounts(activeFiltersRef.current).catch(() => undefined);
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [canView, roleCountFilterKey, loadRoleCounts]);
 
   const refreshAll = () => {
     list.refreshTable();

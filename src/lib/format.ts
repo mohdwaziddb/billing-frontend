@@ -10,7 +10,7 @@ const useUtcSource = () =>
 // Backend MySQL DATETIME bhejta hai ("YYYY-MM-DD HH:mm:ss", offset nahi hota).
 // Live par ise UTC maan ke IST me dikhate hain; local par browser-legacy parse.
 // Offset wali ISO strings (Z / +05:30) ko chhoote nahi — unka offset hi chalega.
-const parseServerDateTime = (value: string): Date => {
+export const parseServerDateTime = (value: string): Date => {
   const trimmed = value.trim();
   if (/([Zz]|[+-]\d{2}:?\d{2})$/.test(trimmed)) {
     return new Date(trimmed);

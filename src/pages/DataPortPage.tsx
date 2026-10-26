@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import clsx from "clsx";
 import {
@@ -90,6 +90,10 @@ const DataPortWorkspace = ({ module, modules }: { module: DataPortModuleMeta; mo
   const [result, setResult] = useState<ImportResult | null>(null);
   const [filter, setFilter] = useState<RowFilter>("all");
   const [guideOpen, setGuideOpen] = useState(false);
+  // Latest rows ref: cell edit handlers stable rahein (useCallback) taaki memo rows sirf
+  // badli hui row re-render karein — pehle har keystroke par 5000 rows tak poori grid re-render hoti thi.
+  const rowsRef = useRef<DataPortRow[]>(rows);
+  rowsRef.current = rows;
 
   const counts = useMemo(() => {
     const valid = rows.filter((row) => row.valid).length;
@@ -153,13 +157,13 @@ const DataPortWorkspace = ({ module, modules }: { module: DataPortModuleMeta; mo
     }
   }, [module.key]);
 
-  const scheduleRevalidate = (nextRows: DataPortRow[]) => {
+  const scheduleRevalidate = useCallback((nextRows: DataPortRow[]) => {
     if (revalidateTimer.current) {
       window.clearTimeout(revalidateTimer.current);
     }
     setChecking(true);
     revalidateTimer.current = window.setTimeout(() => void runRevalidate(nextRows), REVALIDATE_DELAY_MS);
-  };
+  }, [runRevalidate]);
 
   const handleSampleDownload = async () => {
     try {
@@ -207,17 +211,19 @@ const DataPortWorkspace = ({ module, modules }: { module: DataPortModuleMeta; mo
     }
   };
 
-  const updateCell = (rowNumber: number, field: string, value: string) => {
-    const nextRows = rows.map((row) => (row.rowNumber === rowNumber ? { ...row, values: { ...row.values, [field]: value } } : row));
+  const updateCell = useCallback((rowNumber: number, field: string, value: string) => {
+    const nextRows = rowsRef.current.map((row) => (row.rowNumber === rowNumber ? { ...row, values: { ...row.values, [field]: value } } : row));
+    rowsRef.current = nextRows;
     setRows(nextRows);
     scheduleRevalidate(nextRows);
-  };
+  }, [scheduleRevalidate]);
 
-  const deleteRow = (rowNumber: number) => {
-    const nextRows = rows.filter((row) => row.rowNumber !== rowNumber);
+  const deleteRow = useCallback((rowNumber: number) => {
+    const nextRows = rowsRef.current.filter((row) => row.rowNumber !== rowNumber);
+    rowsRef.current = nextRows;
     setRows(nextRows);
     scheduleRevalidate(nextRows);
-  };
+  }, [scheduleRevalidate]);
 
   const clearAll = () => {
     revalidateAbort.current?.abort();
@@ -414,40 +420,17 @@ const DataPortWorkspace = ({ module, modules }: { module: DataPortModuleMeta; mo
                     </td>
                   </tr>
                 ) : (
-                  visibleRows.map((row) => {
-                    // Solid rang (opacity nahi) — sticky cells ke neeche scroll hoti cells na jhaanken.
-                    const rowBg = !row.valid ? "bg-rose-50" : groupShade.get(row.rowNumber) ? "bg-slate-50" : "bg-white";
-                    return (
-                    <tr key={row.rowNumber} className={rowBg}>
-                      <Td className={clsx("sticky left-0 z-10 font-semibold text-slate-400", rowBg)}>{row.rowNumber}</Td>
-                      <Td className={clsx("sticky left-14 z-10 shadow-[1px_0_0_#e2e8f0]", rowBg)}>
-                        <RowStatus row={row} />
-                      </Td>
-                      {module.fields.map((field) => (
-                        <Td key={field.key}>
-                          <CellEditor
-                            field={field}
-                            value={row.values[field.key] ?? ""}
-                            error={row.validationErrors[field.key]}
-                            disabled={!module.canImport}
-                            onChange={(value) => updateCell(row.rowNumber, field.key, value)}
-                          />
-                        </Td>
-                      ))}
-                      <Td className="text-right">
-                        <button
-                          type="button"
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-                          onClick={() => deleteRow(row.rowNumber)}
-                          aria-label={`Remove row ${row.rowNumber}`}
-                          title="Remove row"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </Td>
-                    </tr>
-                    );
-                  })
+                  visibleRows.map((row) => (
+                    <DataPortGridRow
+                      key={row.rowNumber}
+                      row={row}
+                      fields={module.fields}
+                      canImport={module.canImport}
+                      shaded={Boolean(groupShade.get(row.rowNumber))}
+                      onCellChange={updateCell}
+                      onDelete={deleteRow}
+                    />
+                  ))
                 )}
               </tbody>
             </table>
@@ -568,6 +551,56 @@ const typeLabel = (field: DataPortField) => {
       return "text";
   }
 };
+
+/** Grid ki ek row — memo: cell edit par sirf wahi row re-render (row object same rehta hai baaki rows ka). */
+const DataPortGridRow = memo(({
+  row,
+  fields,
+  canImport,
+  shaded,
+  onCellChange,
+  onDelete
+}: {
+  row: DataPortRow;
+  fields: DataPortField[];
+  canImport: boolean;
+  shaded: boolean;
+  onCellChange: (rowNumber: number, field: string, value: string) => void;
+  onDelete: (rowNumber: number) => void;
+}) => {
+  // Solid rang (opacity nahi) — sticky cells ke neeche scroll hoti cells na jhaanken.
+  const rowBg = !row.valid ? "bg-rose-50" : shaded ? "bg-slate-50" : "bg-white";
+  return (
+    <tr className={rowBg}>
+      <Td className={clsx("sticky left-0 z-10 font-semibold text-slate-400", rowBg)}>{row.rowNumber}</Td>
+      <Td className={clsx("sticky left-14 z-10 shadow-[1px_0_0_#e2e8f0]", rowBg)}>
+        <RowStatus row={row} />
+      </Td>
+      {fields.map((field) => (
+        <Td key={field.key}>
+          <CellEditor
+            field={field}
+            value={row.values[field.key] ?? ""}
+            error={row.validationErrors[field.key]}
+            disabled={!canImport}
+            onChange={(value) => onCellChange(row.rowNumber, field.key, value)}
+          />
+        </Td>
+      ))}
+      <Td className="text-right">
+        <button
+          type="button"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+          onClick={() => onDelete(row.rowNumber)}
+          aria-label={`Remove row ${row.rowNumber}`}
+          title="Remove row"
+        >
+          <Trash2 size={16} />
+        </button>
+      </Td>
+    </tr>
+  );
+});
 
 const CellEditor = ({
   field,

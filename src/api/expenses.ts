@@ -20,6 +20,20 @@ export const getExpensesPage = async (params?: ExpenseFilterParams) => {
   return response.data.data;
 };
 
+// Expenses page ke KPI cards — backend SQL aggregate (pehle 1000 rows mangwa ke JS me jodte the).
+export type ExpenseSummary = {
+  total: number;
+  thisMonth: number;
+  today: number;
+  category: number;
+  categoryCount: number;
+};
+
+export const getExpenseSummary = async (params: { today: string; monthStart: string; categoryId?: number | string }) => {
+  const response = await apiClient.get<ApiResponse<ExpenseSummary>>("/v1/expenses/summary", { params });
+  return response.data.data;
+};
+
 export const createExpense = async (payload: ExpenseRequest) => {
   const response = await apiClient.post<ApiResponse<Expense>>("/v1/expenses", payload);
   return response.data.data;
