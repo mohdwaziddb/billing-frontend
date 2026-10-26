@@ -1018,7 +1018,7 @@ export const DashboardPage = () => {
             minHeightClass="min-h-0"
             emptyText="No invoices fall within the selected range."
             columns={[
-              { key: "invoice", header: "Invoice", render: (item) => <span className="break-all font-semibold text-slate-950">{item.invoiceNo}</span> },
+              { key: "invoice", header: "Invoice", render: (item) => <span className="break-words font-semibold text-slate-950">{item.invoiceNo}</span> },
               {
                 key: "customer",
                 header: "Customer",
@@ -1055,16 +1055,12 @@ export const DashboardPage = () => {
           <div className="flex-1 space-y-2">
             {summary?.topCustomers?.length ? (
               summary.topCustomers.slice(0, DASHBOARD_ROW_LIMIT).map((customer) => (
-                <div key={customer.customerId} className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-950">{customer.customerName}</p>
-                      <p className="mt-0.5 truncate fs-11 text-slate-500">{customer.mobile} · Last purchase {formatDate(customer.lastPurchaseDate)}</p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="fs-11 uppercase tracking-[0.14em] text-slate-500">Sales</p>
-                      <Money value={customer.totalPurchaseAmount} align="right" className="mt-0.5 font-bold text-slate-950" />
-                    </div>
+                // Compact row (Billing activity table ki row jitni): pehle 3-line card + alag Paid/Due
+                // line thi, isliye ye column lamba hota aur left table ke neeche ~300px khaali bachta tha.
+                <div key={customer.customerId} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="min-w-0 truncate fs-13 font-semibold text-slate-950">{customer.customerName}</p>
+                    <Money value={customer.totalPurchaseAmount} align="right" className="shrink-0 fs-13 font-bold text-slate-950" />
                   </div>
                   {(() => {
                     const paid = Math.max(0, Number(customer.totalPaidAmount ?? 0));
@@ -1072,17 +1068,18 @@ export const DashboardPage = () => {
                     const base = paid + due;
                     const paidShare = base > 0 ? (paid / base) * 100 : 0;
                     return (
-                      <div className="mt-2">
-                        <div className="flex h-2 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                      <div className="mt-1.5 flex items-center gap-3">
+                        <p className="min-w-0 flex-1 truncate fs-11 text-slate-500" title={`Paid ${formatCurrency(paid)} · Due ${formatCurrency(due)}`}>
+                          {customer.mobile} · {formatDate(customer.lastPurchaseDate)}
+                        </p>
+                        <div className="flex h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
                           <div className="h-full" style={{ width: `${paidShare}%`, background: seriesColors.collections }} />
-                          {/* 2px surface gap between the two fills */}
                           {paidShare > 0 && paidShare < 100 ? <div className="h-full w-0.5 bg-white" /> : null}
                           <div className="h-full flex-1" style={{ background: base > 0 && due > 0 ? CHART_COLORS.outstanding : "transparent" }} />
                         </div>
-                        <div className="mt-1.5 flex justify-between gap-3 fs-12">
-                          <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-sm" style={{ background: seriesColors.collections }} />Paid <Money value={paid} className="font-semibold text-slate-900" /></span>
-                          <span className="inline-flex items-center gap-1.5 text-slate-600"><span className="h-2 w-2 rounded-sm" style={{ background: CHART_COLORS.outstanding }} />Due <Money value={due} className="font-semibold text-slate-900" /></span>
-                        </div>
+                        <span className={`shrink-0 whitespace-nowrap text-right fs-11 font-semibold ${due > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                          {due > 0 ? `Due ${formatCurrency(due)}` : "Fully paid"}
+                        </span>
                       </div>
                     );
                   })()}
@@ -1151,16 +1148,17 @@ export const DashboardPage = () => {
               <button
                 key={category.categoryId}
                 type="button"
-                className={`flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left transition ${activeCategoryId === category.categoryId ? "border-slate-300 bg-slate-100" : "border-transparent bg-slate-50 hover:bg-slate-100"}`}
+                className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition ${activeCategoryId === category.categoryId ? "border-slate-300 bg-slate-100" : "border-transparent bg-slate-50 hover:bg-slate-100"}`}
                 onClick={() => setActiveCategoryId((current) => (current === category.categoryId ? null : category.categoryId))}
               >
                 <span className="flex min-w-0 items-center gap-3">
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: categoryColorFor(category.categoryName, index) }} />
                   <span className="truncate fs-13 font-semibold text-slate-700">{category.categoryName}</span>
                 </span>
-                <span className="shrink-0 text-right">
-                  <Money value={category.totalAmount} align="right" className="block text-sm font-extrabold text-slate-950" />
-                  <span className="text-xs font-bold text-slate-400">{categoryTotal ? category.percentage.toFixed(0) : "0"}%</span>
+                {/* Amount + % ek line me (pehle 2 line): list chhoti, Outstanding card ke neeche khaali jagah nahi. */}
+                <span className="flex shrink-0 items-baseline gap-2 text-right">
+                  <Money value={category.totalAmount} align="right" className="text-sm font-extrabold text-slate-950" />
+                  <span className="w-9 text-xs font-bold text-slate-400">{categoryTotal ? category.percentage.toFixed(0) : "0"}%</span>
                 </span>
               </button>
             )) : (
@@ -1215,7 +1213,7 @@ export const DashboardPage = () => {
             </div>
             <div className="flex-1 space-y-2">
               {outstandingCustomersPage.records.length ? outstandingCustomersPage.records.map((customer) => (
-                <div key={customer.customerId} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-3">
+                <div key={customer.customerId} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
                   <div className="min-w-0">
                     <p className="truncate fs-13 font-semibold text-slate-700">{customer.customerName}</p>
                     <p className="truncate text-xs text-slate-400">{customer.mobile}</p>

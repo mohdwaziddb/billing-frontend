@@ -197,6 +197,11 @@ export const LoginPage = () => {
       navigate(route ? fromPath ?? route : "/no-menu", { replace: true });
     } catch (err: any) {
       setApiError(err, "Incorrect code. Enter the 6-digit code from your authenticator app.");
+      // MFA token 5 min ka hai: expire hone par code screen par atke rehne ki jagah password par wapas.
+      if (/MFA session expired/i.test(String(err?.response?.data?.message ?? ""))) {
+        setMfaToken(null);
+        setMfaAccountLabel(null);
+      }
     } finally {
       setMfaLoading(false);
     }
